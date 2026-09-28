@@ -1058,6 +1058,7 @@ const SND = {
 // ---------- estado
 let state = 'title';
 let s = 0, sPrev = 0, speed = 0, lane = 0, playerLaneF = 0, camLane = 0, side = 0, lastOut = false, lastLaneInt = 0;
+let laneSoft = false;   // el último cambio vino del giroscopio: se acompaña con una transición más suave
 let level = 0, score = 0, invul = 0, shake = 0, dieT = 0, time = 0, kick = 0, hitFlash = 0;
 let best = 0;
 try { best = +(localStorage.getItem('hipertunel-best') || 0) || 0; } catch (e) {}
@@ -1065,7 +1066,7 @@ try { best = +(localStorage.getItem('hipertunel-best') || 0) || 0; } catch (e) {
 // ---------- entrada: saltos de carril
 const keys = new Set();
 const hold = { dir: 0, t: 0 };
-function stepLane(d){ if (state !== 'play' || d === 0) return; lane = Math.round(lane) + d; }
+function stepLane(d, soft){ if (state !== 'play' || d === 0) return; lane = Math.round(lane) + d; laneSoft = !!soft; }
 const cont = { dir: 0 };            // movimiento continuo (tecla mantenida / inclinación fuerte)
 function glide(d, rate, dt){ lane += d * rate * dt; cont.dir = d; }
 function endGlide(){ if (cont.dir !== 0) { lane = cont.dir > 0 ? Math.ceil(lane - 0.25) : Math.floor(lane + 0.25); cont.dir = 0; } }
@@ -1095,7 +1096,8 @@ cv.addEventListener('pointerup', endP); cv.addEventListener('pointercancel', end
 cv.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // giroscopio (fuera del visor de Claude): inclinar = saltar carriles
-const tilt = { on: false, has: false, phi: 0, phi0: null, t: 0 };
+const tilt = { on: false, has: false, phi: 0, phi0: null, t: 0, armed: true };
+const TILT_STEP = 10, TILT_REARM = 4.5, TILT_HOLD = 24;   // grados: saltar de carril, rearmar, encadenar
 let tiltCheckT = 0, tiltWarned = false, motionN = 0, orientN = 0;
 function onOrient(e){
   orientN++; if (motionN > 5 || e.beta == null || e.gamma == null) return;
@@ -1107,7 +1109,7 @@ function onMotion(e, fromOrient){
   const a = e.accelerationIncludingGravity; if (!a || a.x == null || a.y == null) return;
   if (Math.hypot(a.x, a.y) < 2.5) return;
   const phi = Math.atan2(a.y, a.x);
-  tilt.phi = tilt.has ? tilt.phi + wrap(phi - tilt.phi) * 0.4 : phi;
+  tilt.phi = tilt.has ? tilt.phi + wrap(phi - tilt.phi) * 0.25 : phi;   // filtrado: el sensor tiembla y se notaba de golpe
   tilt.has = true; if (tilt.phi0 === null) tilt.phi0 = tilt.phi;
   if (state === 'play') $('tz').classList.remove('on');
 }
@@ -1154,10 +1156,14 @@ function pollInput(dt){
   let tl = false, tr = false;
   for (const tt of touches.values()) { if (tt.d < 0) tl = true; else tr = true; tt.t += dt; if (tt.t > 0.16) { gd = tt.d; rate = Math.min(12, 6 + (tt.t - 0.16) * 14); } }
   $('tzl').classList.toggle('down', tl); $('tzr').classList.toggle('down', tr);
-  // giroscopio
+  // giroscopio: un carril por inclinación. Hay que volver cerca del centro (TILT_REARM) para
+  // encadenar otro, o el sensor dispara varios de golpe al inclinar despacio.
   if (tilt.has && tilt.phi0 !== null) {
-    const deg = wrap(tilt.phi - tilt.phi0) * 180 / Math.PI, a = Math.abs(deg);
-    if (a > 8) { if (tilt.t === 0) stepLane(Math.sign(deg)); tilt.t += dt; if (a > 15 || tilt.t > 0.28) { gd = Math.sign(deg); rate = clamp((a - 8) / 18, 0.3, 1) * 12; } } else tilt.t = 0;
+    const deg = wrap(tilt.phi - tilt.phi0) * 180 / Math.PI, a = Math.abs(deg), dir = Math.sign(deg);
+    if (a < TILT_REARM) { tilt.armed = true; tilt.t = 0; }
+    else if (a > TILT_STEP && tilt.armed) { stepLane(dir, true); tilt.armed = false; tilt.t = 0; }
+    // solo con el móvil bien girado se encadenan carriles seguidos, y más despacio que antes
+    if (a > TILT_HOLD) { tilt.t += dt; if (tilt.t > 0.34) { gd = dir; rate = clamp((a - TILT_HOLD) / 16, 0.25, 1) * 7; } } else if (a >= TILT_REARM) tilt.t = 0;
   }
   // mando
   let gps = null;
@@ -1240,7 +1246,7 @@ function start(){
   SND.key = 0; lastBiome = 0; applyTheme(); nearT = 0; nextMilestone = 1000; recordPassed = false;
   achRun = []; toastQ = []; toastT = 0; $('toast').classList.remove('show');
   starsArr.length = 0; combo = 0; comboT = 0; hyper = 0; hypMeter = 0; hitstop = 0; maxStage = 0; starsGot = 0; maxCombo = 0;
-  enableTilt(); goLandscape(); tilt.phi0 = null;
+  enableTilt(); goLandscape(); tilt.phi0 = null; tilt.armed = true; tilt.t = 0; laneSoft = false;
   SND.init(); SND.startMusic(); SND.play('start');
   clearObjs(); clearMechanics(); buildSections(); lastBoostZ = 0; killer = null; sinceRest = 0; lastEnc = ''; encLog.length = 0; pathL = 0; prevPathL = 0; pathT = 60; evCool = 60;
   s = sPrev = 0; speed = 16; lane = 0; playerLaneF = 0; camLane = 0; lastLaneInt = 0; cont.dir = 0; level = 0; score = 0; invul = 0; shake = 0; kick = 0; lastOut = false;
@@ -1457,7 +1463,7 @@ function update(dt){
 
   if (state === 'play') {
     const bkS = biomeAt(s).key;
-    playerLaneF = damp(playerLaneF, lane, bkS === 'snow' ? (cont.dir ? 15 : 8.5) : (cont.dir ? 30 : 22), dt);
+    playerLaneF = damp(playerLaneF, lane, (bkS === 'snow' ? (cont.dir ? 15 : 8.5) : (cont.dir ? 30 : 22)) * (laneSoft ? 0.62 : 1), dt);
     if (air) { air.t += dt; if (air.t >= air.dur) { air = null; shake = Math.max(shake, 0.35); SND.play('land'); } }
     for (const h0 of hints) if (!h0.done && s >= h0.z - 40) { h0.done = true; popText(h0.text); }
     const Lc = laneMod(Math.round(playerLaneF));
