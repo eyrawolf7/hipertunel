@@ -251,9 +251,10 @@ const qnum = (k, d) => { const v = parseFloat(QS.get(k)); return isFinite(v) ? v
 const EXPO = qnum('expo', 0.72);
 const FOG_NEAR = qnum('fnear', 25), FOG_FAR = qnum('ffar', 170);
 // Antelación del aviso. Cuanto más larga, más carriles pintados a la vez y menos avisa el color.
-const WARN_S = qnum('warns', 0.95), WARN_MIN = qnum('warnmin', 30), WARN_MAX = qnum('warnmax', 70);
+const WARN_S = qnum('warns', 1.5), WARN_MIN = qnum('warnmin', 55), WARN_MAX = qnum('warnmax', 130);
+const APPEAR = qnum('appear', 0.72);   // a qué parte de la antelación del aviso asoma ya el cubo
 // Densidad de obstáculos y velocidad: se calibran juntas, una compensa a la otra.
-const LAM_MAX = qnum('lam', 0.25), PAR_2 = qnum('par2', 0.15), PAR_3 = qnum('par3', 0.05);
+const LAM_MAX = qnum('lam', 0.2), PAR_2 = qnum('par2', 0.15), PAR_3 = qnum('par3', 0.05);
 const SPD_MAX = qnum('spdmax', 54), SPD_K = qnum('spdk', 0.007);
 const SHOWFPS = QS.has('fps');
 // Gestión de color: los colores se escriben en sRGB (como se ven) y se convierten a lineal para
@@ -696,8 +697,8 @@ function placeObj(o){
   }
   if (o.type === 'boost') { o.pads.forEach((p, i) => { const zz = o.z + 1.8 + i * 3.3, k = Math.max(0, kappa(zz)), sag = k > 1e-5 ? (1 - Math.cos(k * LANE_W / 2)) / k : 0; placeAt(p, zz, o.lane, 0.05 + sag); }); return; }
   const bob = 0;
-  if (o.type === 'block') { o.h = lerp(0.95, o.hOut, sideM(zc)); o.g.scale.y = o.h; }
-  placeAt(o.g, zc, o.lane, o.h / 2 + bob);
+  if (o.type === 'block') { o.h = lerp(0.95, o.hOut, sideM(zc)); const v = o.vis === undefined ? 1 : o.vis; o.g.scale.y = o.h * v; o.g.visible = v > 0.02; }
+  placeAt(o.g, zc, o.lane, o.h * (o.type === 'block' && o.vis !== undefined ? o.vis : 1) / 2 + bob);
   if (o.sh) placeAt(o.sh, zc, o.lane, 0.1);
 }
 function addBlock(z, lane, len, color, wallLook){
@@ -1155,7 +1156,7 @@ const SENS = qnum('sens', 1);
 const TILT_DEAD = qnum('tdead', 2 / SENS), TILT_K = qnum('tk', 1.15 * SENS), TILT_HOLD = qnum('thold', 10 / SENS);
 const TILT_RATE = qnum('trate', 28 * SENS), TILT_DELAY = qnum('tdelay', 0.12), TILT_SMOOTH = qnum('tsmooth', 0.85), LANE_SOFT = qnum('lanesoft', 0.62);
 // HOLD_T: lo que tarda un toque mantenido en empezar a deslizar · SLIDE_*: carriles por segundo
-const HOLD_T = qnum('holdt', 0.07), SLIDE_MIN = qnum('slidemin', 7), SLIDE_MAX = qnum('slidemax', 15);
+const HOLD_T = qnum('holdt', 0.06), SLIDE_MIN = qnum('slidemin', 11), SLIDE_MAX = qnum('slidemax', 26);
 const LANE_K = qnum('lanek', 26);   // rapidez en acomodarse al carril de al lado (22 en la v0.31)
 const TILT_CAL = qnum('tcal', 0.3), TILT_DRIFT = qnum('tdrift', 3), TILT_QUIET = qnum('tquiet', 10);
 // TILT_CAL: segundos fijando el cero al empezar · TILT_DRIFT: rapidez del recentrado con el móvil
@@ -1221,9 +1222,9 @@ function pollInput(dt){
   // repetición al mantener
   let gd = 0, rate = 0;
   const kd = (keys.has('ArrowLeft') || keys.has('KeyA') ? -1 : 0) + (keys.has('ArrowRight') || keys.has('KeyD') ? 1 : 0);
-  if (kd !== 0 && kd === hold.dir) { hold.t += dt; if (hold.t > HOLD_T) { gd = kd; rate = Math.min(SLIDE_MAX, SLIDE_MIN + (hold.t - HOLD_T) * 16); } } else hold.dir = kd;
+  if (kd !== 0 && kd === hold.dir) { hold.t += dt; if (hold.t > HOLD_T) { gd = kd; rate = Math.min(SLIDE_MAX, SLIDE_MIN + (hold.t - HOLD_T) * 34); } } else hold.dir = kd;
   let tl = false, tr = false;
-  for (const tt of touches.values()) { if (tt.d < 0) tl = true; else tr = true; tt.t += dt; if (tt.t > HOLD_T) { gd = tt.d; rate = Math.min(SLIDE_MAX, SLIDE_MIN + (tt.t - HOLD_T) * 16); } }
+  for (const tt of touches.values()) { if (tt.d < 0) tl = true; else tr = true; tt.t += dt; if (tt.t > HOLD_T) { gd = tt.d; rate = Math.min(SLIDE_MAX, SLIDE_MIN + (tt.t - HOLD_T) * 34); } }
   $('tzl').classList.toggle('down', tl); $('tzr').classList.toggle('down', tr);
   // Giroscopio: como un volante analógico. El ángulo no da saltos de carril, da VELOCIDAD de
   // deslizamiento: cuanto más girado, más rápido resbalas por el túnel. Al volver al centro te
@@ -1253,7 +1254,7 @@ function pollInput(dt){
     const ax = gp.axes[0] || 0;
     const l = ax < -0.5 || !!(gp.buttons[14] && gp.buttons[14].pressed), r = ax > 0.5 || !!(gp.buttons[15] && gp.buttons[15].pressed);
     if (l && !gpPrev.l) { stepLane(-1); gpT = 0; } else if (r && !gpPrev.r) { stepLane(1); gpT = 0; }
-    else if (l || r) { gpT += dt; if (gpT > HOLD_T) { gd = l ? -1 : 1; rate = Math.min(SLIDE_MAX, SLIDE_MIN + (gpT - HOLD_T) * 16); } }
+    else if (l || r) { gpT += dt; if (gpT > HOLD_T) { gd = l ? -1 : 1; rate = Math.min(SLIDE_MAX, SLIDE_MIN + (gpT - HOLD_T) * 34); } }
     const a = !!(gp.buttons[0] && gp.buttons[0].pressed);
     if (a && !gpPrev.a && state !== 'play' && state !== 'dying') start();
     gpPrev = { l, r, a }; break;
@@ -1595,7 +1596,13 @@ function update(dt){
     if (COARSE && tiltCheckT > 0) { tiltCheckT -= dt; if (tiltCheckT <= 0 && !tilt.has && !tiltWarned) { tiltWarned = true; popText('Giroscopio no disponible aquí'); } }
     checkAch(dt);
     const wnNow = clamp(speed * WARN_S, WARN_MIN, WARN_MAX);
-    for (const o of objs) if (o.type === 'block' && !o.lit && o.z - s < wnNow) { o.lit = true; o.litFrom = Math.max(s + 1, o.z - wnNow); }
+    for (const o of objs) if (o.type === 'block') {
+      if (!o.lit && o.z - s < wnNow) { o.lit = true; o.litFrom = Math.max(s + 1, o.z - wnNow); }
+      // El cubo solo asoma cuando su carril lleva ya un tramo pintado: el color tiene que avisar de
+      // algo que aún no ves, no acompañar a algo que ya está ahí. Emerge del suelo en pocos metros.
+      const t = clamp((wnNow * APPEAR - (o.z - s)) / Math.max(wnNow * 0.1, 1), 0, 1);
+      o.vis = o.vis === undefined ? t : Math.max(o.vis, t);
+    }
     collide();
     spawnAhead();
   } else if (state === 'dying') {
@@ -1691,7 +1698,7 @@ requestAnimationFrame(frame);
 window.__game = { tubeDbg(){
     let lo = 9, hi = -9; for (let i = 0; i < NV; i++) { const r = tCol[i * 4]; if (r < lo) lo = r; if (r > hi) hi = r; }
     const k = kappa(s + 20); return { kappa: +k.toFixed(4), shadeAtCam: +tubeShade(0, k).toFixed(3), shadeOpp: +tubeShade(LANE_W * 8, k).toFixed(3), colLo: +lo.toFixed(3), colHi: +hi.toFixed(3), fog: [scene.fog.near | 0, scene.fog.far | 0], kIn: +((kappa(s) / K0 + 1) / 2).toFixed(2) };
-  }, fps(){ return fpsStats(); }, fpsReset(){ fpsBuf.length = 0; }, gfx(){ return { hdr: hdrOK, expo: EXPO, dpr: DPR }; }, kill(){ die(null); }, chordGap(){ let worst = 1e9; for (const o of objs) if (o.type === 'boost') o.pads.forEach((p, i) => { const zz = o.z + 1.8 + i * 3.3; const du0 = wrapL(o.lane - camLane + twr(zz)); if (Math.abs(du0) > 5) return; const a = surfPt(zz, du0 - 0.5, new THREE.Vector3()), b = surfPt(zz, du0 + 0.5, new THREE.Vector3()); const c = a.add(b).multiplyScalar(0.5); const Y = new THREE.Vector3(0, 1, 0).applyQuaternion(p.quaternion); worst = Math.min(worst, p.position.clone().sub(c).dot(Y)); }); return worst; }, motion(x, y){ onMotion({ accelerationIncludingGravity: { x, y, z: 0 } }); }, tiltState(){ return { has: tilt.has, phi0: tilt.phi0 }; }, encLog, diffAt: (z) => diffAt(z), cxAt: (z) => cx(z), cyAt: (z) => cy(z), perm: () => PERM.slice(), padErr(){ let worst = 0; for (const o of objs) if (o.type === 'boost') for (let i = 0; i < 3; i++) { const p = o.pads[i]; const zz = o.z + 1.8 + i * 3.3; const du0 = wrapL(o.lane - camLane + twr(zz)); if (Math.abs(du0) > 6) continue; for (const dz of [-1.5, 1.5]) { const du = du0 + twr(zz + dz) - twr(zz); const pt = surfPt(zz + dz, du, new THREE.Vector3()); const loc = pt.clone().sub(p.position).applyQuaternion(p.quaternion.clone().invert()); worst = Math.max(worst, Math.abs(loc.y + 0.06)); } } return worst; }, jellies, jump(){ startJump(); }, airH(){ return airH(); }, dbg(){ return { snow: snowballs.length, jel: jellies.length, cur: currents.length, air: !!air, inCur: inCurrent, biome: biomeAt(s).key }; }, warp(z){ clearObjs(); clearMechanics(); s = sPrev = z; cursor = z + 60; lastBoostZ = z; }, get hyper(){ return hyper; }, get combo(){ return combo; }, get nstars(){ return starsArr.length; }, get score(){ return score; }, update, start, get state(){ return state; }, get s(){ return s; }, get speed(){ return speed; }, get side(){ return side; }, get level(){ return level; }, get lane(){ return laneMod(Math.round(playerLaneF)); }, get laneF(){ return playerLaneF; }, byLane, objs, setStep(fn){ testStep = fn; } };
+  }, fps(){ return fpsStats(); }, fpsReset(){ fpsBuf.length = 0; }, gfx(){ return { hdr: hdrOK, expo: EXPO, dpr: DPR }; }, kill(){ die(null); }, chordGap(){ let worst = 1e9; for (const o of objs) if (o.type === 'boost') o.pads.forEach((p, i) => { const zz = o.z + 1.8 + i * 3.3; const du0 = wrapL(o.lane - camLane + twr(zz)); if (Math.abs(du0) > 5) return; const a = surfPt(zz, du0 - 0.5, new THREE.Vector3()), b = surfPt(zz, du0 + 0.5, new THREE.Vector3()); const c = a.add(b).multiplyScalar(0.5); const Y = new THREE.Vector3(0, 1, 0).applyQuaternion(p.quaternion); worst = Math.min(worst, p.position.clone().sub(c).dot(Y)); }); return worst; }, motion(x, y){ onMotion({ accelerationIncludingGravity: { x, y, z: 0 } }); }, tiltState(){ return { has: tilt.has, phi0: tilt.phi0 }; }, encLog, diffAt: (z) => diffAt(z), cxAt: (z) => cx(z), cyAt: (z) => cy(z), perm: () => PERM.slice(), padErr(){ let worst = 0; for (const o of objs) if (o.type === 'boost') for (let i = 0; i < 3; i++) { const p = o.pads[i]; const zz = o.z + 1.8 + i * 3.3; const du0 = wrapL(o.lane - camLane + twr(zz)); if (Math.abs(du0) > 6) continue; for (const dz of [-1.5, 1.5]) { const du = du0 + twr(zz + dz) - twr(zz); const pt = surfPt(zz + dz, du, new THREE.Vector3()); const loc = pt.clone().sub(p.position).applyQuaternion(p.quaternion.clone().invert()); worst = Math.max(worst, Math.abs(loc.y + 0.06)); } } return worst; }, jellies, jump(){ startJump(); }, airH(){ return airH(); }, dbg(){ return { snow: snowballs.length, jel: jellies.length, cur: currents.length, air: !!air, inCur: inCurrent, biome: biomeAt(s).key }; }, warp(z){ clearObjs(); clearMechanics(); s = sPrev = z; cursor = z + 60; lastBoostZ = z; }, get hyper(){ return hyper; }, get combo(){ return combo; }, get nstars(){ return starsArr.length; }, get score(){ return score; }, update, start, get state(){ return state; }, get s(){ return s; }, get speed(){ return speed; }, get side(){ return side; }, get level(){ return level; }, get lane(){ return laneMod(Math.round(playerLaneF)); }, get laneF(){ return playerLaneF; }, byLane, objs, setStep(fn){ testStep = fn; }, hold(d){ keys.clear(); if (d) keys.add(d < 0 ? 'ArrowLeft' : 'ArrowRight'); } };
 })();
 </script>
 </body>

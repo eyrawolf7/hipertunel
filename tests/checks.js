@@ -83,6 +83,35 @@ for (const giro of [15, 25, 40]) {
   }
   if (mov !== null && mov > 1) fail.push('Recolocando el móvil ' + giro + ' grados al empezar, la partida arranca deslizando sola: ' + mov.toFixed(1) + ' carriles en 3 s');
 }
+// 4d) el carril se tiene que pintar ANTES de que el cubo asome. Si el cubo ya se ve a lo lejos y el
+// color llega después, el aviso no avisa de nada: acompaña a algo que ya estabas viendo.
+{
+  let casos = 0, malos = 0, peor = 1e9;
+  for (let rep = 0; rep < 4; rep++) {
+    G.start(); G.warp(800 + rep * 2200);
+    const visto = new Map();
+    for (let i = 0; i < 60 * 15; i++) {
+      G.update(1 / 60);
+      if (G.state !== 'play') { G.start(); G.warp(800 + rep * 2200); continue; }
+      const s = G.s;
+      for (const o of G.objs) {
+        if (o.type !== 'block') continue;
+        if (!visto.has(o)) visto.set(o, { lit: null, vis: null });
+        const r = visto.get(o);
+        if (r.lit === null && o.lit) r.lit = o.z - s;
+        if (r.vis === null && o.vis > 0.02) r.vis = o.z - s;
+      }
+    }
+    for (const [, r] of visto) {
+      if (r.lit === null || r.vis === null) continue;
+      casos++; const margen = r.lit - r.vis;
+      if (margen < peor) peor = margen;
+      if (margen <= 0) malos++;
+    }
+  }
+  if (casos < 40) fail.push('No se pudieron medir los avisos: solo ' + casos + ' bloques');
+  else if (malos > casos * 0.02) fail.push(malos + ' de ' + casos + ' cubos asoman antes que el aviso de su carril');
+}
 // 5) el color solo avisa si es raro: con medio túnel pintado deja de significar nada.
 // En el original nunca se ven más de 2-4 carriles de color a la vez. Pero tampoco debe quedar
 // vacío: la dificultad tiene que seguir creciendo con la distancia.
