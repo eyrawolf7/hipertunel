@@ -1,40 +1,41 @@
 # Hipertúnel
 
-Runner de túnel en primera persona inspirado en Boost 3D (iPhone, 2009).
+Runner de túnel en primera persona con la jugabilidad de Boost 2 (Android, 2015) y una
+presentación colorida y actual.
 
 ## 👉 Jugar: [eyrawolf7.github.io/hipertunel](https://eyrawolf7.github.io/hipertunel/)
 
-En el móvil, ponlo **en horizontal**. Al pulsar *Jugar* te pedirá permiso para el
-giroscopio: acéptalo y podrás pilotar inclinando el móvil. La pantalla de inicio
-muestra un diagnóstico del sensor para saber si está funcionando.
-
-También puedes abrir `index.html` en el ordenador (necesita conexión) o
-`hipertunel-movil.html`, que lleva las librerías dentro y funciona sin conexión
-—pero al abrirlo como archivo local el navegador bloquea el giroscopio.
+- **Móvil**: ponlo en horizontal e inclínalo para girar (o toca a izquierda o derecha).
+- **Android**: [hipertunel.apk](https://eyrawolf7.github.io/hipertunel/hipertunel.apk)
+  (hay que permitir instalar apps de origen desconocido).
+- **Switch (homebrew)**: [hipertunel.nro](https://eyrawolf7.github.io/hipertunel/hipertunel.nro)
+  → cópialo a `/switch/` en la SD y ábrelo desde el Homebrew Menu. Ver `ports/switch/README.md`.
+- **Sin conexión**: `hipertunel-movil.html` es el juego entero en un solo archivo.
 
 ## Cómo se juega
-Cambia de carril, esquiva los cubos y pisa las placas azules para acelerar.
-Tienes hasta 3 niveles de impulso: cada placa sube uno, y si chocas pierdes uno
-y atraviesas el bloque. Si chocas sin impulso, se acabó.
 
-- **Teclado**: ← → o A D para cambiar de carril (mantener para encadenar), espacio para empezar.
-- **Móvil**: toca la mitad izquierda o derecha, o inclina el móvil.
-- **Mando**: stick o cruceta.
+Gira alrededor del túnel para esquivar las cajas. Cuando un carril se colorea, viene una caja
+por él (se enciende al entrar en ese carril). Pisa las placas azules: cada una es un impulso
+(hasta 3) y con impulso atraviesas las cajas, pero pierdes todos los impulsos. Sin impulso, un
+choque es el final. A veces el túnel se despliega y corres por fuera; al volver a entrar, salta
+al vacío y aterriza en un mundo nuevo. Recoge monedas por el camino.
+
+Modos: **Clásico** (lo más lejos posible), **Supervivencia** (sin impulsos, la velocidad no
+para de subir) y **Contrarreloj** (60 s; los impulsos suman tiempo y los choques lo restan).
+
+Controles: inclinación, toques, ← → o A D, mando (palanca o cruceta), Esc o P para pausar.
 
 ## Desarrollo
+
 ```bash
 npm install
-npm run check    # comprobaciones de calidad (deben salir "Todo OK")
-npm run sim      # 2,5 min de juego con un bot, sin errores
-npm run serve    # servidor local en el puerto 5173
-npm run shots -- 150,1500,3000,6000   # capturas en tests/shots/
+npm run dev          # http://localhost:5173
+npm test             # reglas de Boost 2 en la simulación
+npm run bot          # partidas con bot, sin navegador
+node tests/qa.mjs    # batería funcional en Chrome sin cabeza
+npm run build        # index.html y hipertunel-movil.html (un solo archivo)
+npm run android      # hipertunel.apk
+npm run paridad      # la simulación en C (Switch) da lo mismo que la web
 ```
 
-Todo el contexto (reglas de diseño, estructura del código y siguientes pasos)
-está en `CLAUDE.md`.
-
-## Carpetas
-- `index.html`: el juego entero, en un único archivo (Three.js r147 por CDN).
-- `hipertunel-movil.html`: el mismo juego con las librerías incrustadas.
-- `tests/`: simulación con bot, comprobaciones de calidad y capturas automáticas.
-- `referencias/`: material de referencia (no se publica).
+Arquitectura y reglas en `CLAUDE.md` y `docs/CONTRATO.md`.
