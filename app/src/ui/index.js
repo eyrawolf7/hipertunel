@@ -233,6 +233,7 @@ function hudHTML() {
     <div class="hud-dist"><b data-hud="dist">0</b><span>m</span></div>
     <div class="hud-speed"><b data-hud="speed">0</b> km/h</div>
   </div>
+  <div class="hud-count" data-hud="count"></div>
   <div class="hud-br" data-hud="chevs">
     <span class="chev" data-c="0">${ICON.chevron}</span><span class="chev" data-c="1">${ICON.chevron}</span><span class="chev" data-c="2">${ICON.chevron}</span>
   </div>
@@ -535,6 +536,16 @@ export function createUI(root, handlers = {}) {
       if (prev != null && lv > prev) restart(hudEl.chev[lv - 1], 'pop');
       if (prev != null && lv < prev) restart(hudEl.chevs, 'lose');
       hudEl.chevs.dataset.level = lv;
+    }
+    // cuenta atrás de salida: 3, 2, 1 y ¡YA!
+    const cd = st.countdown | 0;
+    if (cd !== last.cd) {
+      const was = last.cd; last.cd = cd;
+      const el = hudEl.count || (hudEl.count = root.querySelector('[data-hud="count"]'));
+      if (el) {
+        if (cd > 0) { el.textContent = cd; restart(el, 'go'); }
+        else if (was > 0) { el.textContent = '¡YA!'; restart(el, 'go'); setTimeout(() => { if (!last.cd) el.textContent = ''; }, 700); }
+      }
     }
     const inv = !!st.invul;
     if (inv !== last.inv) { last.inv = inv; hudEl.chevs.classList.toggle('invul', inv); }

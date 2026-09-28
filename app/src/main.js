@@ -39,7 +39,7 @@ let coins = 0;
 const bestAtStart = {};
 
 const ui = createUI($('ui'), {
-  onPlay: (m) => { audio.unlock(); input.requestTilt(); startGame(m); },
+  onPlay: (m) => { audio.unlock(); input.requestTilt(); goLandscape(); startGame(m); },
   onResume: () => resume(),
   onRestart: () => { audio.unlock(); startGame(mode); },
   onMenu: () => toMenu(),
@@ -72,8 +72,21 @@ input.onButton = (b) => {
   }
 };
 document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'play') pause(); audio.pause(document.hidden); });
-addEventListener('resize', () => renderer.resize());
+const checkPortrait = () => { const p = COARSE && innerHeight > innerWidth; $('rotate').hidden = !p; if (p && state === 'play') pause(); };
+addEventListener('resize', () => { renderer.resize(); checkPortrait(); });
+checkPortrait();
 addEventListener('pointerdown', () => audio.unlock(), { once: true });
+
+// En el móvil: pantalla completa y horizontal al empezar (si el navegador lo permite)
+function goLandscape() {
+  if (!COARSE) return;
+  try {
+    const lock = () => { try { screen.orientation?.lock?.('landscape').catch(() => {}); } catch (e) {} };
+    const el = document.documentElement;
+    const p = el.requestFullscreen ? el.requestFullscreen({ navigationUI: 'hide' }) : null;
+    if (p && p.then) p.then(lock).catch(lock); else lock();
+  } catch (e) {}
+}
 
 // ---------------------------------------------------------------- estados
 function newGame(m, seed) {
@@ -95,11 +108,14 @@ function startGame(m) {
   newGame(m);
   coins = 0;
   bestAtStart[m] = bestOf(m);
-  state = 'countdown'; countdown = 2.4;
+  state = 'countdown'; countdown = 3;
   ui.show('hud');
   audio.setWorld(0);
   audio.play('countdown');
-  if (!input.hasTilt && settings.tilt && matchMedia('(pointer: coarse)').matches) setTimeout(() => { if (!input.hasTilt) ui.toast('Sin giroscopio: toca a izquierda o derecha', 'info'); }, 1500);
+  let seen = 0; try { seen = +(localStorage.getItem('hipertunel-partidas') || 0); localStorage.setItem('hipertunel-partidas', String(seen + 1)); } catch (e) {}
+  if (seen < 3) setTimeout(() => ui.toast(input.hasTilt ? 'Inclina el móvil para girar' : (COARSE ? 'Toca a la izquierda o a la derecha para girar' : 'Gira con ← →'), 'info'), 300);
+  if (seen < 3) setTimeout(() => { if (state === 'play') ui.toast('Pisa las flechas azules para acelerar', 'boost'); }, 4200);
+  if (seen >= 3 && !input.hasTilt && settings.tilt && COARSE) setTimeout(() => { if (!input.hasTilt) ui.toast('Sin giroscopio: toca a izquierda o derecha', 'info'); }, 1500);
 }
 
 function pause() { if (state !== 'play') return; pausedFrom = state; state = 'paused'; ui.show('pause'); audio.pause(true); }
@@ -137,7 +153,7 @@ function stepSim() {
   for (const e of ev) {
     if (state === 'attract') continue;
     if (e.type === 'boost') { audio.play('boost', { level: e.level }); ui.toast(e.level === 3 ? '¡Velocidad máxima!' : '¡Impulso ' + e.level + '!', 'boost'); }
-    else if (e.type === 'crash') audio.play(e.fatal ? 'death' : 'crash');
+    else if (e.type === 'crash') { audio.play(e.fatal ? 'death' : 'crash'); if (!e.fatal) ui.toast('¡Impulsos perdidos!', 'info'); }
     else if (e.type === 'coin') { coins = game.coinsGot; audio.play('coin', { combo: e.combo }); }
     else if (e.type === 'foldStart') audio.play('foldStart');
     else if (e.type === 'foldEnd') audio.play('foldEnd');
@@ -156,7 +172,7 @@ function frame(now) {
     const before = Math.ceil(countdown);
     countdown -= dt;
     if (Math.ceil(countdown) !== before && countdown > 0) audio.play('countdown');
-    if (countdown <= 0) { state = 'play'; audio.play('go'); ui.toast('¡Adelante!', 'boost'); }
+    if (countdown <= 0) { state = 'play'; audio.play('go'); }
   }
   if (window.__freeze) { acc = 0; }
   else if (state === 'play' || state === 'attract' || state === 'dying') {

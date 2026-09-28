@@ -709,3 +709,10 @@
   .htui *, .htui *::before, .htui *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; animation-delay: 0s !important; transition-duration: .01ms !important; }
 }
 .htui.htui-reduce .lg, .htui.htui-reduce .sticker, .htui.htui-reduce .btn-play, .htui.htui-reduce .press, .htui.htui-reduce .hud-timer.low { animation-iteration-count: 1; }
+
+/* cuenta atrás de salida */
+.htui .hud-count { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); font-family: inherit; font-weight: 700; font-size: clamp(64px, 18vh, 150px); color: #fff; pointer-events: none; opacity: 0;
+  -webkit-text-stroke: 0; text-shadow: 0 6px 0 #2b2257, 5px 0 0 #2b2257, -5px 0 0 #2b2257, 0 -5px 0 #2b2257, 4px 4px 0 #2b2257, -4px 4px 0 #2b2257, 4px -4px 0 #2b2257, -4px -4px 0 #2b2257, 0 12px 0 rgba(43,34,87,.35); }
+.htui .hud-count.go { animation: htCount .7s cubic-bezier(.2,1.4,.4,1) both; }
+@keyframes htCount { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.3) rotate(-8deg); } 25% { opacity: 1; transform: translate(-50%, -50%) scale(1.15) rotate(2deg); } 45% { transform: translate(-50%, -50%) scale(1) rotate(0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -62%) scale(.9); } }
+@media (prefers-reduced-motion: reduce) { .htui .hud-count.go { animation-duration: .01s; opacity: 1; } }
