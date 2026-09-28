@@ -2175,7 +2175,11 @@ cv.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // giroscopio (fuera del visor de Claude): inclinar = saltar carriles
 const tilt = { on: false, has: false, phi: 0, phi0: null, t: 0, armed: true };
-const TILT_STEP = 10, TILT_REARM = 4.5, TILT_HOLD = 24;   // grados: saltar de carril, rearmar, encadenar
+// Grados: saltar un carril, volver a armar, y a partir de dónde se encadenan vueltas seguidas.
+// Un toque corto mueve un carril; mantener el móvil girado da vueltas rápidas al túnel, que es
+// parte de la gracia. TILT_REARM es solo antirrebote del sensor, no un freno.
+const TILT_STEP = qnum('tstep', 8), TILT_REARM = qnum('trearm', 4), TILT_HOLD = qnum('thold', 16);
+const TILT_RATE = qnum('trate', 15), TILT_DELAY = qnum('tdelay', 0.24), TILT_SMOOTH = qnum('tsmooth', 0.4), LANE_SOFT = qnum('lanesoft', 0.62);
 let tiltCheckT = 0, tiltWarned = false, motionN = 0, orientN = 0;
 function onOrient(e){
   orientN++; if (motionN > 5 || e.beta == null || e.gamma == null) return;
@@ -2187,7 +2191,7 @@ function onMotion(e, fromOrient){
   const a = e.accelerationIncludingGravity; if (!a || a.x == null || a.y == null) return;
   if (Math.hypot(a.x, a.y) < 2.5) return;
   const phi = Math.atan2(a.y, a.x);
-  tilt.phi = tilt.has ? tilt.phi + wrap(phi - tilt.phi) * 0.25 : phi;   // filtrado: el sensor tiembla y se notaba de golpe
+  tilt.phi = tilt.has ? tilt.phi + wrap(phi - tilt.phi) * TILT_SMOOTH : phi;   // filtrado justo para quitar el temblor, sin restar respuesta
   tilt.has = true; if (tilt.phi0 === null) tilt.phi0 = tilt.phi;
   if (state === 'play') $('tz').classList.remove('on');
 }
@@ -2241,7 +2245,8 @@ function pollInput(dt){
     if (a < TILT_REARM) { tilt.armed = true; tilt.t = 0; }
     else if (a > TILT_STEP && tilt.armed) { stepLane(dir, true); tilt.armed = false; tilt.t = 0; }
     // solo con el móvil bien girado se encadenan carriles seguidos, y más despacio que antes
-    if (a > TILT_HOLD) { tilt.t += dt; if (tilt.t > 0.34) { gd = dir; rate = clamp((a - TILT_HOLD) / 16, 0.25, 1) * 7; } } else if (a >= TILT_REARM) tilt.t = 0;
+    // girado de verdad y mantenido: vueltas seguidas, cada vez más rápidas cuanto más se gira
+    if (a > TILT_HOLD) { tilt.t += dt; if (tilt.t > TILT_DELAY) { gd = dir; rate = clamp((a - TILT_HOLD) / 14, 0.35, 1) * TILT_RATE; } } else if (a >= TILT_REARM) tilt.t = 0;
   }
   // mando
   let gps = null;
@@ -2557,7 +2562,8 @@ function update(dt){
 
   if (state === 'play') {
     const bkS = biomeAt(s).key;
-    playerLaneF = damp(playerLaneF, lane, (bkS === 'snow' ? (cont.dir ? 15 : 8.5) : (cont.dir ? 30 : 22)) * (laneSoft ? 0.62 : 1), dt);
+    const kLane = bkS === 'snow' ? (cont.dir ? 15 : 8.5) : (cont.dir ? 30 : 22);
+    playerLaneF = damp(playerLaneF, lane, cont.dir ? kLane : kLane * (laneSoft ? LANE_SOFT : 1), dt);
     if (air) { air.t += dt; if (air.t >= air.dur) { air = null; shake = Math.max(shake, 0.35); SND.play('land'); } }
     for (const h0 of hints) if (!h0.done && s >= h0.z - 40) { h0.done = true; popText(h0.text); }
     const Lc = laneMod(Math.round(playerLaneF));
