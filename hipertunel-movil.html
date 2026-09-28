@@ -73,6 +73,8 @@ body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .opt input{width:22px;height:22px;margin:1px 0 0;accent-color:#e8403a;flex:0 0 auto}
 .opt span{font-size:16px;font-weight:600;line-height:1.25}
 .opt small{display:block;font-size:13px;font-weight:500;opacity:.66;margin-top:2px}
+.mini{margin:8px 0 0;padding:8px 14px;border:0;border-radius:10px;background:#2b2257;color:#fff;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.mini.ok{background:#2e9e5b}
 .screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;z-index:5;overflow:auto}
 @media (max-height:540px){
   .screen{padding:10px calc(env(safe-area-inset-right,0px) + 12px) 10px calc(env(safe-area-inset-left,0px) + 12px)}
@@ -172,6 +174,8 @@ h2{margin:0;font-size:32px;font-style:italic}
     <p class="tag">Cambia de carril, esquiva los cubos y pisa las placas azules para acelerar. Cada placa te deja atravesar un obstáculo.</p>
     <button class="big" id="bPlay">Jugar</button>
     <label class="opt" id="optTilt" hidden><input type="checkbox" id="cbTilt" checked><span>Girar el móvil para conducir<small>Si lo desmarcas, juegas con las flechas de la pantalla</small></span></label>
+    <label class="opt" id="optInv" hidden><input type="checkbox" id="cbInv"><span>Invertir el giro<small>Por si lo sostienes al revés</small></span></label>
+    <button class="mini" id="bCal" hidden>Calibrar el centro aquí</button>
     <div id="sens" hidden><span id="sensTxt">Buscando giroscopio…</span><i class="meter"><b id="sensBar"></b></i></div>
     <div class="help" id="help"></div>
     <p class="rule">Tienes hasta <b>3 impulsos</b>. Si chocas, pierdes uno. Si chocas sin ninguno, se acabó. Cuantos más impulsos llevas, más rápido vas y más puntos sumas.</p>
@@ -1267,8 +1271,8 @@ const ri = (a,b) => Math.floor(rr(a, b + 1));
 const sm = (t) => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
 const COARSE = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
 // El jugador elige en la pantalla de inicio: giroscopio (por defecto) o flechas en pantalla.
-let useTilt = true;
-try { useTilt = localStorage.getItem('hipertunel-tilt') !== '0'; } catch (e) {}
+let useTilt = true, tiltInv = false;
+try { useTilt = localStorage.getItem('hipertunel-tilt') !== '0'; tiltInv = localStorage.getItem('hipertunel-inv') === '1'; } catch (e) {}
 
 // ---------- geometría del túnel
 const LANES = 16, LW = TAU / LANES, R = 4;          // R = distancia del eje al centro de cada carril
@@ -2054,6 +2058,51 @@ const ENC = {
 // Una "ruta segura" invisible serpentea por los carriles: nunca se pone nada encima, así siempre hay salida.
 let pathL = 0, pathT = 0, prevPathL = 0, evCool = 0;
 const STEP = 6;
+// ---------- oleadas
+// Copiado del planteamiento de Boost 2: la dificultad no sale de una fórmula, sino de un guión de
+// oleadas escrito a mano, cada una con su carácter. Eso es lo que hace que se note diseñado: hay
+// tramos densos, tramos de respiro, tramos de espirales... y la última oleada se repite para
+// siempre, así que pasado el guión el juego se estabiliza en un patrón difícil constante.
+//   m    : metros que dura la oleada (la última, Infinity)
+//   box  : probabilidad de soltar algo en cada paso
+//   col  : de lo que sale, cuánto es una colección (serie de bloques seguidos)
+//   spi  : ...y cuánto es una espiral (serie que gira alrededor del túnel)
+//   w    : ancho de la franja, en carriles
+//   n    : [mín, máx] de piezas cuando es colección o espiral
+const WAVES = [
+  { m: 200, box: 0.32, col: 0,    spi: 0,    w: [1, 2], n: [3, 3] },     // presentación: bloques sueltos
+  { m: 240, box: 0.42, col: 0,    spi: 0,    w: [1, 2], n: [3, 3] },
+  { m: 280, box: 0.45, col: 0.35, spi: 0,    w: [2, 3], n: [3, 4] },     // aparecen las series
+  { m: 220, box: 0.40, col: 0.20, spi: 0,    w: [2, 3], n: [3, 4] },
+  { m: 260, box: 0.50, col: 0.40, spi: 0,    w: [2, 3], n: [4, 5] },
+  { m: 200, box: 0.35, col: 0,    spi: 0.55, w: [1, 1], n: [6, 9] },     // primera espiral
+  { m: 300, box: 0.40, col: 0.35, spi: 0.15, w: [2, 3], n: [4, 6] },
+  { m: 180, box: 0.18, col: 0,    spi: 0,    w: [1, 2], n: [3, 3] },     // respiro
+  { m: 320, box: 0.50, col: 0.30, spi: 0.20, w: [2, 4], n: [4, 6] },
+  { m: 260, box: 0.45, col: 0.50, spi: 0,    w: [1, 2], n: [6, 8] },
+  { m: 220, box: 0.30, col: 0,    spi: 0.60, w: [1, 1], n: [8, 12] },    // espirales largas
+  { m: 300, box: 0.55, col: 0.35, spi: 0.15, w: [3, 5], n: [4, 6] },
+  { m: 200, box: 0.20, col: 0.20, spi: 0,    w: [1, 2], n: [3, 4] },     // respiro
+  { m: 340, box: 0.60, col: 0.40, spi: 0.20, w: [3, 5], n: [5, 8] },
+  { m: 280, box: 0.50, col: 0,    spi: 0.55, w: [1, 2], n: [10, 14] },
+  { m: 300, box: 0.65, col: 0.45, spi: 0.20, w: [3, 6], n: [6, 10] },
+  { m: 240, box: 0.35, col: 0.30, spi: 0.30, w: [2, 3], n: [5, 7] },
+  { m: 360, box: 0.70, col: 0.40, spi: 0.25, w: [4, 6], n: [6, 10] },
+  { m: 200, box: 0.25, col: 0,    spi: 0,    w: [1, 2], n: [3, 4] },     // respiro antes del tramo duro
+  { m: 380, box: 0.75, col: 0.45, spi: 0.25, w: [4, 7], n: [8, 12] },
+  { m: 300, box: 0.55, col: 0,    spi: 0.70, w: [1, 2], n: [14, 20] },   // espiral muy larga
+  { m: 360, box: 0.80, col: 0.50, spi: 0.20, w: [4, 7], n: [8, 14] },
+  { m: 260, box: 0.40, col: 0.30, spi: 0.35, w: [2, 4], n: [6, 9] },
+  { m: 400, box: 0.85, col: 0.50, spi: 0.25, w: [5, 8], n: [10, 16] },
+  { m: Infinity, box: 0.85, col: 0.45, spi: 0.35, w: [4, 8], n: [8, 16] }
+];
+const WAVE_Z = (() => { const a = []; let z = 120; for (const w of WAVES) { a.push(z); z += w.m; } return a; })();
+function waveAt(z){
+  for (let i = WAVES.length - 1; i >= 0; i--) if (z >= WAVE_Z[i]) return WAVES[i];
+  return WAVES[0];
+}
+let colec = null;   // serie de bloques en curso (colección o espiral)
+
 function spawnNext(z){
   const D = diffAt(z);
   if (z < 45) return z + STEP;
@@ -2062,30 +2111,55 @@ function spawnNext(z){
   if (pathT <= 0) { pathL += (Math.random() < 0.5 ? 1 : -1) * (Math.random() < 0.25 + D * 0.35 ? 2 : 1); pathT = lerp(60, 22, clamp(D, 0, 1)) * rr(0.7, 1.3); }
   const lo = Math.min(pathL, prevPathL), hi = Math.max(pathL, prevPathL);
   const safe = (l) => { for (let q = lo; q <= hi; q++) if (laneMod(l) === laneMod(q)) return true; return false; };
-  // Menos bloques a la vez: con la densidad antigua casi todos los carriles acababan pintados de
-  // aviso y el color dejaba de avisar. La dificultad se compensa con velocidad, no con muro.
-  const lam = lerp(LAM_MIN, LAM_MAX, clamp(D, 0, 1.2) / 1.2);
-  const n = Math.floor(lam) + (Math.random() < lam % 1 ? 1 : 0);
-  for (let i = 0; i < n; i++) {
-    const l = Math.random() < 0.7 ? pathL + ri(-6, 6) : ri(0, LANES - 1);
-    if (safe(l)) continue;
-    const long = Math.random() < 0.08 + D * 0.12;
-    const len = long ? rr(8, 16 + D * 10) : rr(3, 5);
-    const zz = z + rr(0, STEP);
-    if (!laneFree(l, zz - 4, zz + len + 4)) continue;
-    // Toda la franja del mismo color: con colores distintos, un solo muro se lee como varios avisos
-    // sueltos y la pantalla parece un caos aunque los bloques estén pegados.
+  const W = waveAt(z);
+  const anchoDe = (a) => ri(a[0], a[1]);
+
+  // Serie en curso: se van soltando sus piezas paso a paso. La espiral gira alrededor del túnel,
+  // que es lo que obliga a no soltar el volante.
+  if (colec) {
+    colec.left--;
+    colec.lane += colec.giro;
+    if (!safe(colec.lane)) {
+      const zz = z + rr(0, STEP * 0.4);
+      for (let q = 0; q < colec.w; q++) {
+        const l2 = colec.lane + q;
+        if (safe(l2)) break;
+        if (laneFree(l2, zz - 3, zz + colec.len + 3)) addBlock(zz, l2, colec.len, colec.col);
+      }
+    }
+    if (colec.left <= 0) colec = null;
+    return z + STEP;
+  }
+
+  if (Math.random() < W.box) {
+    const r = Math.random();
+    const esEspiral = r < W.spi;
+    const esColec = !esEspiral && r < W.spi + W.col;
     const col0 = ri(0, PALETTE.length - 1);
-    addBlock(zz, l, len, col0);
-    // Franjas anchas en vez de bloques sueltos: cubren más contorno (hay que moverse de verdad) y a
-    // la vez se leen mejor, porque son un aviso grande en lugar de varios repartidos.
-    if (Math.random() < PAR_2 + D * 0.2) {
-      const dir = Math.random() < 0.5 ? 1 : -1;
-      let ancho = 1;
-      if (Math.random() < PAR_3 + D * 0.35) ancho++;
-      if (Math.random() < D * 0.55) ancho++;
-      if (Math.random() < D * 0.35) ancho++;
-      for (let q = 1; q <= ancho; q++) { const l2 = l + dir * q; if (safe(l2) || !laneFree(l2, zz - 4, zz + len + 4)) break; addBlock(zz, l2, len, col0); }
+    if (esEspiral || esColec) {
+      colec = {
+        left: ri(W.n[0], W.n[1]),
+        lane: laneMod(pathL + (Math.random() < 0.5 ? 1 : -1) * ri(3, 7)),
+        giro: esEspiral ? (Math.random() < 0.5 ? 1 : -1) * (Math.random() < 0.3 ? 2 : 1) : 0,
+        w: esEspiral ? 1 : anchoDe(W.w),
+        len: esEspiral ? rr(3, 4.5) : rr(3, 5),
+        col: col0
+      };
+      return z + STEP;
+    }
+    // bloque suelto: una franja del ancho de la oleada, toda del mismo color para que se lea como
+    // un solo aviso y no como varios
+    const l = Math.random() < 0.7 ? pathL + ri(-6, 6) : ri(0, LANES - 1);
+    if (!safe(l)) {
+      const largo = Math.random() < 0.08 + D * 0.12;
+      const len = largo ? rr(8, 16 + D * 10) : rr(3, 5);
+      const zz = z + rr(0, STEP);
+      if (laneFree(l, zz - 4, zz + len + 4)) {
+        addBlock(zz, l, len, col0);
+        const dir = Math.random() < 0.5 ? 1 : -1;
+        const w = anchoDe(W.w);
+        for (let q = 1; q < w; q++) { const l2 = l + dir * q; if (safe(l2) || !laneFree(l2, zz - 4, zz + len + 4)) break; addBlock(zz, l2, len, col0); }
+      }
     }
   }
   evCool -= STEP;
@@ -2245,15 +2319,18 @@ const tilt = { on: false, has: false, phi: 0, phi0: null, t: 0, armed: true, cal
 // ?sens=1.5 sube toda la sensibilidad de golpe (umbrales más bajos y vueltas más rápidas);
 // cada umbral se puede afinar aparte con ?tstep, ?thold, ?trate...
 const SENS = qnum('sens', 1);
-// TILT_DEAD: grados de holgura antes de empezar a deslizar (el sensor tiembla un par de grados)
-// TILT_K: carriles por segundo que se ganan por cada grado de más · TILT_HOLD: a partir de aquí
-// se considera que estás deslizando de verdad, solo para la red de seguridad del cero.
-const TILT_DEAD = qnum('tdead', 2 / SENS), TILT_K = qnum('tk', 1.15 * SENS), TILT_HOLD = qnum('thold', 10 / SENS);
-const TILT_RATE = qnum('trate', 28 * SENS), TILT_DELAY = qnum('tdelay', 0.12), TILT_SMOOTH = qnum('tsmooth', 0.85), LANE_SOFT = qnum('lanesoft', 0.62);
+// TILT_DEAD: holgura del centro, en unidades de seno (0,0194 = 1,1 grados, como el original)
+// TILT_GAIN: carriles por segundo a 90 grados · TILT_HOLD: a partir de aquí se considera que
+// estás deslizando de verdad, solo para la red de seguridad del cero.
+// Valores del original (Boost 2): zona muerta de 1,1 grados y 0,2 rad por fotograma a 60 fps por
+// unidad de seno, que en nuestros 16 carriles son 30,56 carriles por segundo a 90 grados.
+const TILT_DEAD = qnum('tdead', 0.0194 / SENS), TILT_GAIN = qnum('tgain', 30.56 * SENS), TILT_HOLD = qnum('thold', 10 / SENS);
+const TILT_RATE = qnum('trate', 28 * SENS), TILT_DELAY = qnum('tdelay', 0.12), TILT_SMOOTH = qnum('tsmooth', 1), LANE_SOFT = qnum('lanesoft', 0.62);
 // HOLD_T: lo que tarda un toque mantenido en empezar a deslizar · SLIDE_*: carriles por segundo
 const HOLD_T = qnum('holdt', 0.06), SLIDE_MIN = qnum('slidemin', 11), SLIDE_MAX = qnum('slidemax', 26);
 const LANE_K = qnum('lanek', 26);   // rapidez en acomodarse al carril de al lado (22 en la v0.31)
-const TILT_CAL = qnum('tcal', 0.3), TILT_DRIFT = qnum('tdrift', 3), TILT_QUIET = qnum('tquiet', 10);
+// el original no filtra la señal ni recentra solo: calibras a mano y ya
+const TILT_CAL = qnum('tcal', 0.3), TILT_DRIFT = qnum('tdrift', 0), TILT_QUIET = qnum('tquiet', 10);
 // TILT_CAL: segundos fijando el cero al empezar · TILT_DRIFT: rapidez del recentrado con el móvil
 // quieto · TILT_QUIET: por debajo de estos grados por segundo se considera que no lo estás girando
 let tiltCheckT = 0, tiltWarned = false, motionN = 0, orientN = 0;
@@ -2308,6 +2385,7 @@ let wasPortrait = false;
 function applyTiltPref(){
   try { localStorage.setItem('hipertunel-tilt', useTilt ? '1' : '0'); } catch (e) {}
   if (COARSE) $('tz').classList.toggle('on', !useTilt || !tilt.has);
+  showTiltOpts();
   sensorStatus();
 }
 addEventListener('orientationchange', () => { tilt.phi0 = null; tilt.has = false; });
@@ -2339,7 +2417,12 @@ function pollInput(dt){
     // giro sino un cero mal cogido, y se corrige. Fuera de ese caso no se toca el cero: cualquier
     // recentrado persigue los giros lentos y es justo lo que se siente como retardo.
     if (tilt.cal <= 0 && quieto && tilt.roll > 2.5) tilt.phi0 += wrap(tilt.phi - tilt.phi0) * clamp(TILT_DRIFT * dt, 0, 1);
-    if (a > TILT_DEAD) { gd = dir; rate = Math.min(TILT_RATE, (a - TILT_DEAD) * TILT_K); }
+    // Curva del original: la velocidad de giro es proporcional al SENO de la inclinación, que es lo
+    // que mide de verdad el acelerómetro. Sin tope y sin suavizar: mucho control fino cerca del
+    // centro y recorrido largo al girar mucho, en vez de saturar pronto.
+    const sa = Math.abs(Math.sin(deg * Math.PI / 180));
+    if (tiltInv) dir = -dir;
+    if (sa >= TILT_DEAD) { gd = dir; rate = sa * TILT_GAIN; }
   }
   // mando
   let gps = null;
@@ -2378,10 +2461,19 @@ function setHelp(){
       : '<span class="k">Toca</span><span>La izquierda o la derecha de la pantalla</span><span class="k">Mantener</span><span>Salta carriles seguidos</span>';
 }
 if (COARSE) {
-  const cb = $('cbTilt');
+  const cb = $('cbTilt'), ci = $('cbInv'), bc = $('bCal');
   $('optTilt').hidden = false; cb.checked = useTilt;
   cb.addEventListener('change', () => { useTilt = cb.checked; if (useTilt) enableTilt(); applyTiltPref(); setHelp(); });
+  ci.checked = tiltInv;
+  ci.addEventListener('change', () => { tiltInv = ci.checked; try { localStorage.setItem('hipertunel-inv', tiltInv ? '1' : '0'); } catch (e) {} });
+  // calibrar a mano, como en el original: fija el centro en la postura en la que sujetas el móvil
+  bc.addEventListener('click', () => {
+    enableTilt(); tilt.phi0 = null; tilt.has = false; tilt.cal = TILT_CAL;
+    bc.textContent = 'Centro guardado ✓'; bc.classList.add('ok');
+    setTimeout(() => { bc.textContent = 'Calibrar el centro aquí'; bc.classList.remove('ok'); }, 1400);
+  });
 }
+function showTiltOpts(){ if (!COARSE) return; const v = useTilt; $('optInv').hidden = !v; $('bCal').hidden = !v; }
 setHelp();
 applyTiltPref();
 const fmt = (n) => Math.floor(n).toLocaleString('es-ES');
@@ -2438,7 +2530,7 @@ function start(){
   // filtrado de la partida anterior, el cero queda torcido y el piloto se va solo hacia un lado.
   enableTilt(); goLandscape(); tilt.phi0 = null; tilt.has = false; tilt.armed = true; tilt.t = 0; tilt.cal = TILT_CAL; laneSoft = false;
   SND.init(); SND.startMusic(); SND.play('start');
-  clearObjs(); clearMechanics(); buildSections(); lastBoostZ = 0; killer = null; sinceRest = 0; lastEnc = ''; encLog.length = 0; pathL = 0; prevPathL = 0; pathT = 60; evCool = 60;
+  colec = null; clearObjs(); clearMechanics(); buildSections(); lastBoostZ = 0; killer = null; sinceRest = 0; lastEnc = ''; encLog.length = 0; pathL = 0; prevPathL = 0; pathT = 60; evCool = 60;
   s = sPrev = 0; speed = 16; lane = 0; playerLaneF = 0; camLane = 0; lastLaneInt = 0; cont.dir = 0; level = 0; score = 0; invul = 0; shake = 0; kick = 0; lastOut = false;
   cursor = 60;
   addBoost(40, 0);

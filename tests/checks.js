@@ -25,15 +25,22 @@ const porSegundo = (deg) => {
   }
   return null;
 };
-const v = [2, 6, 10, 15, 22, 35].map(porSegundo);
+// La referencia es la curva de Boost 2 (ver referencias/analisis-boost2.md): la velocidad de giro
+// es el seno de la inclinación por 0,2 radianes por fotograma a 60 fps, que en 16 carriles son
+// 30,56 carriles por segundo a 90 grados, con una zona muerta de 1,1 grados.
+const curvaBoost2 = (g) => { const s = Math.abs(Math.sin(g * Math.PI / 180)); return s >= 0.0194 ? s * 30.56 : 0; };
+const angulos = [1, 2, 5, 10, 20, 35, 60, 90];
+const v = angulos.map(porSegundo);
 if (v.some((x) => x === null)) fail.push('No se pudo medir el giroscopio: el jugador muere siempre');
 else {
-  if (v[0] > 0.2) fail.push('El giroscopio se mueve con el móvil casi recto (2 grados): ' + v[0].toFixed(1) + ' carriles/s, el pulso de la mano ya desviaría');
-  if (v[1] < 2.5) fail.push('Con un gesto pequeño (6 grados) apenas desliza: ' + v[1].toFixed(1) + ' carriles/s');
-  if (v[2] < 6) fail.push('A 10 grados debería cruzar un carril en menos de 0,2 s, y va a ' + v[2].toFixed(1) + ' carriles/s');
-  if (v[5] < 20) fail.push('Con el móvil bien girado no se desliza rápido: ' + v[5].toFixed(1) + ' carriles/s');
-  // y la respuesta tiene que crecer de forma continua, sin escalones
-  for (let i = 1; i < v.length; i++) if (v[i] <= v[i - 1]) fail.push('El giroscopio no responde de forma progresiva entre ' + [2, 6, 10, 15, 22, 35][i - 1] + ' y ' + [2, 6, 10, 15, 22, 35][i] + ' grados');
+  if (v[0] > 0.2) fail.push('Con el móvil casi recto (1 grado) ya se mueve: ' + v[0].toFixed(1) + ' carriles/s');
+  for (let i = 1; i < angulos.length; i++) {
+    const esperado = curvaBoost2(angulos[i]), real = v[i];
+    // margen amplio: el amortiguado del carril mete un retraso pequeño al medir en un segundo
+    if (Math.abs(real - esperado) > Math.max(1.2, esperado * 0.18))
+      fail.push('A ' + angulos[i] + ' grados se desvía de la curva de Boost 2: ' + real.toFixed(1) + ' carriles/s en vez de ' + esperado.toFixed(1));
+  }
+  for (let i = 1; i < v.length; i++) if (v[i] <= v[i - 1]) fail.push('El giroscopio no responde de forma progresiva entre ' + angulos[i - 1] + ' y ' + angulos[i] + ' grados');
 }
 // El cambio de carril tiene que deslizar, no saltar, y comportarse igual aunque al móvil le bajen
 // los fotogramas: una integración ingenua del muelle se vuelve inestable por debajo de 40 fps y
