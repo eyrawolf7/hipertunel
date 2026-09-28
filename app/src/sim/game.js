@@ -103,6 +103,14 @@ export class Game {
     this.boostCounter = 25;            // BoostManager+8 (arranca a 25)
     this.pads = [];                    // { k, lane, taken }
 
+    // ---- monedas (añadido de Hipertúnel, no está en Boost 2). Llevan su propio generador para
+    // no alterar la secuencia de cajas y placas del original.
+    this.coinRng = makeRng((this.seed ^ 0x9e3779b9) >>> 0);
+    this.coins = [];                   // { k, lane, got }
+    this.coinRun = null;
+    this.coinsGot = 0;
+    this.coinStreak = 0; this.coinStreakT = 0;
+
     for (let i = 0; i < ROWS; i++) this.pushRow(true);
   }
 
@@ -160,6 +168,44 @@ export class Game {
     }
     this.updateBoxes(row);
     this.spawnBoosts(row);
+    this.spawnCoins(row);
+  }
+
+  // Monedas: tiras de 5 a 10 por un carril libre, a veces en curva para obligar a girar. En el
+  // estado invertido (sin cajas) sale una lluvia de tiras: es el premio de cambiar de mundo.
+  spawnCoins(row) {
+    const rng = this.coinRng;
+    const free = (l) => !this.boxes.some((b) => (b.lane === l || b.opp === l) && b.k >= row.k - 2 && b.k <= row.k + 1)
+      && !this.pads.some((p) => p.lane === l && Math.abs(p.k - row.k) < 2);
+    let run = this.coinRun;
+    if (!run) {
+      const p = this.inverted ? 0.35 : this.folding ? 0.05 : 0.045;
+      if (rng.next() > p) return;
+      run = this.coinRun = { lane: Math.trunc(rng.float(0, LANES)), left: Math.trunc(rng.float(5, 11)), curve: rng.next() < 0.35 ? (rng.next() < 0.5 ? 1 : -1) : 0, step: 0 };
+    }
+    if (run.curve && ++run.step % 2 === 0) run.lane = mod(run.lane + run.curve, LANES);
+    if (this.fold !== FOLD_IN && this.fold !== FOLD_OUT) run.lane = Math.max(0, Math.min(LANES - 1, run.lane));
+    if (free(run.lane)) this.coins.push({ k: row.k, lane: run.lane, got: false });
+    if (--run.left <= 0) this.coinRun = null;
+  }
+
+  checkCoins() {
+    const hw = 0.33;
+    for (const c of this.coins) {
+      if (c.got) continue;
+      const d = this.s - (c.k - 0.5);
+      if (d < -0.55 || d > 0.45) continue;
+      const a = laneAngle(c.lane);
+      const open = this.fold !== FOLD_IN && this.fold !== FOLD_OUT;
+      const ok = open ? Math.abs(this.theta - a) < hw : angleIn(wrapAngle(this.theta), wrapAngle(a - hw), wrapAngle(a + hw));
+      if (!ok) continue;
+      c.got = true;
+      this.coinsGot++;
+      this.coinStreak = this.coinStreakT > 0 ? this.coinStreak + 1 : 0;
+      this.coinStreakT = 0.6;
+      this.event('coin', { combo: this.coinStreak, lane: c.lane, k: c.k });
+    }
+    if (this.coinStreakT > 0) this.coinStreakT -= 1 / 60;
   }
 
   // ------------------------------------------------------------------ oleadas y cajas
@@ -430,6 +476,7 @@ export class Game {
     this.updateSpeed();
     this.updateBoxMotion();
     this.checkCollisions();
+    this.checkCoins();
     this.updateFold();
     this.prune();
     return this.events;
@@ -523,6 +570,7 @@ export class Game {
     const k0 = Math.floor(this.s) - 2;
     if (this.boxes.length && this.boxes[0].k < k0) this.boxes = this.boxes.filter((b) => b.k >= k0);
     if (this.pads.length && this.pads[0].k < k0) this.pads = this.pads.filter((p) => p.k >= k0);
+    if (this.coins.length && this.coins[0].k < k0) this.coins = this.coins.filter((c) => c.k >= k0);
   }
 
   event(type, data) { this.events.push(Object.assign({ type, frame: this.frame }, data)); }

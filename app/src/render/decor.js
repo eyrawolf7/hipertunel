@@ -2,7 +2,7 @@
 // la pista y más allá de la niebla cercana (regla 5): nada aparece de golpe ni en el camino.
 // Si están los modelos GLB del modelador se usan; si no, formas procedurales de respaldo.
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { loadModel } from './assets.js';
 import { makeFrame } from './track.js';
 
 const KINDS = {
@@ -35,10 +35,8 @@ export class Decor {
   }
 
   load() {
-    const loader = new GLTFLoader();
-    const base = (import.meta.env && import.meta.env.BASE_URL) || './';
     for (const name of ['island_a', 'island_b', 'island_c', 'cloud', 'crystal', 'planet', 'arch']) {
-      loader.load(base + 'assets/' + name + '.glb', (g) => { this.models[name] = g.scene; this.rebuild = true; }, undefined, () => {});
+      loadModel(name).then((m) => { if (m) { this.models[name] = m; this.rebuild = true; } });
     }
   }
 

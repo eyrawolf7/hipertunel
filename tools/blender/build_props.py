@@ -24,11 +24,11 @@ def build_coin():
     gold = lib.material('CoinGold', hexc('#ffc21a'), rough=0.25, metal=0.9)
     # Perfil de la moneda (radio, z) de la cara delantera a la trasera: campo hundido,
     # canto elevado con bisel redondeado y lateral.
-    top = [(0.0, 0.046), (0.285, 0.046), (0.315, 0.056), (0.335, 0.068), (0.365, 0.072),
-           (0.405, 0.070), (0.432, 0.060), (0.447, 0.042), (0.450, 0.020)]
+    top = [(0.0, 0.034), (0.29, 0.034), (0.318, 0.068), (0.372, 0.075), (0.428, 0.064),
+           (0.450, 0.034)]
     prof = top + [(r, -z) for r, z in reversed(top)]
     v, f = lib.lathe(prof, 28)
-    disc = lib.mesh_obj('coin_disc', v, f, gold, sharp_angle=50)
+    disc = lib.mesh_obj('coin_disc', v, f, gold, sharp_angle=40)
 
     # Ranura vertical en relieve (el clásico óvalo alargado de la moneda de Mario).
     def stadium(w, h, n=6):
@@ -43,8 +43,8 @@ def build_coin():
 
     parts = [disc]
     for side in (1, -1):
-        rings = [(1.0, 0.040), (0.96, 0.062), (0.80, 0.074)]
-        base = stadium(0.062, 0.215)
+        rings = [(1.0, 0.030), (0.95, 0.060), (0.78, 0.071)]
+        base = stadium(0.068, 0.225)
         n = len(base)
         verts, faces = [], []
         for s, z in rings:
@@ -59,14 +59,12 @@ def build_coin():
         faces.append(tuple(cap) if side > 0 else tuple(reversed(cap)))
         parts.append(lib.mesh_obj('coin_slot', verts, faces, gold, sharp_angle=50))
 
-    for p in parts:
-        lib.solid(p, (1, 1, 1))
     ob = lib.join(parts, 'Coin')
     # Caras hacia ±Z en glTF = ±Y en Blender (glTF Z = -Blender Y).
     ob.rotation_euler = (math.radians(90), 0, 0)
     lib.select_only(ob)
     bpy.ops.object.transform_apply(rotation=True)
-    return ob, dict(view=(1.0, -1.6, 0.45), sky='#9fd8ff')
+    return ob, dict(view=(1.0, -1.6, 0.45), sky='#fff4dc')
 
 
 # =================================================================== islas
@@ -75,6 +73,7 @@ GRASS_LIGHT = hexc('#c2f27e')
 GRASS_DARK = hexc('#5cc24a')
 ROCKS = [hexc(h) for h in ('#e8c79a', '#d9a878', '#e0b184', '#c98a63', '#d49a6a', '#bf7a55')]
 ROCK_DEEP = hexc('#a8634a')
+STRATA = [hexc(h) for h in ('#f0d2a0', '#e3ad7a', '#d48f62', '#e0a577', '#c07352', '#a85f48')]
 
 
 def island(seed, R, stretch=1.0, lobes=(), depth=1.0, trees=4, waterfall=False, extra_rocks=3,
@@ -135,7 +134,7 @@ def island(seed, R, stretch=1.0, lobes=(), depth=1.0, trees=4, waterfall=False, 
     def rock_cone(cx, cy, rr, dd, sd):
         rr2 = random.Random(sd)
         n = rr2.choice([9, 10, 11])
-        rings = [(0.93, -0.6), (0.82, -0.28), (0.6, -0.55), (0.34, -0.8), (0.0, -1.0)]
+        rings = [(0.97, -0.7), (0.93, -0.2), (0.74, -0.45), (0.46, -0.7), (0.2, -0.9), (0.0, -1.0)]
         verts, faces, idx = [], [], []
         for k, (fr, fz) in enumerate(rings):
             if fr == 0:
@@ -163,15 +162,17 @@ def island(seed, R, stretch=1.0, lobes=(), depth=1.0, trees=4, waterfall=False, 
 
         def rc(p, nrm, poly):
             d = -p.z / dd
-            c = ROCKS[(poly.index * 7 + sd) % len(ROCKS)]
-            c = mix(c, ROCK_DEEP, smoothstep(0.35, 1.0, d) * 0.7)
+            # Estratos horizontales (tipo tarta) con leve variación por cara.
+            band = int(d * 4.5)
+            c = STRATA[min(band, len(STRATA) - 1)]
+            c = mix(c, ROCKS[(poly.index * 7 + sd) % len(ROCKS)], 0.25)
             return mix(c, hexc('#ffe2b8'), max(0.0, nrm.z) * 0.3)
         lib.paint(ob, rc)
         return ob
 
     cones = [(0, 0, R * (1 if not lobes else 0.8), R * depth)]
     for la, ls in lobes:
-        cones.append((math.cos(la) * R * 0.55 * stretch, math.sin(la) * R * 0.55, R * 0.6, R * depth * 0.75))
+        cones.append((math.cos(la) * R * 0.6 * stretch, math.sin(la) * R * 0.6, R * 0.68, R * depth * 0.8))
     for i, (cx, cy, rr, dd) in enumerate(cones):
         parts.append(rock_cone(cx, cy, rr, dd, seed * 10 + i))
 
@@ -209,8 +210,9 @@ def island(seed, R, stretch=1.0, lobes=(), depth=1.0, trees=4, waterfall=False, 
         placed.append((x, y, size))
     for ti, (x, y, size) in enumerate(placed):
         z0 = top_z(x, y) - 0.2
-        trunk_h = size * 1.6
-        tv, tf = lib.lathe([(0.0, trunk_h), (0.16 * size, trunk_h), (0.24 * size, 0.2), (0.32 * size, 0.0), (0.0, -0.3)], 7)
+        size *= 1.2
+        trunk_h = size * 1.25
+        tv, tf = lib.lathe([(0.0, trunk_h), (0.2 * size, trunk_h), (0.26 * size, 0.3), (0.38 * size, 0.0), (0.0, -0.3)], 7)
         tr = lib.mesh_obj('trunk', lib.transform(tv, Matrix.Translation((x, y, z0))), tf, rock_m, sharp_angle=40)
         lib.paint(tr, lambda p, n, _: mix(hexc('#a8683f'), hexc('#c98a55'), max(0.0, n.x * 0.5 + 0.5)))
         parts.append(tr)
@@ -311,17 +313,20 @@ def island(seed, R, stretch=1.0, lobes=(), depth=1.0, trees=4, waterfall=False, 
     return ob
 
 
+ISLAND_VIEW = dict(view=(1.0, -1.35, 0.32), margin=0.95)
+
+
 def build_island_a():
-    return island(11, 13.5, trees=4, waterfall=True, depth=1.05, extra_rocks=4), dict()
+    return island(11, 13.5, trees=4, waterfall=True, depth=1.05, extra_rocks=4), ISLAND_VIEW
 
 
 def build_island_b():
-    return island(23, 12.5, stretch=1.45, lobes=((0.3, 0.12), (math.pi + 0.2, 0.1)), depth=0.8,
-                  trees=5, extra_rocks=3, second_tier=True), dict()
+    return island(23, 12.5, stretch=1.42, lobes=((0.3, 0.12), (math.pi + 0.2, 0.1)), depth=1.0,
+                  trees=5, extra_rocks=3, second_tier=True), ISLAND_VIEW
 
 
 def build_island_c():
-    return island(37, 10.5, depth=1.45, trees=2, extra_rocks=4), dict()
+    return island(37, 10.5, depth=1.45, trees=2, extra_rocks=4), ISLAND_VIEW
 
 
 # =================================================================== nube
@@ -339,7 +344,7 @@ def build_cloud():
             if p.z < zb:
                 p.z = zb + (p.z - zb) * 0.22
         ob = lib.mesh_obj('puff', v, f, m, smooth=True)
-        lib.paint(ob, lambda p, n, _: mix(hexc('#c9dcff'), hexc('#ffffff'), smoothstep(-0.1, 2.6, p.z) * 0.8 + max(0, n.z) * 0.3),
+        lib.paint(ob, lambda p, n, _: mix(hexc('#d3e2ff'), hexc('#ffffff'), smoothstep(-0.1, 3.2, p.z) * 0.85 + max(0, n.z) * 0.3),
                   per='vertex')
         parts.append(ob)
     ob = lib.join(parts, 'Cloud')
@@ -423,19 +428,15 @@ def build_planet():
 
 
 # =================================================================== arco
-def build_arch():
-    am = lib.material('ArchPaint', (1, 1, 1), rough=0.28, vcol=True)
-    bm = lib.material('ArchBulb', hexc('#fff3b0'), rough=0.3, emit=hexc('#ffd84a'), emit_strength=1.0)
-    R, r = 11.0, 1.35
-    NS, NR = 48, 12
+def torus(R, r, NS, NR, y=0.0):
+    """Toro vertical en el plano XZ (se atraviesa por el eje Y)."""
     verts, faces = [], []
     for i in range(NS):
         u = TAU * i / NS
         for j in range(NR):
             w = TAU * j / NR
-            # anillo vertical en el plano XZ, eje de paso = Y
             rr = R + r * math.cos(w)
-            verts.append(Vector((rr * math.cos(u), r * math.sin(w), rr * math.sin(u))))
+            verts.append(Vector((rr * math.cos(u), y + r * math.sin(w), rr * math.sin(u))))
     for i in range(NS):
         for j in range(NR):
             a = i * NR + j
@@ -443,26 +444,39 @@ def build_arch():
             c = ((i + 1) % NS) * NR + (j + 1) % NR
             d = i * NR + (j + 1) % NR
             faces.append((a, d, c, b))
-    tor = lib.mesh_obj('torus', verts, faces, am, smooth=True)
-    stripe_cols = [hexc(h) for h in ('#ff4a5c', '#ffcf2e', '#3fd06a', '#3d8bff')]
+    return verts, faces
+
+
+def build_arch():
+    am = lib.material('ArchPaint', (1, 1, 1), rough=0.28, vcol=True)
+    gm = lib.material('ArchGold', hexc('#ffc21a'), rough=0.3, metal=0.85)
+    bm = lib.material('ArchBulb', hexc('#ffe066'), rough=0.3, emit=hexc('#ffb300'), emit_strength=1.0)
+    R, r = 11.0, 1.3
+    NS, NR = 48, 12
+    v, f = torus(R, r, NS, NR)
+    tor = lib.mesh_obj('torus', v, f, am, smooth=True)
+    # Blanco con franjas anchas de colores (rojo, amarillo, verde, rosa); sin azul,
+    # que en el juego queda reservado a las placas de impulso.
+    stripe_cols = [hexc(h) for h in ('#ff4a5c', '#ffb02e', '#3fd06a', '#ff6fb5')]
     white = hexc('#fffaf2')
 
     def tc(p, n, poly):
         i = poly.index // NR
-        j = poly.index % NR
-        if i % 4 == 0:
-            return stripe_cols[(i // 4) % 4]
-        # finos ribetes de color en los bordes delantero/trasero (arriba del tubo)
-        return white
+        return stripe_cols[(i // 3) // 2 % 4] if (i // 3) % 2 else white
     lib.paint(tor, tc)
     parts = [tor]
-    NB = 20
+    # Ribetes dorados en las caras delantera y trasera, que llevan las bombillas.
+    for side in (1, -1):
+        v, f = torus(R, 0.4, NS, 6, y=side * r * 0.86)
+        rim = lib.mesh_obj('rim', v, f, gm, smooth=True)
+        lib.solid(rim, (1, 1, 1))
+        parts.append(rim)
+    NB = 16
     for k in range(NB):
-        u = TAU * (k + 0.5) / NB * 1.0
-        # Bombillas en las caras delantera y trasera, a mitad del grosor.
+        u = TAU * (k + 0.5) / NB
         for side in (1, -1):
-            v, f = lib.uvsphere(0.36, 8, 4)
-            c = Vector((R * math.cos(u), side * r * 0.98, R * math.sin(u)))
+            v, f = lib.uvsphere(0.55, 8, 4)
+            c = Vector((R * math.cos(u), side * (r * 0.86 + 0.42), R * math.sin(u)))
             bo = lib.mesh_obj('bulb', [p + c for p in v], f, bm, smooth=True)
             lib.solid(bo, (1, 1, 1))
             parts.append(bo)
@@ -490,9 +504,6 @@ def main():
     for name in names:
         lib.reset()
         ob, pv = MODELS[name]()
-        if name.startswith('island'):
-            # Origen en el centro horizontal, a la altura de la cima del césped.
-            pass
         lib.export(ob, f'{name}.glb')
         if do_preview:
             lib.preview(ob, f'{name}.png', **pv)

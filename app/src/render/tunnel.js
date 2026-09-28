@@ -12,7 +12,7 @@ const NQ = (ROWS + 4) * LANES;
 const vert = /* glsl */`
 attribute vec4 aWarn;      // rgb color del aviso, a = intensidad (0 nada, ~0.4 apagado, 1 encendido)
 attribute vec3 aN;
-attribute vec2 aCell;      // x = carril, y = distancia en filas al jugador
+attribute vec2 aCell;      // x = carril, y = índice de fila
 varying vec2 vUv; varying vec4 vWarn; varying vec3 vN; varying vec3 vW; varying vec2 vCell;
 void main(){
   vUv = uv; vWarn = aWarn; vN = aN; vCell = aCell;
@@ -31,14 +31,14 @@ void main(){
   float d = edgeDist(vUv, size);
   float px = fwidth(d) + 1e-4;
   // junta entre paneles, bisel y subdivisiones finas (el original tiene 2x2 dentro de cada celda)
-  float seam = 1.0 - smoothstep(0.035 - px, 0.035 + px, d);
+  float seam = 1.0 - smoothstep(0.028 - px, 0.028 + px, d);
   float bevel = smoothstep(0.03, 0.26, d);
   vec2 sub = abs(fract(vUv * vec2(2.0, 2.0)) - 0.5) * size / 2.0;
   float subD = min(sub.x, sub.y);
-  float subL = (1.0 - smoothstep(0.0, 0.012 + px, subD)) * 0.35;
+  float subL = (1.0 - smoothstep(0.0, 0.01 + px, subD)) * 0.32;
   vec3 N = normalize(vN);
   vec3 V = normalize(uCam - vW);
-  float lam = 0.55 + 0.45 * max(dot(N, uKey), 0.0);
+  float lam = 0.6 + 0.4 * max(dot(N, uKey), 0.0);
   float hemi = 0.5 + 0.5 * N.y;
   float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
   vec3 base = mix(uBase2, uBase, hemi);
@@ -48,12 +48,23 @@ void main(){
   // aviso: color vivo. Apagado si no estás en ese carril, encendido (y brillante) si estás.
   float wa = vWarn.a;
   vec3 warn = vWarn.rgb;
-  col = mix(col, warn * (0.55 + 0.45 * lam) , clamp(wa * 1.6, 0.0, 1.0) * (wa > 0.0 ? 1.0 : 0.0));
-  col += warn * max(wa - 0.55, 0.0) * 1.6;           // solo el encendido emite (y da bloom)
-  col *= mix(0.72, 1.0, bevel);
+  // apagado = tono pastel del color (se lee de lejos sin gritar); encendido = color puro que emite
+  float on = clamp((wa - 0.42) / 0.58, 0.0, 1.0);
+  vec3 pastel = mix(base, warn, 0.5) * lam;
+  vec3 vivid = warn * (0.8 + 0.2 * lam);
+  if (wa > 0.0) col = mix(pastel, vivid, on);
+  col += warn * on * 0.55;                            // solo el encendido emite (y da bloom)
+  col *= mix(0.74, 1.0, bevel);
   col = mix(col, uSeam, seam);
   col = mix(col, uSeam, subL * (1.0 - clamp(wa * 2.0, 0.0, 1.0) * 0.5));
+  // brillo de plástico: un reflejo especular suave que se mueve con la cámara
+  vec3 H = normalize(uKey + V);
+  col += vec3(1.0) * pow(max(dot(N, H), 0.0), 64.0) * 0.1 * (1.0 - clamp(wa, 0.0, 1.0) * 0.5);
   col += uGlow * fres * 0.25;
+  // anillos de luz neutros cada 8 filas, en la junta: pasan zumbando y dan velocidad sin
+  // teñir ningún carril (regla 2)
+  float ring = (mod(vCell.y, 8.0) < 0.5) ? (1.0 - smoothstep(0.02, 0.16 + px * 2.0, vUv.y * size.y)) : 0.0;
+  col = mix(col, uGlow * 2.2 + 0.3, ring * 0.9 * (1.0 - uInvert));
   // estado invertido (transición entre mundos): túnel oscuro con juntas de neón
   vec3 inv = mix(vec3(0.03, 0.03, 0.06), warn * 0.8, clamp(wa * 1.4, 0.0, 1.0)) + uGlow * (seam * 1.6 + subL * 0.8);
   col = mix(col, inv, uInvert);
@@ -140,7 +151,7 @@ export class Tunnel {
         }
         for (let j = 0; j < 4; j++) {
           const w = q * 16 + j * 4; W[w] = wr; W[w + 1] = wg; W[w + 2] = wb; W[w + 3] = wa;
-          C[q * 8 + j * 2] = c; C[q * 8 + j * 2 + 1] = k - game.s;
+          C[q * 8 + j * 2] = c; C[q * 8 + j * 2 + 1] = k;
         }
       }
     }

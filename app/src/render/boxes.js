@@ -13,23 +13,36 @@ export class Boxes {
   constructor(scene, envMap) {
     this.geo = new RoundedBoxGeometry(1, 1, 1, 3, 0.09);
     this.mat = new THREE.MeshPhysicalMaterial({
-      color: 0xffffff, roughness: 0.32, metalness: 0.0, clearcoat: 1.0, clearcoatRoughness: 0.12,
-      envMapIntensity: 1.1, emissive: 0x000000,
+      color: 0xffffff, roughness: 0.38, metalness: 0.0, clearcoat: 1.0, clearcoatRoughness: 0.1,
+      envMapIntensity: 0.8, emissive: 0x000000,
     });
     // brillo propio: sube cuando estás en su carril (Box+0x1c del original)
     this.mat.onBeforeCompile = (sh) => {
       sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aGlow;\nvarying float vGlow;')
         .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlow = aGlow;');
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vGlow;')
-        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * (0.12 + 0.55 * vGlow);');
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * (0.05 + 0.3 * vGlow);');
     };
     this.mesh = new THREE.InstancedMesh(this.geo, this.mat, MAX);
+    // contorno oscuro (casco invertido): deja las cajas recortadas como en un juego de Switch y
+    // las separa del fondo claro
+    this.outlineMat = new THREE.ShaderMaterial({
+      uniforms: { uColor: { value: new THREE.Color(0x2b2257) }, uW: { value: 0.045 } },
+      vertexShader: 'uniform float uW; void main(){ vec3 p = position + normal * uW / vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz)); gl_Position = projectionMatrix * viewMatrix * instanceMatrix * vec4(p, 1.0); }',
+      fragmentShader: 'uniform vec3 uColor; void main(){ gl_FragColor = vec4(uColor, 1.0); }',
+      side: THREE.BackSide,
+    });
+    this.outline = new THREE.InstancedMesh(this.geo, this.outlineMat, MAX);
+    this.outline.instanceMatrix = null;
     this.glow = new Float32Array(MAX);
     this.geo.setAttribute('aGlow', new THREE.InstancedBufferAttribute(this.glow, 1).setUsage(THREE.DynamicDrawUsage));
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;
     this.mesh.count = 0;
     scene.add(this.mesh);
+    this.outline.instanceMatrix = this.mesh.instanceMatrix;
+    this.outline.frustumCulled = false; this.outline.count = 0;
+    scene.add(this.outline);
     this.fr = makeFrame();
     this.m = new THREE.Matrix4(); this.q = new THREE.Quaternion(); this.sc = new THREE.Vector3();
     this.T = new THREE.Vector3(); this.N = new THREE.Vector3(); this.B = new THREE.Vector3(); this.p = new THREE.Vector3();
@@ -92,6 +105,7 @@ export class Boxes {
     }
     this.mesh.count = n;
     this.mesh.instanceMatrix.needsUpdate = true;
+    this.outline.count = n;
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
     this.geo.attributes.aGlow.needsUpdate = true;
     if (this.glowBy.size > 200) { const live = new Set(game.boxes.map((b) => b.id)); for (const id of this.glowBy.keys()) if (!live.has(id)) this.glowBy.delete(id); }

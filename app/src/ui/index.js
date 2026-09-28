@@ -61,8 +61,11 @@ function injectAssets() {
 
 // ---------- plantillas ----------
 function logoHTML() {
-  return `<h1 class="logo" aria-label="${LOGO}">${[...LOGO].map((ch, i) =>
-    `<span class="lg t-${LOGO_TINTS[i % 4]}" style="--i:${i}" data-ch="${ch}" aria-hidden="true">${ch}</span>`).join('')}</h1>`;
+  // Tres capas idénticas (extrusión de color, contorno de tinta y relleno blanco) para que el
+  // contorno de una letra nunca pise el relleno de la vecina.
+  const row = (cls) => `<span class="lg-row ${cls}" aria-hidden="true">${[...LOGO].map((ch, i) =>
+    `<span class="lg t-${LOGO_TINTS[i % 4]}" style="--i:${i}">${ch}</span>`).join('')}</span>`;
+  return `<h1 class="logo" aria-label="${LOGO}">${row('l-ext')}${row('l-ink')}${row('l-fill')}</h1>`;
 }
 
 function titleHTML() {
@@ -121,7 +124,7 @@ function toggleRow(key, icon, label, sub) {
   return `<div class="set-row">
     <span class="set-ico">${ICON[icon]}</span>
     <span class="set-lbl">${label}${sub ? `<small>${sub}</small>` : ''}</span>
-    <button class="tog" role="switch" aria-checked="false" data-nav data-set="${key}" aria-label="${label}"><i></i></button>
+    <button class="tog" role="switch" aria-checked="false" data-nav data-set="${key}" aria-label="${label}"${key === 'tilt' ? ' data-default' : ''}><i></i></button>
   </div>`;
 }
 

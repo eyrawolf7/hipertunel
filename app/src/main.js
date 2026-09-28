@@ -52,7 +52,11 @@ const ui = createUI($('ui'), {
   },
   onCalibrate: () => { input.requestTilt(); input.calibrate(); ui.toast('Centro calibrado', 'info'); },
   onSound: (n) => audio.play(n),
+  onPause: () => pause(),
+  keyboard: false,
 });
+const pushRecords = () => ui.records?.({ classic: bestOf('classic'), survival: bestOf('survival'), timetrial: bestOf('timetrial') });
+pushRecords();
 ui.settings(settings);
 audio.setMusic(settings.music); audio.setMuted(!settings.sound);
 
@@ -114,6 +118,7 @@ function finish() {
   ui.over({ mode, distM, coins, score, best: top[0].score, isRecord, time: game.time, maxBoostTime: game.maxBoostTime, top: top.map((e) => ({ ...e, me: e === me })) });
   ui.show('over');
   if (isRecord) audio.play('record');
+  pushRecords();
 }
 
 // ---------------------------------------------------------------- bucle
@@ -133,6 +138,7 @@ function stepSim() {
     if (state === 'attract') continue;
     if (e.type === 'boost') { audio.play('boost', { level: e.level }); ui.toast(e.level === 3 ? '¡Velocidad máxima!' : '¡Impulso ' + e.level + '!', 'boost'); }
     else if (e.type === 'crash') audio.play(e.fatal ? 'death' : 'crash');
+    else if (e.type === 'coin') { coins = game.coinsGot; audio.play('coin', { combo: e.combo }); }
     else if (e.type === 'foldStart') audio.play('foldStart');
     else if (e.type === 'foldEnd') audio.play('foldEnd');
     else if (e.type === 'world') { audio.setWorld(game.world); if (!game.inverted) { audio.play('world'); } }
@@ -152,7 +158,8 @@ function frame(now) {
     if (Math.ceil(countdown) !== before && countdown > 0) audio.play('countdown');
     if (countdown <= 0) { state = 'play'; audio.play('go'); ui.toast('¡Adelante!', 'boost'); }
   }
-  if (state === 'play' || state === 'attract' || state === 'dying') {
+  if (window.__freeze) { acc = 0; }
+  else if (state === 'play' || state === 'attract' || state === 'dying') {
     acc += dt;
     let n = 0;
     while (acc >= STEP && n < 6) { stepSim(); acc -= STEP; n++; }
@@ -162,7 +169,7 @@ function frame(now) {
   if (state === 'dying') { overT += dt; if (overT > 1.3) finish(); }
   if (state === 'over') overT += dt;
 
-  const a = state === 'play' || state === 'attract' || state === 'dying' ? acc / STEP : 1;
+  const a = window.__freeze ? 1 : state === 'play' || state === 'attract' || state === 'dying' ? acc / STEP : 1;
   const s = prev.s + (game.s - prev.s) * a;
   let dth = game.theta - prev.theta;
   if (dth > Math.PI) dth -= Math.PI * 2; else if (dth < -Math.PI) dth += Math.PI * 2;

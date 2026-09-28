@@ -97,7 +97,7 @@ def select_only(ob):
 def paint(ob, fn, per='face'):
     """Pinta el atributo de color 'Col'. fn(pos_mundo, normal, poligono) -> RGB lineal."""
     me = ob.data
-    attr = me.color_attributes.get('Col') or me.color_attributes.new('Col', 'FLOAT_COLOR', 'CORNER')
+    attr = me.color_attributes.get('Col') or me.color_attributes.new('Col', 'BYTE_COLOR', 'CORNER')
     mw = ob.matrix_world
     nm = mw.to_3x3()
     for p in me.polygons:
@@ -227,7 +227,8 @@ def export(ob, filename):
     bpy.ops.export_scene.gltf(
         filepath=path, export_format='GLB', use_selection=True, export_apply=True, export_yup=True,
         export_texcoords=False, export_normals=True, export_materials='EXPORT',
-        export_vertex_color='MATERIAL', export_cameras=False, export_lights=False, export_extras=False,
+        export_vertex_color='MATERIAL', export_all_vertex_colors=False,
+        export_active_vertex_color_when_no_material=False, export_cameras=False, export_lights=False, export_extras=False,
         export_animations=False)
     tris = sum(len(p.vertices) - 2 for p in ob.data.polygons)
     dims = ob.dimensions
@@ -267,7 +268,9 @@ def preview(ob, filename, view=(1.0, -1.25, 0.7), sky='#bfe6ff', lens=50, margin
     sun.angle = math.radians(8)
     so = bpy.data.objects.new('Sun', sun)
     sc.collection.objects.link(so)
-    so.rotation_euler = (math.radians(40), math.radians(10), math.radians(35))
+    to_light = Matrix.Rotation(math.radians(50), 3, 'Z') @ Vector((view[0], view[1], 0)).normalized()
+    to_light = (to_light + Vector((0, 0, 1.3))).normalized()
+    so.rotation_euler = (-to_light).to_track_quat('-Z', 'Y').to_euler()
 
     cam = bpy.data.cameras.new('Cam')
     cam.lens = lens

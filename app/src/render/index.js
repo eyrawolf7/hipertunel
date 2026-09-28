@@ -15,6 +15,7 @@ import { Pads } from './pads.js';
 import { Sky } from './sky.js';
 import { Decor } from './decor.js';
 import { Fx } from './fx.js';
+import { Coins } from './coins.js';
 import { THEMES, BOX_COLORS } from './worlds.js';
 
 const DEG = Math.PI / 180;
@@ -55,8 +56,8 @@ export class Renderer {
 
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-    this.hemi = new THREE.HemisphereLight(0xffffff, 0xb8c4e8, 1.1); this.scene.add(this.hemi);
-    this.key = new THREE.DirectionalLight(0xffffff, 1.6); this.camera.add(this.key); this.key.position.set(-0.4, 1, 0.6); this.key.target.position.set(0, 0, -1); this.camera.add(this.key.target);
+    this.hemi = new THREE.HemisphereLight(0xffffff, 0xffe8d8, 1.0); this.scene.add(this.hemi);
+    this.key = new THREE.DirectionalLight(0xfff4e6, 1.3); this.camera.add(this.key); this.key.position.set(-0.4, 1, 0.6); this.key.target.position.set(0, 0, -1); this.camera.add(this.key.target);
 
     this.track = new Track();
     this.sky = new Sky(this.scene);
@@ -65,6 +66,7 @@ export class Renderer {
     this.boxes = new Boxes(this.scene);
     this.pads = new Pads(this.scene);
     this.fx = new Fx(this.scene);
+    this.coins = new Coins(this.scene);
     this.colors = BOX_COLORS.map((h) => new THREE.Color(h));
 
     this.composer = null;
@@ -89,7 +91,7 @@ export class Renderer {
     const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: q === 'alta' ? 4 : 0 });
     const comp = new EffectComposer(this.renderer, rt);
     comp.addPass(new RenderPass(this.scene, this.camera));
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.55, 0.5, 0.92);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.45, 1.02);
     comp.addPass(this.bloom);
     this.grade = new ShaderPass(GradeShader);
     comp.addPass(this.grade);
@@ -126,12 +128,13 @@ export class Renderer {
       if (e.type === 'boost') { this.cam.kick = 1; this.cam.rollAmp = (Math.random() * 2 - 1) * 0.127; this.cam.roll = 1; this.flash(0x7fd6ff, 0.35); }
       if (e.type === 'crash') {
         const p = this.boxes.positions.get(e.id);
-        if (p) this.fx.explode(p, this.colors[(game.boxes.find((b) => b.id === e.id) || { color: 0 }).color], 40);
+        if (p) this.fx.explode(p, this.colors[(game.boxes.find((b) => b.id === e.id) || { color: 0 }).color], 46, this.look, 60);
         this.cam.shake = 0.35; this.cam.shakeDecay = 0.9;
         if (e.fatal) { this.flash(0xff3040, 0.55); this.deathFocus = p ? p.clone() : null; }
         else this.flash(0xffffff, 0.6);
         this.cam.hit = 1;
       }
+      if (e.type === 'coin') this.coins.collect(game, e, this.track);
       if (e.type === 'foldStart') { this.cam.shake = Math.max(this.cam.shake, 0.12); this.cam.shakeDecay = 0.15; }
       if (e.type === 'foldEnd') { this.flash(0xffffff, 0.8); }
       if (e.type === 'world') {
@@ -201,6 +204,7 @@ export class Renderer {
     this.tunnel.update(game, tr, this.colors, dt);
     this.boxes.update(game, tr, this.colors, dt, !game.alive && this.deathT > 0 && Math.floor(this.deathT * 10) % 2 ? game.killer : 0);
     this.pads.update(game, tr, dt);
+    this.coins.update(game, tr, dt);
     this.fx.update(dt);
     this.sky.update(cam, this.upS, outside ? 1 : 0, dt, this.cam.invert);
     this.decor.update(game, tr, cam, outside, dt);
