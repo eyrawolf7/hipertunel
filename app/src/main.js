@@ -15,6 +15,7 @@ const QS = new URLSearchParams(location.search);
 
 // ---------------------------------------------------------------- ajustes y récords
 const COARSE = matchMedia('(pointer: coarse)').matches;
+const IS_ANDROID_WEB = /Android/i.test(navigator.userAgent) && !window.Capacitor && location.protocol === 'https:';
 const DEFAULTS = { tilt: true, invert: false, sens: 1, quality: COARSE ? 'media' : 'alta', reduceFx: false, music: true, sound: true };
 let settings = { ...DEFAULTS };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('hipertunel-ajustes') || '{}')); } catch (e) {}
@@ -206,6 +207,8 @@ function frame(now) {
   if (state === 'play' || state === 'countdown' || state === 'dying') {
     ui.hud({ distM: game.distanceM, speedMS: game.speedMS, level: game.level, coins, timeLeft: mode === 'timetrial' ? game.timeLeft : null, mode, invul: game.invul > 0, best: bestAtStart[mode] || 0, countdown: state === 'countdown' ? Math.ceil(countdown) : 0 });
   }
+  // en la web desde Android se ofrece la app; dentro de la app (Capacitor) no
+  const apk = $('apk'); if (apk) apk.hidden = !(IS_ANDROID_WEB && state === 'attract');
   if (ui.tiltMeter && state !== 'play') ui.tiltMeter(Math.max(-1, Math.min(1, input.tiltValue * 2)), input.hasTilt ? 'Giroscopio activo' : (window.isSecureContext ? 'Buscando giroscopio…' : 'El giroscopio necesita https'));
   if (fps.el && fps.buf.length > 10) { const avg = fps.buf.reduce((p, c) => p + c, 0) / fps.buf.length; const worst = Math.max(...fps.buf); fps.el.textContent = (1 / avg).toFixed(0) + ' fps · peor ' + (1 / worst).toFixed(0); }
 }

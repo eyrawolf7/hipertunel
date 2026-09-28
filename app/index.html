@@ -13,7 +13,8 @@
   #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
   #ui { position: fixed; inset: 0; pointer-events: none; }
   #fatal { position: fixed; inset: 0; display: grid; place-items: center; color: #fff; font: 600 20px system-ui; text-align: center; padding: 24px; background: #2b2257; }
-  #fatal[hidden], #rotate[hidden] { display: none; }
+  #fatal[hidden], #rotate[hidden], #apk[hidden] { display: none; }
+  #apk { position: fixed; z-index: 20; top: calc(env(safe-area-inset-top, 0px) + 12px); right: calc(env(safe-area-inset-right, 0px) + 12px); font: 700 14px Fredoka, system-ui, sans-serif; color: #2b2257; background: #ffd23f; border: 3px solid #2b2257; border-radius: 999px; padding: 6px 14px; text-decoration: none; box-shadow: 0 4px 0 #2b2257; }
   #rotate { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; text-align: center; background: radial-gradient(circle at 50% 40%, #4a3aa8, #2b2257); color: #fff; font-family: Fredoka, "Baloo 2", system-ui, sans-serif; }
   #rotate b { display: block; font-size: 28px; margin-top: 10px; } #rotate span { display: block; opacity: .75; margin-top: 6px; }
   .fps { position: fixed; left: 8px; bottom: 8px; z-index: 99; font: 600 12px monospace; color: #fff; background: rgba(0,0,0,.5); padding: 3px 6px; border-radius: 6px; pointer-events: none; }
@@ -22,6 +23,7 @@
 <body>
 <canvas id="view" aria-label="Hipertúnel"></canvas>
 <div id="ui"></div>
+<a id="apk" href="hipertunel.apk" download hidden>⬇ App para Android</a>
 <div id="rotate" hidden><div><svg viewBox="0 0 64 64" width="72" height="72"><rect x="20" y="8" width="24" height="44" rx="5" fill="none" stroke="#fff" stroke-width="4"/><path d="M50 40a18 18 0 0 1-18 18" fill="none" stroke="#ffd23f" stroke-width="4" stroke-linecap="round"/><path d="M28 56l4 3-1-5" fill="none" stroke="#ffd23f" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg><b>Gira el móvil</b><span>Hipertúnel se juega en horizontal</span></div></div>
 <div id="fatal" hidden>Tu navegador no puede mostrar gráficos 3D (WebGL). Prueba con Chrome o Safari actualizados.</div>
 <script type="module" src="./src/main.js"></script>
