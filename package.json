@@ -1,0 +1,16 @@
+{
+  "name": "hipertunel",
+  "private": true,
+  "version": "0.31.0",
+  "description": "Runner de túnel en primera persona inspirado en Boost 3D (demo interna).",
+  "scripts": {
+    "serve": "npx --yes http-server . -p 5173 -c-1",
+    "sim": "node tests/sim.js",
+    "check": "node tests/checks.js",
+    "shots": "node tests/shots.js"
+  },
+  "devDependencies": {
+    "three": "0.147.0",
+    "puppeteer": "^23.0.0"
+  }
+}

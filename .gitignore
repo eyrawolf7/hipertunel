@@ -1,0 +1,6 @@
+node_modules/
+.DS_Store
+referencias/
+tests/shots/
+tests/base-v031/
+dist/
