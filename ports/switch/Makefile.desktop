@@ -1,0 +1,34 @@
+# Hipertúnel nativo para escritorio (Mac/Linux) con SDL2 + OpenGL 3.3 core.
+#   make -f Makefile.desktop            -> build/hipertunel
+#   make -f Makefile.desktop run
+#   make -f Makefile.desktop shots      -> capturas en build/shots/ (como tests/shots.mjs)
+# En Mac: brew install sdl2
+BUILD   := build
+TARGET  := $(BUILD)/hipertunel
+SDL_CFLAGS := $(shell sdl2-config --cflags)
+SDL_LIBS   := $(shell sdl2-config --libs)
+# -ffp-contract=off: la simulación tiene que redondear igual que JS (ver README)
+CFLAGS  ?= -O2 -g
+CFLAGS  += -std=c99 -Wall -Wextra -Wno-unused-parameter -ffp-contract=off $(SDL_CFLAGS)
+SRCS    := src/main.c src/render.c src/track.c src/input.c src/gl.c src/png.c \
+           sim/game.c sim/waves.c sim/rng.c sim/bot.c sim/jsmath.c
+OBJS    := $(patsubst %.c,$(BUILD)/obj/%.o,$(SRCS))
+
+$(TARGET): $(OBJS)
+	$(CC) $(OBJS) -o $@ $(SDL_LIBS) -lm
+
+$(BUILD)/obj/%.o: %.c $(wildcard src/*.h sim/*.h)
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+run: $(TARGET)
+	./$(TARGET)
+
+shots: $(TARGET)
+	@mkdir -p $(BUILD)/shots
+	HIP_SCREENSHOT=$(BUILD)/shots HIP_ROWS=$${ROWS:-40,150,400} HIP_SEED=$${SEED:-3} HIP_TITLE=1 ./$(TARGET)
+
+clean:
+	rm -rf $(BUILD)/obj $(TARGET)
+
+.PHONY: run shots clean

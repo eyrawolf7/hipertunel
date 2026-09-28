@@ -89,11 +89,12 @@ void game_reset(Game *g) {
   g->nRows = 0;
   g->kFirst = 0;
 
-  g->s = 0.5; g->theta = 0; g->omega = 0;
+  g->s = 0; g->theta = 0; g->omega = 0;
   g->v = V_START; g->vTarget = V_START;
   g->level = 0; g->boostOn = 0; g->invul = 0; g->alive = 1;
   g->crashes = 0; g->rowsPassed = 0;
   g->maxBoostTime = 0; g->boostTime = 0;
+  g->boostTotal = 0;
   g->timeLeft = 60;
   g->lastCollideRow = -99;
 
@@ -120,6 +121,8 @@ void game_reset(Game *g) {
   g->coinStreak = 0; g->coinStreakT = 0;
 
   for (i = 0; i < ROWS; i++) push_row(g, 1);
+  /* BoxManager+0x70 empieza desfasado: hay una pasada de cajas en el primer fotograma */
+  g->pendingRow = 1;
 }
 
 /* ------------------------------------------------------------------ túnel */
@@ -183,9 +186,9 @@ static void on_new_row(Game *g, int k) {
     g->world = g->world + 1 < 6 ? g->world + 1 : 6;
     event(g, EV_WORLD, &e); e->world = g->world;
   }
-  update_boxes(g, k);
+  /* las cajas de esta fila las pone BoxManager::update en el fotograma siguiente */
   spawn_boosts(g, k);
-  spawn_coins(g, k);
+  g->pendingRow = 1;
 }
 
 int game_inverted(const Game *g) { return g->world == 1 || g->world == 3 || g->world == 5; }
@@ -369,8 +372,8 @@ static void spawn_box(Game *g, int k, Collection *c) {
   } else {
     b.lane = c->lane; b.h = c->h; b.fixed = c->fixed; b.dir = c->rollDir; b.color = c->color;
     b.group = c->id; b.joined = 0;
-    c->count++;
     if (w->variant > 0 && c->count % w->variant == 0) { b.fixed = 1; b.h = R_UNITS; }
+    c->count++;
     if (b.fixed && !c->spiral && c->count > 1) b.joined = 1;
   }
   b.id = g->nextBoxId++;
@@ -392,11 +395,13 @@ static void spawn_box(Game *g, int k, Collection *c) {
 }
 
 /* ------------------------------------------------------------------ placas */
+/* filas del anillo padRow-6 ... padRow+6, y con vuelta también las 5 más antiguas */
 static int pad_busy(const Game *g, int l, int k) {
-  int i;
+  int i, kl = game_klast(g);
   for (i = 0; i < g->nBoxes; i++) {
     const Box *b = &g->boxes[i];
-    if (b->fixed && (b->lane == l || b->opp == l) && abs(b->k - k) <= 6) return 1;
+    if (b->fixed && !b->hit && (b->lane == l || b->opp == l) &&
+        ((b->k >= k - 6 && b->k <= k + 6) || (b->k >= kl - 29 && b->k <= kl - 25))) return 1;
   }
   return 0;
 }
@@ -448,7 +453,9 @@ static void update_fold(Game *g) {             /* Tunnel::updateFold */
   rate = fabs(g->fold) / 150 + 0.05; if (rate > 0.1) rate = 0.1;   /* Math.min(x, 0.1) */
   target = g->foldToIn ? FOLD_IN : FOLD_OUT;
   dir = js_sign(target - g->fold);
-  g->fold += dir * rate;
+  /* primero se encoge hacia 0; al quedar por debajo del paso cambia de signo y luego crece */
+  if (g->fold * target <= 0 && fabs(g->fold) < rate) g->fold = -g->fold;
+  else g->fold += dir * rate;
   if ((dir > 0 && g->fold >= target) || (dir < 0 && g->fold <= target)) {
     g->fold = target;
     g->folding = 0;
@@ -557,15 +564,17 @@ static void check_boost(Game *g) {             /* Player::checkForBoost */
   for (i = 0; i < g->nPads; i++) {
     Pad *p = &g->pads[i];
     double a, hw = 0.314159, lo, hi;
-    Row *row;
+    Row *r0, *r1;
     if (p->taken) continue;
     if (!((p->k == cur + 1 && f > 0.5) || p->k == cur)) continue;
     a = lane_angle(p->lane);
     lo = wrap_angle(a - hw); hi = wrap_angle(a + hw);
     if (!angle_in(wrap_angle(g->theta), lo, hi)) continue;
-    row = (Row *)game_row_at(g, p->k);
-    if (row && row->taken) continue;
-    if (row) row->taken = 1;
+    /* ni la fila actual ni la siguiente pueden estar ya usadas; se marcan las dos */
+    r0 = (Row *)game_row_at(g, cur); r1 = (Row *)game_row_at(g, cur + 1);
+    if ((r0 && r0->taken) || (r1 && r1->taken)) continue;
+    if (r0) r0->taken = 1;
+    if (r1) r1->taken = 1;
     for (j = 0; j < g->nPads; j++) if (g->pads[j].k == p->k) g->pads[j].taken = 1;
     p->got = 1;
     init_boost(g);
@@ -579,8 +588,9 @@ static void update_box_motion(Game *g) {
     Box *b = &g->boxes[i];
     if (b->grow < 1) { b->grow = b->grow + 0.027; if (b->grow > 1) b->grow = 1; }
     if (b->fixed || b->hit) continue;
-    b->roll += b->rollSpeed;
-    if (fabs(b->roll) >= edge) {
+    /* Box::update: o gira o llega, no las dos cosas en el mismo fotograma (41 por carril) */
+    if (fabs(b->roll) < edge) { b->roll += b->rollSpeed; continue; }
+    {
       int next;
       b->roll = 0;
       next = b->lane + (int)js_sign(b->rollSpeed);
@@ -656,16 +666,19 @@ int game_step(Game *g, double steer_in) {
     g->timeLeft += g->level >= 3 ? dtS : -dtS;
     if (g->timeLeft <= 0) { g->timeLeft = 0; die(g, NULL); return g->nEvents; }
   }
-  if (g->level == 3) g->boostTime += dtS;
+  if (g->level == 3) { g->boostTime += dtS; g->boostTotal += dtS; }
 
+  /* orden de Game::update: plegado, cajas de la fila nueva, movimiento y choques, jugador */
+  update_fold(g);
+  if (g->pendingRow) { int k = game_klast(g); g->pendingRow = 0; update_boxes(g, k); spawn_coins(g, k); }
+  update_box_motion(g);
+  check_collisions(g);
+  if (!g->alive) return g->nEvents;
   advance(g);
   steer(g, steer_in);
   check_boost(g);
   update_speed(g);
-  update_box_motion(g);
-  check_collisions(g);
   check_coins(g);
-  update_fold(g);
   prune(g);
   return g->nEvents;
 }

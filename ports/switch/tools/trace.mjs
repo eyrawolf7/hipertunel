@@ -42,6 +42,7 @@ function hashObjects(g) {
 function hashBits(g) {
   H = 2166136261;
   for (const x of [g.s, g.theta, g.omega, g.v, g.vTarget, g.fold, g.timeLeft, g.time, g.invul, g.boostTime, g.maxBoostTime, g.coinStreakT]) hd(x);
+  hd(g.boostTotal); hi(g.pendingRow);
   const t = g.turn;
   for (const x of [t.yawT, t.pitchT, t.dYaw, t.dPitch, t.thr]) hd(x);
   for (const r of g.rows) { hi(r.k); hd(r.yaw); hd(r.pitch); hi(r.taken); }

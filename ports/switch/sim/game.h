@@ -85,6 +85,7 @@ typedef struct {
   Turn turn;
   Row rows[ROWS]; int nRows;   /* rows[0] es la más antigua, como el array de JS */
   int kFirst;
+  int pendingRow;                  /* fila nueva a la espera de cajas y monedas */
 
   /* jugador */
   double s, theta, omega, v, vTarget;
@@ -92,6 +93,7 @@ typedef struct {
   double invul;
   int alive, crashes, rowsPassed;
   double maxBoostTime, boostTime, timeLeft;
+  double boostTotal;               /* tiempo total a tope (Player+0x128) */
   int lastCollideRow, killer;
 
   /* cajas y placas */

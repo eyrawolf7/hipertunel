@@ -136,6 +136,7 @@ function toMenu() { audio.pause(false); attract(); }
 function finish() {
   state = 'over'; overT = 0;
   const distM = game.distanceM;
+  coins = game.coinsGot;
   const score = Math.round(distM + coins * 10);
   const list = loadTop(mode);
   const me = { score, distM, coins, time: +game.time.toFixed(1), date: Date.now() };
@@ -238,7 +239,7 @@ function frame(now) {
   renderer.render();
   audio.setSpeed(game.speedMS, game.level);
   if (state === 'play' || state === 'countdown' || state === 'dying') {
-    ui.hud({ distM: game.distanceM, speedMS: state === 'countdown' && game.frame === 0 ? 0 : game.speedMS, level: game.level, coins, timeLeft: mode === 'timetrial' ? game.timeLeft : null, mode, invul: game.invul > 0, best: bestAtStart[mode] || 0, countdown: state === 'countdown' ? Math.ceil(countdown) : 0 });
+    ui.hud({ distM: game.distanceM, speedMS: state === 'countdown' && game.frame === 0 ? 0 : game.speedMS, level: game.level, coins: game.coinsGot, timeLeft: mode === 'timetrial' ? game.timeLeft : null, mode, invul: game.invul > 0, best: bestAtStart[mode] || 0, countdown: state === 'countdown' ? Math.ceil(countdown) : 0 });
   }
   // en la web desde Android se ofrece la app; dentro de la app (Capacitor) no
   const apk = $('apk'); if (apk) apk.hidden = !(IS_ANDROID_WEB && state === 'attract');

@@ -37,6 +37,7 @@ static uint32_t hash_bits(const Game *g) {
   H = 2166136261u;
   hd(g->s); hd(g->theta); hd(g->omega); hd(g->v); hd(g->vTarget); hd(g->fold);
   hd(g->timeLeft); hd(g->time); hd(g->invul); hd(g->boostTime); hd(g->maxBoostTime); hd(g->coinStreakT);
+  hd(g->boostTotal); hi(g->pendingRow);
   hd(g->turn.yawT); hd(g->turn.pitchT); hd(g->turn.dYaw); hd(g->turn.dPitch); hd(g->turn.thr);
   for (i = 0; i < g->nRows; i++) { hi(g->rows[i].k); hd(g->rows[i].yaw); hd(g->rows[i].pitch); hi(g->rows[i].taken); }
   for (i = 0; i < g->nBoxes; i++) { const Box *b = &g->boxes[i]; hd(b->h); hd(b->roll); hd(b->rollSpeed); hd(b->grow); }
