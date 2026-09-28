@@ -83,6 +83,7 @@ export class Renderer {
     this.applyTheme(0, 0, 1);
     this.time = 0;
     this.lean = 0;
+    this.warmup();
     this.deathFocus = null;
   }
 
@@ -122,6 +123,7 @@ export class Renderer {
     const u = this.tunnel.uniforms;
     c('base', u.uBase.value); c('base2', u.uBase2.value); c('seam', u.uSeam.value); c('fog', u.uFog.value); c('glow', u.uGlow.value);
     u.uDark.value = (A.dark || 0) + ((B.dark || 0) - (A.dark || 0)) * t;
+    u.uInvBase.value.set(A.inv || 0x13112a).lerp(new THREE.Color(B.inv || 0x13112a), t);
     this.sky.setTheme(A, B, t);
     this.decor.setTheme(t < 0.5 ? A : B);
     this.themeFog = u.uFog.value.clone();
@@ -150,6 +152,15 @@ export class Renderer {
     }
   }
 
+  // Compila todos los sombreadores al arrancar (también los ocultos: cielo, decorado, vacío) para
+  // que no haya tirones la primera vez que aparece algo.
+  warmup() {
+    const hidden = [];
+    this.scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
+    try { this.renderer.compile(this.scene, this.camera); } catch (e) {}
+    for (const o of hidden) o.visible = false;
+  }
+
   flash(hex, a) { this.cam.flashCol.set(hex); this.cam.flash = Math.max(this.cam.flash, a); }
 
   // s y theta vienen interpolados entre los dos últimos pasos de la simulación
@@ -164,7 +175,7 @@ export class Renderer {
     const landing = gapAhead ? gapAhead.to + 1 : -1;
     if (this.pendingTheme && (!gapAhead || s >= landing - 0.5)) {
       this.themeFrom = this.themeIdx; this.themeIdx += this.pendingTheme; this.pendingTheme = 0; this.themeBlend = 0;
-      if (gapAhead || this.wasFlying) this.flash(0xffffff, 0.45);
+      if (gapAhead || this.wasFlying) { this.flash(THEMES[this.themeIdx % THEMES.length].glow, 0.3); this.landT = 1.5; }
     }
     this.wasFlying = game.jumpAt(s) > 0.2;
     const inv = game.inverted || (this.pendingTheme > 0) ? 1 : 0;
@@ -224,7 +235,8 @@ export class Renderer {
     this.tunnel.uniforms.uKey.value.copy(this.upS).multiplyScalar(0.85).addScaledVector(this.look, -0.35).addScaledVector(right, -0.4).normalize();
     const gapNear = game.gaps.some((g) => g.from - s < 34 && g.to - s > -6);
     const outside = game.fold < 29 || gapNear;
-    const fogFar = outside ? 190 : 120;
+    const fogFar = (outside ? 190 : 120) * (1 + 0.3 * (this.landT > 0 ? this.landT / 1.5 : 0));
+    if (this.landT > 0) this.landT -= dt;
     this.tunnel.uniforms.uFogFar.value += (fogFar - this.tunnel.uniforms.uFogFar.value) * Math.min(1, dt * 2);
     this.tunnel.uniforms.uFogNear.value = this.tunnel.uniforms.uFogFar.value * 0.38;
     c.hit = Math.max(0, c.hit - dt * 3);
@@ -233,6 +245,7 @@ export class Renderer {
     this.boxes.update(game, tr, this.colors, dt, !game.alive && this.deathT > 0 && Math.floor(this.deathT * 10) % 2 ? game.killer : 0, cam.position);
     this.tunnel.uniforms.uOutside.value += ((game.fold < 29 ? 1 : 0) - this.tunnel.uniforms.uOutside.value) * Math.min(1, dt * 2);
     this.tunnel.uniforms.uSkyFill.value.copy(this.sky.u.uTop.value);
+    this.streaks.outside = outside;
     this.streaks.update(cam, this.look, this.upS, sp01, this.streakKick, dt, this.fogColor, this.cam.invert);
     this.streakKick = Math.max(0, (this.streakKick || 0) - dt * 1.5);
     this.pads.update(game, tr, dt);
@@ -251,7 +264,7 @@ export class Renderer {
       g.uFlash.value.set(c.flashCol.r, c.flashCol.g, c.flashCol.b, c.flash * (reduceFx ? 0.4 : 1));
     }
     c.flash = Math.max(0, c.flash - dt * 2.5);
-    if (this.bloom) this.bloom.strength = 0.45 + this.cam.invert * 0.15 + (outside ? 0.1 : 0);
+    if (this.bloom) this.bloom.strength = 0.45 + Math.max(this.cam.invert * 0.3, this.tunnel.uniforms.uDark.value * 0.2) + (outside ? 0.1 : 0);
   }
 
   render() { if (this.composer) this.composer.render(); else this.renderer.render(this.scene, this.camera); }

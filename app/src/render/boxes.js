@@ -23,7 +23,7 @@ export class Boxes {
       sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vGlow;\nvarying float vUpY;')
         // degradado de color: arriba más claro, abajo hacia un tono más profundo (sombra de color, no gris)
         .replace('#include <color_fragment>', '#include <color_fragment>\nfloat gy = clamp(vUpY + 0.5, 0.0, 1.0);\ndiffuseColor.rgb *= mix(vec3(0.62, 0.55, 0.78), vec3(1.1), gy);')
-        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * (0.05 + 0.3 * vGlow);');
+        .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * (0.05 + 0.3 * vGlow);\n// luz de borde blanca: separa la caja de un carril de su mismo color\ntotalEmissiveRadiance += vec3(pow(1.0 - saturate(dot(normalize(vNormal), normalize(vViewPosition))), 2.0)) * 0.35;');
     };
     this.mesh = new THREE.InstancedMesh(this.geo, this.mat, MAX);
     // contorno oscuro (casco invertido): deja las cajas recortadas como en un juego de Switch y

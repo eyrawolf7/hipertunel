@@ -36,7 +36,7 @@ export class Decor {
 
   load() {
     for (const name of ['island_a', 'island_b', 'island_c', 'cloud', 'crystal', 'planet', 'arch']) {
-      loadModel(name).then((m) => { if (m) { this.models[name] = m; this.rebuild = true; } });
+      loadModel(name).then((m) => { if (m) { this.models[name] = m; this.rebuild = true; this.onLoad && this.onLoad(); } });
     }
   }
 
@@ -60,7 +60,7 @@ export class Decor {
     for (let i = 0; i < 16; i++) {
       const name = kinds[i % kinds.length];
       const obj = this.build(name);
-      const big = name === 'planet' ? 2.4 : name.startsWith('island') ? 0.7 : name === 'arch' ? 1.4 : 1;
+      const big = name === 'planet' ? 2.4 : name.startsWith('island') ? 1.6 : name === 'arch' ? 1.4 : 1;
       obj.scale.multiplyScalar(big * (0.75 + Math.random() * 0.5));
       this.group.add(obj);
       this.items.push({ obj, name, placed: false, spin: (Math.random() - 0.5) * 0.2 });

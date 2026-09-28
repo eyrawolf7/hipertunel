@@ -26,9 +26,14 @@ void main(){
   float border = smoothstep(0.5, 0.44, max(q.x, q.y));
   float c = chev(uv) * smoothstep(0.46, 0.34, q.x);
   vec3 blue = mix(vec3(0.02, 0.2, 1.0), vec3(0.08, 0.72, 1.0), uv.y);
-  vec3 col = mix(blue, vec3(1.0), c);
+  vec3 col = mix(blue, vec3(0.92), c * 0.9);
   float a = vMain > 0.5 ? border : c * vAlpha;
-  vec3 outc = vMain > 0.5 ? col * 1.6 + vec3(1.0) * c * 1.2 : vec3(0.3, 0.7, 1.0) * 1.5;
+  // marco blanco y filete azul marino: se lee como placa y no como un destello
+  float m = max(q.x, q.y);
+  float frame = smoothstep(0.41, 0.43, m) * (1.0 - smoothstep(0.47, 0.49, m));
+  float navy = smoothstep(0.38, 0.4, m) * (1.0 - smoothstep(0.41, 0.42, m));
+  col = mix(col, vec3(1.0), frame); col = mix(col, vec3(0.04, 0.1, 0.4), navy);
+  vec3 outc = vMain > 0.5 ? min(col, vec3(1.0)) : vec3(0.3, 0.7, 1.0) * 0.9;
   if (a < 0.01) discard;
   gl_FragColor = vec4(outc, a);
 }`;

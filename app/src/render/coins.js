@@ -62,7 +62,7 @@ export class Coins {
       const bob = Math.sin(this.time * 4 + c.k * 0.7) * 0.06;
       p.copy(fr.P).addScaledVector(fr.X, sp.x).addScaledVector(fr.U, sp.y).addScaledVector(N, 0.85 + bob + game.jumpAt(sMid));
       m.makeBasis(T, N, B);
-      m.multiply(this.rot.makeRotationY(this.time * 5 + c.k * 0.5));
+      m.multiply(this.rot.makeRotationY(this.time * 3 + c.k * 0.5));
       const dc = camPos ? p.distanceTo(camPos) : 99;
       if (dc < 4) m.scale(this.sc.setScalar(Math.max(0, (dc - 1.2) / 2.8)));
       m.setPosition(p);

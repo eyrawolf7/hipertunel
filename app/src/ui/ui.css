@@ -60,8 +60,8 @@
 .htui .vig { position: absolute; inset: 0; pointer-events: none; z-index: -1; }
 .htui .vig-title {
   background:
-    radial-gradient(120% 85% at 50% 42%, transparent 45%, rgba(52, 34, 150, .45) 100%),
-    linear-gradient(180deg, rgba(40, 28, 120, .35) 0%, transparent 28%, transparent 66%, rgba(36, 24, 104, .7) 100%);
+    radial-gradient(120% 85% at 50% 42%, transparent 50%, rgba(52, 34, 150, .22) 100%),
+    linear-gradient(180deg, rgba(40, 28, 120, .22) 0%, transparent 26%, transparent 72%, rgba(36, 24, 104, .42) 100%);
 }
 .htui .vig-title::after, .htui .vig-menu::after {
   content: '';
@@ -671,7 +671,7 @@
 @keyframes stickerBob { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(-3deg) translateY(-.1em); } }
 @keyframes popIn { from { opacity: 0; transform: scale(.6); } }
 @keyframes playPulse { 0%, 100% { box-shadow: 0 .26em 0 var(--ink), 0 .5em 1.1em rgba(20, 12, 60, .35), 0 0 0 0 rgba(255, 75, 75, .55); } 50% { box-shadow: 0 .26em 0 var(--ink), 0 .5em 1.1em rgba(20, 12, 60, .35), 0 0 0 .45em rgba(255, 75, 75, 0); } }
-@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .7; } }
 @keyframes slideDown { from { opacity: 0; transform: translateY(-1em); } }
 @keyframes cardIn { from { opacity: 0; transform: translateY(1.5em) scale(.9); } }
 @keyframes cardPop { from { opacity: 0; transform: translateY(1.2em) scale(.85); } }

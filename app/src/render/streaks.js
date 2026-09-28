@@ -36,6 +36,8 @@ export class Streaks {
     // blanco en los mundos claros, color del mundo en los oscuros
     const bright = (fogColor.r + fogColor.g + fogColor.b) / 3;
     this.c.set(bright > 0.5 ? 0xffffff : 0xfff1c9);
+    // por fuera, sobre el cielo, se tiñen y bajan: si no parecen arañazos
+    if (this.outside) this.c.lerp(fogColor, 0.5);
     for (let i = 0; i < N; i++) {
       const o = this.d[i];
       o.z += speed * o.v * dt;
@@ -50,7 +52,7 @@ export class Streaks {
     }
     this.lines.geometry.attributes.position.needsUpdate = true;
     this.lines.geometry.attributes.color.needsUpdate = true;
-    this.mat.opacity = Math.min(0.55, Math.max(0, sp01 - 0.25) * 0.5 + kick * 0.4) * (1 - invert * 0.3);
+    this.mat.opacity = Math.min(0.55, Math.max(0, sp01 - 0.25) * 0.5 + kick * 0.4) * (1 - invert * 0.3) * (this.outside ? 0.5 : 1);
     this.lines.visible = this.mat.opacity > 0.01;
   }
 }

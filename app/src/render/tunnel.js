@@ -23,7 +23,7 @@ void main(){
 const frag = /* glsl */`
 uniform vec3 uBase; uniform vec3 uBase2; uniform vec3 uSeam; uniform vec3 uFog; uniform vec3 uGlow;
 uniform vec3 uCam; uniform vec3 uKey; uniform float uFogNear; uniform float uFogFar; uniform float uTime;
-uniform float uInvert; uniform vec2 uCellSize; uniform float uHit; uniform vec3 uRing; uniform float uOutside; uniform vec3 uSkyFill; uniform float uDark;
+uniform float uInvert; uniform vec2 uCellSize; uniform float uHit; uniform vec3 uRing; uniform float uOutside; uniform vec3 uSkyFill; uniform float uDark; uniform vec3 uInvBase;
 varying vec2 vUv; varying vec4 vWarn; varying vec3 vN; varying vec3 vW; varying vec2 vCell;
 float edgeDist(vec2 uv, vec2 size){ vec2 p = uv * size; vec2 q = min(p, size - p); return min(q.x, q.y); }
 void main(){
@@ -35,7 +35,8 @@ void main(){
   float bevel = smoothstep(0.03, 0.26, d);
   vec2 sub = abs(fract(vUv * vec2(2.0, 2.0)) - 0.5) * size / 2.0;
   float subD = min(sub.x, sub.y);
-  float subL = (1.0 - smoothstep(0.0, 0.008 + px, subD)) * 0.16;
+  float subL = (1.0 - smoothstep(0.0, 0.008 + px, subD)) * 0.07;
+  float ao = smoothstep(0.02, 0.12, d);                // sombra suave junto a la junta
   vec3 N = normalize(vN);
   vec3 V = normalize(uCam - vW);
   float lam = mix(0.6, 0.86, uOutside) + mix(0.4, 0.14, uOutside) * max(dot(N, uKey), 0.0);
@@ -57,21 +58,29 @@ void main(){
   col *= mix(0.78, 1.0, bevel);
   col += 0.1 * (1.0 - bevel) * step(0.5, vUv.x) * (1.0 - clamp(wa * 2.0, 0.0, 1.0));   // brillo del bisel
   col += uSkyFill * 0.14 * max(N.y, 0.0) * uOutside;
-  col = mix(col, uSeam, seam);
-  col = mix(col, uSeam, subL * (1.0 - clamp(wa * 2.0, 0.0, 1.0) * 0.5));
+  col *= mix(0.86, 1.0, ao);
+  // junta: un tono del propio panel (no tinta morada), con un toque del color de junta del mundo
+  vec3 seamC = mix(base * 0.6, uSeam, 0.35);
+  col = mix(col, seamC, seam);
+  col = mix(col, seamC, subL * (1.0 - clamp(wa * 2.0, 0.0, 1.0) * 0.5));
   // brillo de plástico: un reflejo especular suave que se mueve con la cámara
   vec3 H = normalize(uKey + V);
   col += vec3(1.0) * pow(max(dot(N, H), 0.0), 64.0) * 0.1 * (1.0 - clamp(wa, 0.0, 1.0) * 0.5);
   col += uGlow * fres * 0.25;
   // anillos de luz neutros cada 8 filas, en la junta: pasan zumbando y dan velocidad sin
   // teñir ningún carril (regla 2)
-  float ring = (mod(vCell.y, 8.0) < 0.5) ? (1.0 - smoothstep(0.02, 0.16 + px * 2.0, vUv.y * size.y)) : 0.0;
-  col = mix(col, uRing * 1.9, ring * 0.85 * (1.0 - uInvert));
+  float ringLine = (mod(vCell.y, 8.0) < 0.5) ? (1.0 - smoothstep(0.02, 0.16 + px * 2.0, vUv.y * size.y)) : 0.0;
+  // en los mundos claros es una banda ancha y suave (no un aro fino en el centro de la vista)
+  float ringBand = (mod(vCell.y, 8.0) < 0.5) ? (1.0 - smoothstep(0.0, 1.4, vUv.y * size.y)) : 0.0;
+  float ring = ringLine;
+  col = mix(col, uRing * 1.3, ringBand * 0.3 * (1.0 - uInvert));
   // estado invertido (transición entre mundos): túnel oscuro con juntas de neón
   // mundos oscuros y estado invertido: baldosa azul noche con juntas de luz (como las texturas
   // invertidas del original). El aviso sigue siendo apagado/encendido.
-  vec3 neon = mix(uGlow, vec3(1.0), 0.35 + 0.4 * uInvert);
-  vec3 inv = vec3(0.075, 0.068, 0.15) * (0.7 + 0.3 * lam) * mix(0.8, 1.0, bevel);
+  // pulso de luz que recorre las juntas hacia ti: le da vida al neón
+  float pulse = 0.65 + 0.9 * smoothstep(0.88, 1.0, fract(vCell.y / 24.0 + uTime * 0.6));
+  vec3 neon = mix(uGlow, vec3(1.0), 0.35 + 0.4 * uInvert) * pulse;
+  vec3 inv = uInvBase * (0.7 + 0.3 * lam) * mix(0.8, 1.0, bevel) * (0.8 + 0.4 * hemi) * mix(0.8, 1.0, ao);
   inv = mix(inv, vec3(0.03, 0.028, 0.06), uInvert);
   if (wa > 0.0) inv = mix(warn * 0.4, warn * 1.1, on) + warn * on * 0.3;
   inv += neon * (seam * 1.25 + subL * 0.45 + ring * 1.0) * (1.0 - clamp(wa * 2.0, 0.0, 1.0) * 0.5);
@@ -109,7 +118,7 @@ export class Tunnel {
       uKey: { value: new THREE.Vector3(0.3, 0.8, 0.5).normalize() },
       uFogNear: { value: 40 }, uFogFar: { value: 118 }, uTime: { value: 0 }, uInvert: { value: 0 },
       uCellSize: { value: new THREE.Vector2(CELL_W, ROW_M) }, uHit: { value: 0 },
-      uRing: { value: new THREE.Color(0xfff1c9) }, uDark: { value: 0 }, uOutside: { value: 0 }, uSkyFill: { value: new THREE.Color(0x8fc8ff) },
+      uRing: { value: new THREE.Color(0xfff1c9) }, uDark: { value: 0 }, uInvBase: { value: new THREE.Color(0x13112a) }, uOutside: { value: 0 }, uSkyFill: { value: new THREE.Color(0x8fc8ff) },
     };
     this.mat = new THREE.ShaderMaterial({ vertexShader: vert, fragmentShader: frag, uniforms: this.uniforms, side: THREE.DoubleSide });
     this.mesh = new THREE.Mesh(g, this.mat);
