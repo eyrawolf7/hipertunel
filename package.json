@@ -9,7 +9,8 @@
     "check": "node tests/checks.js",
     "shots": "node tests/shots.js",
     "build": "node tools/build-movil.js",
-    "compare": "node tests/compare.js"
+    "compare": "node tests/compare.js",
+    "densidad": "node tests/densidad.js"
   },
   "devDependencies": {
     "puppeteer": "^23.0.0",
