@@ -2183,7 +2183,7 @@ function sensorStatus(){
   el.hidden = false;
   let txt, ok = false;
   if (tilt.has) { ok = true; const deg = tilt.phi0 === null ? 0 : wrap(tilt.phi - tilt.phi0) * 180 / Math.PI; txt = 'Giroscopio activo ✓ · inclina para probar'; $('sensBar').style.transform = 'translateX(' + clamp(deg * 2.2, -46, 46) + 'px)'; }
-  else if (!window.isSecureContext) txt = 'El navegador bloquea el giroscopio al abrir el archivo desde el móvil. Ábrelo desde una web https (instrucciones en el chat).';
+  else if (!window.isSecureContext) txt = 'El navegador bloquea el giroscopio al abrir el archivo directamente. Ábrelo en eyrawolf7.github.io/hipertunel';
   else if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function' && !tilt.on) txt = 'Pulsa Jugar para dar permiso al giroscopio.';
   else if (tilt.on && performance.now() > 3000) txt = 'No llegan datos del giroscopio en este navegador (' + (window.self !== window.top ? 'se está abriendo dentro de otra página' : 'sensor sin datos') + ').';
   else txt = 'Buscando giroscopio…';

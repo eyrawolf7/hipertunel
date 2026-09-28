@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#cfe9ff">
 <title>Hipertúnel</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231a1740'/%3E%3Cpath d='M14 40l18-18 18 18' fill='none' stroke='%234db2ff' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M14 52l18-18 18 18' fill='none' stroke='%23fff' stroke-width='5' stroke-linecap='round' stroke-linejoin='round' opacity='.85'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
@@ -1126,7 +1127,7 @@ function sensorStatus(){
   el.hidden = false;
   let txt, ok = false;
   if (tilt.has) { ok = true; const deg = tilt.phi0 === null ? 0 : wrap(tilt.phi - tilt.phi0) * 180 / Math.PI; txt = 'Giroscopio activo ✓ · inclina para probar'; $('sensBar').style.transform = 'translateX(' + clamp(deg * 2.2, -46, 46) + 'px)'; }
-  else if (!window.isSecureContext) txt = 'El navegador bloquea el giroscopio al abrir el archivo desde el móvil. Ábrelo desde una web https (instrucciones en el chat).';
+  else if (!window.isSecureContext) txt = 'El navegador bloquea el giroscopio al abrir el archivo directamente. Ábrelo en eyrawolf7.github.io/hipertunel';
   else if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function' && !tilt.on) txt = 'Pulsa Jugar para dar permiso al giroscopio.';
   else if (tilt.on && performance.now() > 3000) txt = 'No llegan datos del giroscopio en este navegador (' + (window.self !== window.top ? 'se está abriendo dentro de otra página' : 'sensor sin datos') + ').';
   else txt = 'Buscando giroscopio…';
