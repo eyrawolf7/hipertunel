@@ -23,7 +23,8 @@ if (QS.get('q')) settings.quality = QS.get('q');
 const saveSettings = () => { try { localStorage.setItem('hipertunel-ajustes', JSON.stringify(settings)); } catch (e) {} };
 const loadTop = (mode) => { try { return JSON.parse(localStorage.getItem('hipertunel-top-' + mode) || '[]'); } catch (e) { return []; } };
 const saveTop = (mode, list) => { try { localStorage.setItem('hipertunel-top-' + mode, JSON.stringify(list)); } catch (e) {} };
-const bestOf = (mode) => { const t = loadTop(mode); return t.length ? t[0].score : 0; };
+// los récords van por distancia, como en Boost 2; los puntos (con monedas) son un dato aparte
+const bestOf = (mode) => { const t = loadTop(mode); return t.length ? (t[0].distM ?? t[0].score) : 0; };
 
 // ---------------------------------------------------------------- piezas
 const canvas = $('view');
@@ -140,10 +141,10 @@ function finish() {
   const score = Math.round(distM + coins * 10);
   const list = loadTop(mode);
   const me = { score, distM, coins, time: +game.time.toFixed(1), date: Date.now() };
-  list.push(me); list.sort((a, b) => b.score - a.score);
+  list.push(me); list.sort((a, b) => (b.distM ?? b.score) - (a.distM ?? a.score));
   const top = list.slice(0, 5); saveTop(mode, top);
   const isRecord = top[0] === me && list.length > 1;
-  ui.over({ mode, distM, coins, score, best: top[0].score, isRecord, time: game.time, maxBoostTime: mode === 'classic' ? game.boostTotal : game.maxBoostTime, top: top.map((e) => ({ ...e, me: e === me })) });
+  ui.over({ mode, distM, coins, score, best: top[0].distM ?? top[0].score, isRecord, time: game.time, maxBoostTime: mode === 'classic' ? game.boostTotal : game.maxBoostTime, top: top.map((e) => ({ ...e, me: e === me })) });
   ui.show('over');
   if (isRecord) audio.play('record');
   pushRecords();
