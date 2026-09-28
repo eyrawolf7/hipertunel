@@ -11,7 +11,8 @@
     "build": "node tools/build-movil.js",
     "compare": "node tests/compare.js",
     "densidad": "node tests/densidad.js",
-    "ritmo": "node tests/ritmo.js"
+    "ritmo": "node tests/ritmo.js",
+    "partida": "node tests/partida.js"
   },
   "devDependencies": {
     "puppeteer": "^23.0.0",

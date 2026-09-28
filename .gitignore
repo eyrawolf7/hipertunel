@@ -8,4 +8,6 @@ tests/despues-*/
 tests/cal-*/
 tests/prueba-*/
 tests/final-*/
+tests/partida*/
+tests/nuevo-*/
 dist/
