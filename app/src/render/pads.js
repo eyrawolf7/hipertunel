@@ -75,8 +75,8 @@ export class Pads {
     };
     for (const pd of game.pads) {
       if (pd.taken) continue;
-      put(pd.k - 0.5, pd.lane, 1, true);
-      for (let j = 1; j <= 6; j++) put(pd.k - 0.5 - j, pd.lane, (7 - j) / 7 * 0.8, false);
+      put(pd.k, pd.lane, 1, true);
+      for (let j = 1; j <= 6; j++) put(pd.k - j, pd.lane, (7 - j) / 7 * 0.8, false);
     }
     this.mesh.count = n;
     this.mesh.instanceMatrix.needsUpdate = true;

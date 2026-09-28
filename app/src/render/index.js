@@ -82,6 +82,7 @@ export class Renderer {
     this.themeIdx = 0; this.themeBlend = 1; this.themeFrom = 0;
     this.applyTheme(0, 0, 1);
     this.time = 0;
+    this.lean = 0;
     this.deathFocus = null;
   }
 
@@ -89,7 +90,7 @@ export class Renderer {
     this.quality = q;
     const dpr = Math.min(window.devicePixelRatio || 1, q === 'alta' ? 2 : q === 'media' ? 1.5 : 1);
     this.renderer.setPixelRatio(dpr);
-    if (this.composer) { this.composer.dispose?.(); }
+    if (this.composer) { for (const p of this.composer.passes) p.dispose?.(); this.composer.dispose?.(); }
     if (q === 'baja') { this.composer = null; this.bloom = null; this.grade = null; this.resize(); return; }
     const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: q === 'alta' ? 4 : 0 });
     const comp = new EffectComposer(this.renderer, rt);
@@ -175,7 +176,7 @@ export class Renderer {
     // ---- cámara: superficie del jugador + normal, mirando la dirección de la fila +10
     const closed = game.fold === 30 || game.fold === -30;
     const sec = section(game.fold);
-    const camS = s - 0.35;
+    const camS = s - 0.12;
     tr.frameAt(camS, this.fr);
     const u = theta / (CELL_DEG * DEG);
     surf(sec, u, closed, this.sp);
@@ -203,6 +204,10 @@ export class Renderer {
     cam.up.copy(this.upS);
     // giro del impulso (Camera::boostEffect): ±0,127 rad que se apaga
     if (c.roll > 0) { cam.up.applyAxisAngle(this.look, c.rollAmp * c.roll * (reduceFx ? 0.3 : 1)); c.roll = Math.max(0, c.roll - dt * 1.4); }
+    // alabeo al girar: unos pocos grados, suavizado; solo sensación, no cambia la mecánica
+    this.lean += ((game.alive ? -game.omega * 0.9 : 0) - this.lean) * Math.min(1, dt * 8);
+    const leanA = Math.max(-0.07, Math.min(0.07, this.lean)) * (reduceFx ? 0.3 : 1);
+    if (leanA) cam.up.applyAxisAngle(this.look, leanA);
     cam.lookAt(target);
     // campo de visión: base del original, con un empujón al impulsar
     const sp01 = Math.min(1, Math.max(0, (game.speedMS - 36) / 64));

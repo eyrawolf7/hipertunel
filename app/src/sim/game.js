@@ -66,7 +66,7 @@ export class Game {
     this.foldToIn = false;             // sentido del plegado en curso
     this.foldRows = 0;                 // filas desde que se ordenó
     this.foldStarted = false;
-    this.world = 0;                    // estado visual: pares = mundo, impares = transición invertida
+    this.world = this.mode === 'survival' ? 2 : 0;   // estado visual: pares = mundo, impares = transición invertida
     this.worldRows = -1;               // cuenta atrás hasta salir del estado invertido
     this.curves = true;
     this.turn = { yawT: 0, pitchT: 0, dYaw: 0, dPitch: 0, thr: 2, need: true };
@@ -100,7 +100,7 @@ export class Game {
     this.intervalCount = 0;
     this.lastLoc = rng.int(0, 100000) % LANES;
     this.invertedHold = false;
-    this.boostCounter = 25;            // BoostManager+8 (arranca a 25)
+    this.boostCounter = 0;             // BoostManager+8 (25 solo en el tutorial)
     this.pads = [];                    // { k, lane, taken }
 
     // ---- monedas (añadido de Hipertúnel, no está en Boost 2). Llevan su propio generador para
@@ -125,11 +125,13 @@ export class Game {
       if (t.need && !this.folding) this.nextTurn(prev);
       yaw = prev.yaw - t.dYaw;
       pitch = prev.pitch + t.dPitch;
-      if (Math.abs(yaw - t.yawT) < t.thr) t.dYaw = 0;
-      if (Math.abs(pitch - t.pitchT) < t.thr) t.dPitch = 0;
-      if (t.dYaw === 0 && t.dPitch === 0) t.need = true;
+      // Tunnel::updateAngle: llegar al objetivo solo apaga la marca de ese eje; el paso sigue
+      // aplicándose hasta que llegan los dos y se elige un objetivo nuevo
+      if (Math.abs(yaw - t.yawT) < t.thr) t.yawOn = false;
+      if (Math.abs(pitch - t.pitchT) < t.thr) t.pitchOn = false;
+      if (!t.yawOn && !t.pitchOn) t.need = true;
       if (this.folding) {
-        if (this.foldRows === 0) { t.dYaw = t.dPitch = 0; }
+        if (this.foldRows === 0) { t.dYaw = t.dPitch = 0; t.yawOn = t.pitchOn = false; }
         this.foldRows++;
       }
     }
@@ -154,6 +156,7 @@ export class Game {
     t.thr = 2 + step;
     t.dYaw = t.yawT - prev.yaw > 0 ? -step : step;
     t.dPitch = t.pitchT - prev.pitch > 0 ? step : -step;
+    t.yawOn = step !== 0; t.pitchOn = step !== 0;
     t.need = false;
   }
 
@@ -226,18 +229,18 @@ export class Game {
   get inverted() { return this.world === 1 || this.world === 3 || this.world === 5; }
 
   updateBoxes(row) {
-    const w = this.wave;
+    // BoxManager::update: primero updateWave; en clásico y contrarreloj no sale nada mientras
+    // dura el estado invertido, ni en la primera fila después
+    if (this.wave.n >= 0 && this.waveLeft < 1 && !this.coll) this.incrementWave();
     if (this.mode === 'classic' || this.mode === 'timetrial') {
-      if (this.inverted) {
-        if (!this.invertedHold) {
-          this.invertedHold = true;
-          if (w.fold) { this.coll = null; this.waveLeft = 0; this.incrementWave(); }
-        }
-        return;                        // mientras dura el estado invertido no sale nada
+      if (!this.inverted) { if (!this.invertedHold) this.spawnNewBoxes(row); }
+      else if (!this.invertedHold) {
+        this.invertedHold = true;
+        if (this.fold > 0 && this.wave.fold) { this.coll = null; this.waveLeft = 0; this.incrementWave(); }
       }
-      this.invertedHold = false;
+      if (!this.inverted) this.invertedHold = false;
+      return;
     }
-    if (w.n >= 0 && this.waveLeft < 1 && !this.coll) this.incrementWave();
     this.spawnNewBoxes(row);
   }
 
@@ -333,12 +336,13 @@ export class Game {
     b.grow = this.fold === FOLD_OUT && !this.folding ? 0 : 1;
     b.hit = false;
     b.bornFrame = this.frame;
-    if (this.folding && this.fold < 25) b.h = SHORT_H, b.tall = false;
+    if (this.folding && (this.fold > 25 || this.foldToIn)) { b.h = SHORT_H; b.tall = false; }
+    if (!b.fixed && this.fold !== FOLD_IN && this.fold !== FOLD_OUT && ((b.lane === LANES - 1 && b.rollSpeed > 0) || (b.lane === 0 && b.rollSpeed < 0))) b.rollSpeed = -b.rollSpeed;
     // en el tubo cerrado el pilar alto cruza de lado a lado y tapa también el carril opuesto
     b.opp = b.tall && this.fold === FOLD_IN ? mod(b.lane + LANES / 2, LANES) : -1;
     this.boxes.push(b);
     if (this.boxes.length > 32) this.boxes.shift();
-    if (w.n >= 0 && !this.folding) this.waveLeft--;
+    if (w.n >= 0 && (this.fold === FOLD_IN || this.fold === FOLD_OUT)) this.waveLeft--;
     this.event('spawn', { id: b.id });
   }
 
@@ -355,7 +359,8 @@ export class Game {
     const lane = rng.int(0, 100000) % LANES;
     const closed = this.fold > 0;
     const lanes = closed ? [lane, (lane + 6) % LANES] : [lane, (lane + 3) % LANES, (lane + 6) % LANES, (lane + 9) % LANES];
-    const busy = (l) => this.boxes.some((b) => (b.lane === l || b.opp === l) && Math.abs(b.k - k) <= 6);
+    // la celda 'ocupada' del original solo la marcan las franjas iluminadas (cajas fijas)
+    const busy = (l) => this.boxes.some((b) => b.fixed && (b.lane === l || b.opp === l) && Math.abs(b.k - k) <= 6);
     let ok;
     if (closed) {
       if (lanes.some(busy)) return;
@@ -390,8 +395,11 @@ export class Game {
       this.fold = target;
       this.folding = false;
       // Tunnel::switchStateWithTransition: estado invertido 24 filas y después el mundo nuevo
-      this.world = Math.min(6, this.world + 1);
-      this.worldRows = 24;
+      // switchStateWithTransition solo al volver a plegar hacia dentro (clásico y contrarreloj)
+      if (this.foldToIn && (this.mode === 'classic' || this.mode === 'timetrial')) {
+        this.world = Math.min(6, this.world + 1);
+        this.worldRows = 24;
+      }
       // En el estado invertido no sale ninguna caja: el render aprovecha ese hueco para cortar la
       // carretera y hacer un salto entre mundos. Es solo visual, no cambia ninguna regla.
       if (this.inverted) this.gaps.push({ from: this.kLast + 4, to: this.kLast + 19 });
@@ -414,7 +422,7 @@ export class Game {
   onStrip(lane) {
     const hw = stripHalfWidth(this.fold);
     let lo = laneAngle(lane) - hw, hi = laneAngle(lane) + hw;
-    if (this.folding || (this.fold !== FOLD_IN && this.fold !== FOLD_OUT)) return this.theta > lo && this.theta < hi;
+    if (this.fold !== FOLD_IN && this.fold !== FOLD_OUT) return this.theta > lo && this.theta < hi;
     lo = wrapAngle(lo); hi = wrapAngle(hi);
     return angleIn(wrapAngle(this.theta), lo, hi);
   }
@@ -464,7 +472,7 @@ export class Game {
     this.events = [];
     this.frame++;
     const dtS = 1 / 60;
-    if (!this.alive) { this.v += (0 - this.v) * 0.08; this.advance(); this.updateFold(); return this.events; }
+    if (!this.alive) { this.v += (0 - this.v) * 0.022; this.advance(); this.updateFold(); return this.events; }
     this.time += dtS;
 
     if (this.invul > 0) this.invul -= dtS;
@@ -498,8 +506,8 @@ export class Game {
 
   updateSpeed() {                      // Player::updateSpeed
     if (this.mode === 'survival') {
-      this.v += 0.0005; this.vTarget = this.v;
-      if (this.v > V_MAX) this.v = this.vTarget = V_MAX;
+      this.v += 0.0005; this.vTarget = this.v;       // el objetivo sigue subiendo sin tope
+      if (this.v > V_MAX) this.v = V_MAX;
       return;
     }
     const d = this.vTarget - this.v;
@@ -510,7 +518,7 @@ export class Game {
     const cur = Math.floor(this.s), f = this.s - cur;
     for (const p of this.pads) {
       if (p.taken) continue;
-      if (!((p.k === cur && f >= 0.5) || p.k === cur + 1)) continue;
+      if (!((p.k === cur + 1 && f > 0.5) || p.k === cur)) continue;
       const a = laneAngle(p.lane);
       const hw = 0.314159;
       const lo = wrapAngle(a - hw), hi = wrapAngle(a + hw);
@@ -533,10 +541,9 @@ export class Game {
       if (Math.abs(b.roll) >= edge) {
         b.roll = 0;
         let next = b.lane + Math.sign(b.rollSpeed);
-        if (this.folding || this.fold !== FOLD_IN) {
-          if (next > LANES - 1 || next < 0) { b.rollSpeed = -b.rollSpeed; next = b.lane + Math.sign(b.rollSpeed); }
-        }
         b.lane = mod(next, LANES);
+        // en lámina abierta rebotan al llegar al borde, sin salirse; en tubo (dentro o fuera) dan la vuelta
+        if (this.fold !== FOLD_IN && this.fold !== FOLD_OUT && ((b.lane === LANES - 1 && b.rollSpeed > 0) || (b.lane === 0 && b.rollSpeed < 0))) b.rollSpeed = -b.rollSpeed;
       }
     }
   }
@@ -551,7 +558,7 @@ export class Game {
     const cur = Math.floor(this.s), f = this.s - cur;
     const hw = stripHalfWidth(this.fold);
     const th = this.theta;
-    const open = this.folding || (this.fold !== FOLD_IN && this.fold !== FOLD_OUT);
+    const open = this.fold !== FOLD_IN && this.fold !== FOLD_OUT;
     const inside = (c) => {
       let lo = c - hw, hi = c + hw;
       if (open) return th > lo && th < hi;
@@ -560,11 +567,12 @@ export class Game {
     for (const b of this.boxes) {
       if (b.hit) continue;
       const a = this.boxAngle(b);
+      // 0x104 del original es la fila actual y 0xfc la siguiente
       if (b.tall) {
-        if (cur !== b.k) continue;
-        if (inside(a) || (this.fold > 28 && inside(a + Math.PI))) this.crash(b);
+        if (b.k !== cur + 1) continue;
+        if (inside(a) || (this.fold > 27 && inside(a + Math.PI))) this.crash(b);
       } else {
-        if (!((cur === b.k && f > 0.5) || b.k === cur + 1)) continue;
+        if (!((b.k === cur + 1 && f > 0.5) || b.k === cur)) continue;
         if (inside(a)) this.crash(b);
       }
     }
@@ -590,7 +598,7 @@ export class Game {
       if (!b.fixed || b.hit) continue;
       const add = (lane) => { if (!out.has(lane)) out.set(lane, []); out.get(lane).push({ from: near, to: b.k, color: b.color, id: b.id }); };
       add(b.lane);
-      if (b.opp >= 0 && this.fold > 26) add(b.opp);
+      if (b.opp >= 0 && this.fold > 27) add(b.opp);
     }
     return out;
   }

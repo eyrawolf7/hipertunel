@@ -341,7 +341,7 @@ await run(8, async () => {
     const p99 = sorted[Math.floor(sorted.length * 0.99)];
     const worst1 = sorted.slice(Math.floor(sorted.length * 0.99));
     const low1 = 1000 / (worst1.reduce((a, b) => a + b, 0) / worst1.length);
-    const info = await page.evaluate(() => { const i = window.__hip.renderer.renderer.info; return { calls: i.render.calls, tris: i.render.triangles, dpr: window.__hip.renderer.renderer.getPixelRatio(), q: window.__hip.renderer.quality, s: +window.__hip.game.s.toFixed(0) }; });
+    const info = await page.evaluate(() => { const i = window.__hip.renderer.renderer.info; return { dpr: window.__hip.renderer.renderer.getPixelRatio(), q: window.__hip.renderer.quality, s: +window.__hip.game.s.toFixed(0) }; });
     const res = { avgFps: +(1000 / avg).toFixed(1), p99ms: +p99.toFixed(1), low1Fps: +low1.toFixed(1), maxMs: +sorted[sorted.length - 1].toFixed(1), frames: r.length, over33ms: r.filter((x) => x > 33.4).length, ...info };
     rec(8, `rendimiento ${name} (${PERF_S} s, demo del título)`, res.avgFps >= 55 && res.low1Fps >= 30 && errors.length === 0, res);
     await page.close();

@@ -2,6 +2,7 @@
 // procedurales. Su "arriba" es el de la pista, suavizado, así al correr por fuera del tubo el cielo
 // queda siempre por encima de la carretera.
 import * as THREE from 'three';
+const Z = new THREE.Vector3(0, 0, 1);
 
 const vert = /* glsl */`
 varying vec3 vDir;
@@ -26,6 +27,29 @@ void main(){
   gl_FragColor = vec4(col, 1.0);
 }`;
 
+// Mar de nubes: un disco enorme muy por debajo de la pista con nubes procedurales (fbm) que
+// avanzan despacio. Da horizonte y profundidad a las fases por fuera sin tocar la carretera.
+const seaVert = /* glsl */`
+varying vec2 vP; varying float vD;
+void main(){ vP = position.xy; vec4 w = modelMatrix * vec4(position, 1.0); vD = length(position.xy);
+  gl_Position = projectionMatrix * viewMatrix * w; }`;
+const seaFrag = /* glsl */`
+uniform vec3 uA; uniform vec3 uB; uniform vec3 uFogC; uniform float uTime; uniform float uAlpha; uniform vec2 uOff;
+varying vec2 vP; varying float vD;
+float h2(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float n2(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h2(i), h2(i + vec2(1, 0)), f.x), mix(h2(i + vec2(0, 1)), h2(i + vec2(1, 1)), f.x), f.y); }
+float fbm(vec2 p){ float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++) { s += a * n2(p); p *= 2.03; a *= 0.5; } return s; }
+void main(){
+  vec2 p = (vP + uOff) / 180.0;
+  float c = fbm(p + vec2(uTime * 0.01, 0.0));
+  float puff = smoothstep(0.38, 0.72, c);
+  vec3 col = mix(uB, uA, puff);
+  float fade = smoothstep(1500.0, 300.0, vD);
+  col = mix(uFogC, col, fade);
+  gl_FragColor = vec4(col, uAlpha * smoothstep(1600.0, 900.0, vD));
+}`;
+
 export class Sky {
   constructor(scene) {
     this.u = {
@@ -36,6 +60,10 @@ export class Sky {
     this.mesh = new THREE.Mesh(new THREE.SphereGeometry(800, 48, 24), new THREE.ShaderMaterial({ vertexShader: vert, fragmentShader: frag, uniforms: this.u, side: THREE.BackSide, depthWrite: false, fog: false }));
     this.mesh.renderOrder = -10; this.mesh.frustumCulled = false;
     scene.add(this.mesh);
+    this.seaU = { uA: { value: new THREE.Color(0xffffff) }, uB: { value: new THREE.Color(0xc9dcff) }, uFogC: { value: new THREE.Color() }, uTime: { value: 0 }, uAlpha: { value: 0 }, uOff: { value: new THREE.Vector2() } };
+    this.sea = new THREE.Mesh(new THREE.CircleGeometry(1600, 48), new THREE.ShaderMaterial({ vertexShader: seaVert, fragmentShader: seaFrag, uniforms: this.seaU, transparent: true, depthWrite: false, fog: false }));
+    this.sea.renderOrder = -9; this.sea.frustumCulled = false;
+    scene.add(this.sea);
     this.vis = 0;
     this._c = new THREE.Color();
   }
@@ -47,6 +75,11 @@ export class Sky {
     u.uBot.value.set(A.skyBot).lerp(c.set(B.skyBot), t);
     u.uSun.value.set(A.sun).lerp(c.set(B.sun), t);
     u.uStars.value = A.stars + (B.stars - A.stars) * t;
+    // nubes: blancas en los mundos de día, teñidas del horizonte en los de noche
+    const night = (A.stars + (B.stars - A.stars) * t) > 0.5;
+    this.seaU.uA.value.copy(u.uBot.value).lerp(c.set(0xffffff), night ? 0.25 : 0.85);
+    this.seaU.uB.value.copy(u.uMid.value).lerp(u.uBot.value, 0.5).multiplyScalar(night ? 0.7 : 0.95);
+    this.seaU.uFogC.value.copy(u.uMid.value);
   }
 
   update(camera, up, outside, dt, invert) {
@@ -57,5 +90,13 @@ export class Sky {
     // el cielo solo se ve por fuera o mientras el tubo se abre
     this.vis += ((outside ? 1 : 0) - this.vis) * Math.min(1, dt * 3);
     this.mesh.visible = this.vis > 0.01;
+    // el mar va 110 m por debajo, perpendicular al "arriba" del cielo, y se desliza con la cámara
+    const skyUp = this.u.uUp.value;
+    this.sea.position.copy(camera.position).addScaledVector(skyUp, -110);
+    this.sea.quaternion.setFromUnitVectors(Z, skyUp);
+    this.seaU.uOff.value.set(camera.position.x, -camera.position.z);
+    this.seaU.uTime.value += dt;
+    this.seaU.uAlpha.value = this.vis * (1 - invert);
+    this.sea.visible = this.vis > 0.01 && invert < 0.99;
   }
 }

@@ -7,7 +7,7 @@ const isIOS = typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEve
 export function createInput(target) {
   const st = {
     tiltOn: true, invert: false, sens: 1, cal: 0,
-    raw: 0, has: false, motionN: 0, listening: false,
+    raw: 0, has: false, motionN: 0, listening: false, target: null,
     keys: new Set(), touches: new Map(), holdT: 0, dir: 0,
     pad: { x: 0, dl: false, dr: false, a: false, b: false, start: false, up: false, down: false, prev: {} },
     onButton: null,
@@ -80,7 +80,9 @@ export function createInput(target) {
   }
 
   // "a" virtual para control digital: arranca suave (un toque = un carril) y acelera si mantienes
-  const digital = (t) => 0.13 + 0.2 * Math.min(1, t / 0.3);
+  const digital = (t) => 0.3 + 0.12 * Math.min(1, t / 0.3);
+  const HOLD = 0.18;
+  const assist = (diff, open) => { const dd = open ? diff : Math.atan2(Math.sin(diff), Math.cos(diff)); return Math.max(-0.42, Math.min(0.42, dd * 2.5)); };
 
   return {
     requestTilt,
@@ -91,18 +93,32 @@ export function createInput(target) {
     get tiltValue() { return st.raw - st.cal; },
     get hasTilt() { return st.has; },
     // Llamar una vez por paso de simulación (60 Hz). Devuelve el "a" final.
-    steer(dt) {
+    // theta: ángulo actual del jugador; open: lámina abierta (sin vuelta).
+    steer(dt, theta = 0, open = false) {
       pollPad();
       let a = 0, src = 'none';
       const kd = (st.keys.has('ArrowLeft') || st.keys.has('KeyA') ? -1 : 0) + (st.keys.has('ArrowRight') || st.keys.has('KeyD') ? 1 : 0);
       let td = 0; for (const t of st.touches.values()) td = t.d;
       const pd = (st.pad.dl ? -1 : 0) + (st.pad.dr ? 1 : 0);
       const d = kd || td || pd;
+      // Control digital con asistencia de carril: un toque lleva al centro del carril siguiente;
+      // mantener desliza de forma continua y al soltar encaja en el carril hacia el que ibas.
+      const L = Math.PI / 6, u = theta / L;
       if (d !== 0) {
-        if (d !== st.dir) st.holdT = 0; else st.holdT += dt;
-        st.dir = d; a = d * digital(st.holdT); src = 'digital';
-      } else { st.dir = 0; st.holdT = 0; }
-      if (!a && st.pad.x) { a = st.pad.x * 0.42; src = 'pad'; }
+        if (d !== st.dir) { st.holdT = 0; st.target = d > 0 ? Math.floor(u + 0.35) + 1 : Math.ceil(u - 0.35) - 1; }
+        else st.holdT += dt;
+        st.dir = d; src = 'digital';
+        if (st.holdT < HOLD) a = assist(st.target * L - theta, open);
+        else { a = d * digital(st.holdT - HOLD); st.target = d > 0 ? Math.ceil(u - 0.05) : Math.floor(u + 0.05); }
+      } else {
+        st.dir = 0; st.holdT = 0;
+        if (st.target !== null) {
+          const diff = st.target * L - theta;
+          const dd = open ? diff : Math.atan2(Math.sin(diff), Math.cos(diff));
+          if (Math.abs(dd) < 0.006) st.target = null; else { a = assist(diff, open); src = 'digital'; }
+        }
+      }
+      if (!a && st.pad.x) { a = st.pad.x * 0.42; src = 'pad'; st.target = null; }
       if (!a && st.tiltOn && st.has) { a = (st.raw - st.cal) * st.sens; if (st.invert) a = -a; src = 'tilt'; }
       st.src = src;
       return a;

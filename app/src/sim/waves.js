@@ -17,7 +17,8 @@ export function buildWaves(mode, rng) {
   const r = (x, y) => rng.float(x, y);
   const ri = (x, y) => Math.trunc(rng.float(x, y));
   const W = [];
-  const w = (n, a, b, c, d, e, extra = {}) => { const o = Object.assign(base(), { n, a, b, c, d, e }, extra); W.push(o); return o; };
+  // Orden de initWave del original: (n, a, b, c, colección, espiral). Aquí e = colección y d = espiral.
+  const w = (n, a, b, c, pCol, pSpi, extra = {}) => { const o = Object.assign(base(), { n, a, b, c, d: pSpi, e: pCol }, extra); W.push(o); return o; };
   const col = (lo, hi) => ({ nMin: lo, nMax: hi });
 
   if (mode === 'classic') {
@@ -88,9 +89,8 @@ export function buildWaves(mode, rng) {
     w(ri(100, 125), 0.25, 1, 0.5, 0.5, 0.5, { interval: 2, ...col(1, 4) });
     w(10, 0.2, 1, 0, 1, 1, { interval: 15, ...col(40, 40), period: -3, sep: 0 });
     w(150, 0.3, 0.5, 0.5, 0.15, 0, { interval: 1, dir: 0.5 });
-    // el original sube la densidad de estas siete oleadas con una recta; no se pudo leer la
-    // constante, así que se reparte entre 0,25 y 0,55
-    for (let i = 0; i < 7; i++) w(ri(25, 75), 0.25 + i * 0.05, r(0.1, 0.9), 0, r(0.1, 0.9), 1, { spiralRollers: false, ...col(5, 10), dir: 0.5 });
+    // el original sube la densidad de estas siete oleadas: 0,2 + i·0,033
+    for (let i = 0; i < 7; i++) w(ri(25, 75), 0.2 + i * 0.033, r(0.1, 0.9), 0, r(0.1, 0.9), 1, { spiralRollers: false, ...col(5, 10), dir: 0.5 });
     w(ri(50, 100), 0.4, 1, 0, 1, 1, { ...col(4, 4), interval: 5, dir: 0.5, fold: true });
     w(ri(100, 125), 0.55, 0.8, 0, 0, 0, { dir: 0.5 });
     w(1000, 0.55, 0.8, 1, 1, 0, { dir: 0.5, fold: true });

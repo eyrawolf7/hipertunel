@@ -26,7 +26,7 @@ await page.goto(url + (url.includes('?') ? '&' : '?') + 'fps', { waitUntil: 'net
 await page.waitForFunction(() => window.__hip && window.__hip.game, { timeout: 15000 });
 const report = [];
 if (opt.title) { await new Promise((r) => setTimeout(r, 1500)); await page.screenshot({ path: out + 'titulo.png' }); }
-await page.evaluate((m, seed) => window.__hip.start(m, seed), opt.mode || 'classic', +(opt.seed || 3));
+await page.evaluate((m, seed) => { window.__hip.start(m, seed); window.__freeze = true; }, opt.mode || 'classic', +(opt.seed || 3));
 for (const r of rows) {
   const st = await page.evaluate(async (r) => {
     const h = window.__hip;

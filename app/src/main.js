@@ -14,7 +14,8 @@ const $ = (id) => document.getElementById(id);
 const QS = new URLSearchParams(location.search);
 
 // ---------------------------------------------------------------- ajustes y récords
-const DEFAULTS = { tilt: true, invert: false, sens: 1, quality: 'alta', reduceFx: false, music: true, sound: true };
+const COARSE = matchMedia('(pointer: coarse)').matches;
+const DEFAULTS = { tilt: true, invert: false, sens: 1, quality: COARSE ? 'media' : 'alta', reduceFx: false, music: true, sound: true };
 let settings = { ...DEFAULTS };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('hipertunel-ajustes') || '{}')); } catch (e) {}
 if (QS.get('q')) settings.quality = QS.get('q');
@@ -50,7 +51,7 @@ const ui = createUI($('ui'), {
     if (k === 'sound') audio.setMuted(!v);
     if (k === 'tilt' && v) input.requestTilt();
   },
-  onCalibrate: () => { input.requestTilt(); input.calibrate(); ui.toast('Centro calibrado', 'info'); },
+  onCalibrate: () => { input.requestTilt(); input.calibrate(); },
   onSound: (n) => audio.play(n),
   onPause: () => pause(),
   keyboard: false,
@@ -65,8 +66,7 @@ input.onButton = (b) => {
   if (state === 'play' && (b === 'pause' || b === 'back')) { pause(); return; }
   if (state === 'over' && b === 'ok' && overT > 0.6) { startGame(mode); return; }
   if (state !== 'play' && state !== 'countdown') {
-    if (b === 'up' || b === 'left') ui.navigate?.(-1);
-    else if (b === 'down' || b === 'right') ui.navigate?.(1);
+    if (b === 'up' || b === 'left' || b === 'down' || b === 'right') ui.navigate?.(b);
     else if (b === 'ok') ui.confirm?.();
     else if (b === 'back') ui.back?.();
   }
@@ -130,8 +130,8 @@ function stepSim() {
   prev.s = game.s; prev.theta = game.theta;
   let steer = 0;
   if (state === 'attract') steer = botSteer(game);
-  else if (state === 'play') steer = input.steer(STEP);
-  else input.steer(STEP);
+  else if (state === 'play') steer = input.steer(STEP, game.theta, game.fold !== 30 && game.fold !== -30);
+  else input.steer(STEP, game.theta, false);
   const ev = game.step({ steer });
   renderer.onEvents(ev, game);
   for (const e of ev) {

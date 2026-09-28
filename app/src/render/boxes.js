@@ -63,8 +63,9 @@ export class Boxes {
     for (const b of game.boxes) {
       if (b.hit || n >= MAX) continue;
       const tall = b.tall && game.fold > 26;
-      // colocación a lo largo: las cortas ocupan [k−1, k], los pilares [k, k+1] (ver colisiones)
-      const sMid = tall ? b.k + 0.5 : b.k - 0.5;
+      // colocación a lo largo, cuadrada con las ventanas de choque del original: la caja corta
+      // se centra en su anillo (choca de k−0,5 a k+1), el pilar medio carril antes (de k−1 a k)
+      const sMid = tall ? b.k - 0.5 : b.k;
       if (!track.rings.has(Math.floor(sMid)) || !track.rings.has(Math.floor(sMid) + 1)) continue;
       track.frameAt(sMid, fr);
       surf(sec, b.lane, closed, sp);
