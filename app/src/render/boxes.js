@@ -11,23 +11,25 @@ const DEG = Math.PI / 180;
 
 export class Boxes {
   constructor(scene, envMap) {
-    this.geo = new RoundedBoxGeometry(1, 1, 1, 3, 0.09);
+    this.geo = new RoundedBoxGeometry(1, 1, 1, 3, 0.14);
     this.mat = new THREE.MeshPhysicalMaterial({
-      color: 0xffffff, roughness: 0.38, metalness: 0.0, clearcoat: 1.0, clearcoatRoughness: 0.1,
-      envMapIntensity: 0.8, emissive: 0x000000,
+      color: 0xffffff, roughness: 0.26, metalness: 0.0, clearcoat: 1.0, clearcoatRoughness: 0.08,
+      envMapIntensity: 0.4, emissive: 0x000000,
     });
     // brillo propio: sube cuando estás en su carril (Box+0x1c del original)
     this.mat.onBeforeCompile = (sh) => {
-      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aGlow;\nvarying float vGlow;')
-        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlow = aGlow;');
-      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vGlow;')
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float aGlow;\nvarying float vGlow;\nvarying float vUpY;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlow = aGlow; vUpY = position.y;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vGlow;\nvarying float vUpY;')
+        // degradado de color: arriba más claro, abajo hacia un tono más profundo (sombra de color, no gris)
+        .replace('#include <color_fragment>', '#include <color_fragment>\nfloat gy = clamp(vUpY + 0.5, 0.0, 1.0);\ndiffuseColor.rgb *= mix(vec3(0.62, 0.55, 0.78), vec3(1.1), gy);')
         .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * (0.05 + 0.3 * vGlow);');
     };
     this.mesh = new THREE.InstancedMesh(this.geo, this.mat, MAX);
     // contorno oscuro (casco invertido): deja las cajas recortadas como en un juego de Switch y
     // las separa del fondo claro
     this.outlineMat = new THREE.ShaderMaterial({
-      uniforms: { uColor: { value: new THREE.Color(0x2b2257) }, uW: { value: 0.045 } },
+      uniforms: { uColor: { value: new THREE.Color(0x3a1f5c) }, uW: { value: 0.06 } },
       vertexShader: 'uniform float uW; void main(){ vec3 p = position + normal * uW / vec3(length(instanceMatrix[0].xyz), length(instanceMatrix[1].xyz), length(instanceMatrix[2].xyz)); gl_Position = projectionMatrix * viewMatrix * instanceMatrix * vec4(p, 1.0); }',
       fragmentShader: 'uniform vec3 uColor; void main(){ gl_FragColor = vec4(uColor, 1.0); }',
       side: THREE.BackSide,
@@ -51,7 +53,7 @@ export class Boxes {
     this.positions = new Map();     // id -> Vector3 (para explosiones y cámara de muerte)
   }
 
-  update(game, track, colors, dt, flashId) {
+  update(game, track, colors, dt, flashId, camPos) {
     const sec = section(game.fold);
     const closed = game.fold === 30 || game.fold === -30;
     const on = game.playerStrips();
@@ -72,7 +74,8 @@ export class Boxes {
       N.copy(fr.X).multiplyScalar(nx).addScaledVector(fr.U, ny);
       B.copy(fr.F).negate();
       const cx = sp.x, cy = sp.y;
-      const w = CELL_W * 0.9;
+      // un pelín más ancha que el carril: la caja choca a ±22,5°, más que el medio carril (15°)
+      const w = CELL_W * (b.fixed ? 1.02 : 1.1);
       let h = tall ? 2 * R * Math.cos(Math.PI / LANES) - 0.02 : (b.tall ? R : SHORT_H * M_PER_UNIT);
       const len = ROW_M * (b.joined ? 1.02 : 0.9);
       h *= b.grow < 1 ? easeOut(b.grow) : 1;
@@ -101,6 +104,8 @@ export class Boxes {
       if (flashId === b.id) { this.mesh.setColorAt(n, this.col.setRGB(1, 1, 1)); this.glow[n] = 2; }
       else this.mesh.setColorAt(n, colors[b.color]);
       this.positions.set(b.id, p.clone());
+      // con invulnerabilidad atraviesas las cajas: la que tienes encima no debe llenar la pantalla
+      if (game.invul > 0 && camPos && p.distanceToSquared(camPos) < 9) { this.mesh.setMatrixAt(n, m.makeScale(0, 0, 0)); }
       n++;
     }
     this.mesh.count = n;

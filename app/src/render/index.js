@@ -16,26 +16,28 @@ import { Sky } from './sky.js';
 import { Decor } from './decor.js';
 import { Fx } from './fx.js';
 import { Coins } from './coins.js';
+import { Streaks } from './streaks.js';
 import { THEMES, BOX_COLORS } from './worlds.js';
 
 const DEG = Math.PI / 180;
+const INV_FOG = new THREE.Color(0x0b0822);
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, uBlur: { value: 0 }, uFlash: { value: new THREE.Vector4(1, 1, 1, 0) }, uVig: { value: 0.22 }, uCA: { value: 0.002 }, uTime: { value: 0 }, uSat: { value: 1.08 } },
+  uniforms: { tDiffuse: { value: null }, uBlur: { value: 0 }, uFlash: { value: new THREE.Vector4(1, 1, 1, 0) }, uVig: { value: 0.1 }, uCA: { value: 0.0 }, uVigCol: { value: new THREE.Color(0x2b2257) }, uTime: { value: 0 }, uSat: { value: 1.08 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: /* glsl */`
-    uniform sampler2D tDiffuse; uniform float uBlur; uniform vec4 uFlash; uniform float uVig; uniform float uCA; uniform float uTime; uniform float uSat;
+    uniform sampler2D tDiffuse; uniform float uBlur; uniform vec4 uFlash; uniform float uVig; uniform float uCA; uniform float uTime; uniform float uSat; uniform vec3 uVigCol;
     varying vec2 vUv;
     void main(){
       vec2 c = vec2(0.5, 0.52); vec2 d = vUv - c; float r = length(d);
       // desenfoque radial solo en los bordes: el centro, donde miras, queda nítido
       float amt = uBlur * smoothstep(0.18, 0.75, r);
       vec3 acc = vec3(0.0); float tot = 0.0;
-      for (int i = 0; i < 8; i++) { float t = float(i) / 7.0; float w = 1.0 - t * 0.6;
+      for (int i = 0; i < 5; i++) { float t = float(i) / 4.0; float w = 1.0 - t * 0.6;
         vec2 uv = vUv - d * amt * t;
         acc += vec3(texture2D(tDiffuse, uv + d * uCA).r, texture2D(tDiffuse, uv).g, texture2D(tDiffuse, uv - d * uCA).b) * w; tot += w; }
       vec3 col = acc / tot;
       float l = dot(col, vec3(0.2126, 0.7152, 0.0722)); col = mix(vec3(l), col, uSat);
-      col *= 1.0 - uVig * smoothstep(0.35, 0.95, r * 1.25);
+      col = mix(col, col * uVigCol * 1.6, uVig * smoothstep(0.35, 0.95, r * 1.25));
       col = mix(col, uFlash.rgb, uFlash.a);
       gl_FragColor = vec4(col, 1.0);
     }`,
@@ -67,6 +69,7 @@ export class Renderer {
     this.pads = new Pads(this.scene);
     this.fx = new Fx(this.scene);
     this.coins = new Coins(this.scene);
+    this.streaks = new Streaks(this.camera); this.streakKick = 0;
     this.colors = BOX_COLORS.map((h) => new THREE.Color(h));
 
     this.composer = null;
@@ -91,7 +94,7 @@ export class Renderer {
     const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: q === 'alta' ? 4 : 0 });
     const comp = new EffectComposer(this.renderer, rt);
     comp.addPass(new RenderPass(this.scene, this.camera));
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.45, 1.02);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.5, 0.45, 1.22);
     comp.addPass(this.bloom);
     this.grade = new ShaderPass(GradeShader);
     comp.addPass(this.grade);
@@ -110,7 +113,7 @@ export class Renderer {
     this.camera.updateProjectionMatrix();
   }
 
-  reset() { this.track.reset(); this.fx.reset(); this.cam.shake = 0; this.cam.kick = 0; this.cam.roll = 0; this.cam.rollAmp = 0; this.deathFocus = null; this.themeIdx = 0; this.applyTheme(0, 0, 1); this.look.set(0, 0, -1); this.upS.set(0, 1, 0); this.firstFrame = true; }
+  reset() { this.track.reset(); this.fx.reset(); this.cam.shake = 0; this.cam.kick = 0; this.cam.roll = 0; this.cam.rollAmp = 0; this.deathFocus = null; this.themeIdx = 0; this.pendingTheme = 0; this.applyTheme(0, 0, 1); this.look.set(0, 0, -1); this.upS.set(0, 1, 0); this.firstFrame = true; }
 
   applyTheme(from, to, t) {
     const A = THEMES[from % THEMES.length], B = THEMES[to % THEMES.length];
@@ -119,13 +122,14 @@ export class Renderer {
     c('base', u.uBase.value); c('base2', u.uBase2.value); c('seam', u.uSeam.value); c('fog', u.uFog.value); c('glow', u.uGlow.value);
     this.sky.setTheme(A, B, t);
     this.decor.setTheme(t < 0.5 ? A : B);
+    this.themeFog = u.uFog.value.clone();
     this.fogColor = u.uFog.value;
   }
 
   // Sucesos de la simulación: efectos de cámara y partículas.
   onEvents(events, game) {
     for (const e of events) {
-      if (e.type === 'boost') { this.cam.kick = 1; this.cam.rollAmp = (Math.random() * 2 - 1) * 0.127; this.cam.roll = 1; this.flash(0x7fd6ff, 0.35); }
+      if (e.type === 'boost') { this.cam.kick = 1; this.cam.rollAmp = (Math.random() * 2 - 1) * 0.127; this.cam.roll = 1; this.streakKick = 1; }
       if (e.type === 'crash') {
         const p = this.boxes.positions.get(e.id);
         if (p) this.fx.explode(p, this.colors[(game.boxes.find((b) => b.id === e.id) || { color: 0 }).color], 46, this.look, 60);
@@ -138,7 +142,8 @@ export class Renderer {
       if (e.type === 'foldStart') { this.cam.shake = Math.max(this.cam.shake, 0.12); this.cam.shakeDecay = 0.15; }
       if (e.type === 'foldEnd') { this.flash(0xffffff, 0.8); }
       if (e.type === 'world') {
-        if (!game.inverted) { this.themeFrom = this.themeIdx; this.themeIdx++; this.themeBlend = 0; }
+        // el mundo nuevo se enciende al aterrizar del salto, si lo hay
+        if (!game.inverted) this.pendingTheme = (this.pendingTheme || 0) + 1;
       }
     }
   }
@@ -151,10 +156,21 @@ export class Renderer {
     const tr = this.track;
     tr.sync(game);
     // tema
-    if (this.themeBlend < 1) { this.themeBlend = Math.min(1, this.themeBlend + dt / 1.2); this.applyTheme(this.themeFrom, this.themeIdx, this.themeBlend); }
-    const inv = game.inverted ? 1 : 0;
-    this.cam.invert += (inv - this.cam.invert) * Math.min(1, dt * 6);
+    if (this.themeBlend < 1) { this.themeBlend = Math.min(1, this.themeBlend + dt / 0.5); this.applyTheme(this.themeFrom, this.themeIdx, this.themeBlend); }
+    // fase oscura: mientras dura el estado invertido y hasta aterrizar del salto entre mundos
+    const gapAhead = game.gaps.find((g) => g.to + 1 > s);
+    const landing = gapAhead ? gapAhead.to + 1 : -1;
+    if (this.pendingTheme && (!gapAhead || s >= landing - 0.5)) {
+      this.themeFrom = this.themeIdx; this.themeIdx += this.pendingTheme; this.pendingTheme = 0; this.themeBlend = 0;
+      if (gapAhead || this.wasFlying) this.flash(0xffffff, 0.45);
+    }
+    this.wasFlying = game.jumpAt(s) > 0.2;
+    const inv = game.inverted || (this.pendingTheme > 0) ? 1 : 0;
+    this.cam.invert += (inv - this.cam.invert) * Math.min(1, dt * 12);
+    this.hemi.intensity = 1.0 * (1 - this.cam.invert * 0.7);
     this.tunnel.uniforms.uInvert.value = this.cam.invert;
+    // en el tránsito invertido la niebla también se apaga: si no, el túnel oscuro se ve gris
+    this.tunnel.uniforms.uFog.value.copy(this.themeFog).lerp(INV_FOG, this.cam.invert);
 
     // ---- cámara: superficie del jugador + normal, mirando la dirección de la fila +10
     const closed = game.fold === 30 || game.fold === -30;
@@ -165,7 +181,8 @@ export class Renderer {
     surf(sec, u, closed, this.sp);
     const sp = this.sp, fr = this.fr;
     const N = new THREE.Vector3().copy(fr.X).multiplyScalar(sp.nx).addScaledVector(fr.U, sp.ny);
-    const pos = new THREE.Vector3().copy(fr.P).addScaledVector(fr.X, sp.x).addScaledVector(fr.U, sp.y).addScaledVector(N, 0.62);
+    const jump = game.jumpAt(camS);
+    const pos = new THREE.Vector3().copy(fr.P).addScaledVector(fr.X, sp.x).addScaledVector(fr.U, sp.y).addScaledVector(N, 0.62 + jump);
     tr.frameAt(Math.min(s + 10, game.kLast), this.fr2);
     const kLook = this.firstFrame ? 1 : Math.min(1, dt * 60 * 0.06);
     this.look.lerp(this.fr2.F, kLook).normalize();
@@ -195,16 +212,25 @@ export class Renderer {
 
     // ---- mundo
     this.tunnel.uniforms.uCam.value.copy(cam.position);
-    const outside = game.fold < 29;
+    // la luz principal va con la cámara (arriba, algo por detrás y a la izquierda): la cara por la
+    // que corres siempre queda bien iluminada, dentro o fuera del tubo
+    const right = new THREE.Vector3().crossVectors(this.look, this.upS).normalize();
+    this.tunnel.uniforms.uKey.value.copy(this.upS).multiplyScalar(0.85).addScaledVector(this.look, -0.35).addScaledVector(right, -0.4).normalize();
+    const gapNear = game.gaps.some((g) => g.from - s < 34 && g.to - s > -6);
+    const outside = game.fold < 29 || gapNear;
     const fogFar = outside ? 190 : 120;
     this.tunnel.uniforms.uFogFar.value += (fogFar - this.tunnel.uniforms.uFogFar.value) * Math.min(1, dt * 2);
     this.tunnel.uniforms.uFogNear.value = this.tunnel.uniforms.uFogFar.value * 0.38;
     c.hit = Math.max(0, c.hit - dt * 3);
     this.tunnel.uniforms.uHit.value = c.hit;
     this.tunnel.update(game, tr, this.colors, dt);
-    this.boxes.update(game, tr, this.colors, dt, !game.alive && this.deathT > 0 && Math.floor(this.deathT * 10) % 2 ? game.killer : 0);
+    this.boxes.update(game, tr, this.colors, dt, !game.alive && this.deathT > 0 && Math.floor(this.deathT * 10) % 2 ? game.killer : 0, cam.position);
+    this.tunnel.uniforms.uOutside.value += ((game.fold < 29 ? 1 : 0) - this.tunnel.uniforms.uOutside.value) * Math.min(1, dt * 2);
+    this.tunnel.uniforms.uSkyFill.value.copy(this.sky.u.uTop.value);
+    this.streaks.update(cam, this.look, this.upS, sp01, this.streakKick, dt, this.fogColor, this.cam.invert);
+    this.streakKick = Math.max(0, (this.streakKick || 0) - dt * 1.5);
     this.pads.update(game, tr, dt);
-    this.coins.update(game, tr, dt);
+    this.coins.update(game, tr, dt, cam.position);
     this.fx.update(dt);
     this.sky.update(cam, this.upS, outside ? 1 : 0, dt, this.cam.invert);
     this.decor.update(game, tr, cam, outside, dt);
@@ -212,8 +238,9 @@ export class Renderer {
 
     if (this.grade) {
       const g = this.grade.uniforms;
-      g.uBlur.value = (0.02 + sp01 * 0.06 + c.kick * 0.1) * (reduceFx ? 0.3 : 1);
-      g.uCA.value = 0.0015 + sp01 * 0.002 + c.kick * 0.004;
+      g.uBlur.value = (0.01 + sp01 * 0.03 + c.kick * 0.06) * (reduceFx ? 0.3 : 1);
+      g.uCA.value = c.kick * 0.003;
+      g.uVigCol.value.copy(this.fogColor);
       g.uTime.value = this.time;
       g.uFlash.value.set(c.flashCol.r, c.flashCol.g, c.flashCol.b, c.flash * (reduceFx ? 0.4 : 1));
     }

@@ -23,7 +23,7 @@ void main(){
 const frag = /* glsl */`
 uniform vec3 uBase; uniform vec3 uBase2; uniform vec3 uSeam; uniform vec3 uFog; uniform vec3 uGlow;
 uniform vec3 uCam; uniform vec3 uKey; uniform float uFogNear; uniform float uFogFar; uniform float uTime;
-uniform float uInvert; uniform vec2 uCellSize; uniform float uHit;
+uniform float uInvert; uniform vec2 uCellSize; uniform float uHit; uniform vec3 uRing; uniform float uOutside; uniform vec3 uSkyFill;
 varying vec2 vUv; varying vec4 vWarn; varying vec3 vN; varying vec3 vW; varying vec2 vCell;
 float edgeDist(vec2 uv, vec2 size){ vec2 p = uv * size; vec2 q = min(p, size - p); return min(q.x, q.y); }
 void main(){
@@ -31,14 +31,14 @@ void main(){
   float d = edgeDist(vUv, size);
   float px = fwidth(d) + 1e-4;
   // junta entre paneles, bisel y subdivisiones finas (el original tiene 2x2 dentro de cada celda)
-  float seam = 1.0 - smoothstep(0.028 - px, 0.028 + px, d);
+  float seam = 1.0 - smoothstep(0.02 - px, 0.02 + px, d);
   float bevel = smoothstep(0.03, 0.26, d);
   vec2 sub = abs(fract(vUv * vec2(2.0, 2.0)) - 0.5) * size / 2.0;
   float subD = min(sub.x, sub.y);
-  float subL = (1.0 - smoothstep(0.0, 0.01 + px, subD)) * 0.32;
+  float subL = (1.0 - smoothstep(0.0, 0.008 + px, subD)) * 0.16;
   vec3 N = normalize(vN);
   vec3 V = normalize(uCam - vW);
-  float lam = 0.6 + 0.4 * max(dot(N, uKey), 0.0);
+  float lam = mix(0.6, 0.86, uOutside) + mix(0.4, 0.14, uOutside) * max(dot(N, uKey), 0.0);
   float hemi = 0.5 + 0.5 * N.y;
   float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
   vec3 base = mix(uBase2, uBase, hemi);
@@ -50,11 +50,13 @@ void main(){
   vec3 warn = vWarn.rgb;
   // apagado = tono pastel del color (se lee de lejos sin gritar); encendido = color puro que emite
   float on = clamp((wa - 0.42) / 0.58, 0.0, 1.0);
-  vec3 pastel = mix(base, warn, 0.5) * lam;
-  vec3 vivid = warn * (0.8 + 0.2 * lam);
+  vec3 pastel = mix(warn, vec3(1.0), 0.3) * (0.82 + 0.18 * lam);
+  vec3 vivid = warn * (0.85 + 0.15 * lam);
   if (wa > 0.0) col = mix(pastel, vivid, on);
-  col += warn * on * 0.55;                            // solo el encendido emite (y da bloom)
-  col *= mix(0.74, 1.0, bevel);
+  col += warn * on * 0.38;                            // solo el encendido emite (y da bloom)
+  col *= mix(0.78, 1.0, bevel);
+  col += 0.1 * (1.0 - bevel) * step(0.5, vUv.x) * (1.0 - clamp(wa * 2.0, 0.0, 1.0));   // brillo del bisel
+  col += uSkyFill * 0.14 * max(N.y, 0.0) * uOutside;
   col = mix(col, uSeam, seam);
   col = mix(col, uSeam, subL * (1.0 - clamp(wa * 2.0, 0.0, 1.0) * 0.5));
   // brillo de plástico: un reflejo especular suave que se mueve con la cámara
@@ -64,9 +66,10 @@ void main(){
   // anillos de luz neutros cada 8 filas, en la junta: pasan zumbando y dan velocidad sin
   // teñir ningún carril (regla 2)
   float ring = (mod(vCell.y, 8.0) < 0.5) ? (1.0 - smoothstep(0.02, 0.16 + px * 2.0, vUv.y * size.y)) : 0.0;
-  col = mix(col, uGlow * 2.2 + 0.3, ring * 0.9 * (1.0 - uInvert));
+  col = mix(col, uRing * 1.9, ring * 0.85 * (1.0 - uInvert));
   // estado invertido (transición entre mundos): túnel oscuro con juntas de neón
-  vec3 inv = mix(vec3(0.03, 0.03, 0.06), warn * 0.8, clamp(wa * 1.4, 0.0, 1.0)) + uGlow * (seam * 1.6 + subL * 0.8);
+  vec3 neon = mix(uGlow, vec3(1.0), 0.35);
+  vec3 inv = mix(vec3(0.035, 0.03, 0.07), warn * 0.8, clamp(wa * 1.4, 0.0, 1.0)) + neon * (seam * 1.8 + subL * 1.2 + ring * 1.2);
   col = mix(col, inv, uInvert);
   float dist = length(uCam - vW);
   float fog = smoothstep(uFogNear, uFogFar, dist);
@@ -100,6 +103,7 @@ export class Tunnel {
       uKey: { value: new THREE.Vector3(0.3, 0.8, 0.5).normalize() },
       uFogNear: { value: 40 }, uFogFar: { value: 118 }, uTime: { value: 0 }, uInvert: { value: 0 },
       uCellSize: { value: new THREE.Vector2(CELL_W, ROW_M) }, uHit: { value: 0 },
+      uRing: { value: new THREE.Color(0xfff1c9) }, uOutside: { value: 0 }, uSkyFill: { value: new THREE.Color(0x8fc8ff) },
     };
     this.mat = new THREE.ShaderMaterial({ vertexShader: vert, fragmentShader: frag, uniforms: this.uniforms, side: THREE.DoubleSide });
     this.mesh = new THREE.Mesh(g, this.mat);
@@ -127,6 +131,7 @@ export class Tunnel {
     for (let k = kNear; k <= game.kLast && q < NQ; k++) {
       const ra = track.rings.get(k), rb = track.rings.get(k + 1);
       if (!ra || !rb) continue;
+      if (game.inGap(k)) continue;           // carretera cortada: salto entre mundos
       for (let c = 0; c < LANES; c++, q++) {
         const b = sec.b, d = sec.d;
         const x0 = b[c * 2], y0 = b[c * 2 + 1], x1 = b[c * 2 + 2], y1 = b[c * 2 + 3];

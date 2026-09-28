@@ -42,7 +42,12 @@ export class Decor {
 
   build(name) {
     const m = this.models[name];
-    if (m) return m.clone(true);
+    if (m) {
+      const o = m.clone(true);
+      // el decorado queda por debajo del umbral del bloom: solo brillan bombillas y cristales
+      o.traverse((c) => { if (c.isMesh && c.material) { c.material = c.material.clone(); c.material.envMapIntensity = 0.45; if (c.material.color) c.material.color.multiplyScalar(0.82); } });
+      return o;
+    }
     return this.make[name]();
   }
 
@@ -55,8 +60,8 @@ export class Decor {
     for (let i = 0; i < 16; i++) {
       const name = kinds[i % kinds.length];
       const obj = this.build(name);
-      const big = name === 'planet' ? 2.2 : name === 'island_a' || name === 'island_b' || name === 'island_c' ? 1 : 1;
-      obj.scale.multiplyScalar(big * (0.8 + Math.random() * 0.6));
+      const big = name === 'planet' ? 2.4 : name.startsWith('island') ? 0.7 : name === 'arch' ? 1.4 : 1;
+      obj.scale.multiplyScalar(big * (0.75 + Math.random() * 0.5));
       this.group.add(obj);
       this.items.push({ obj, name, placed: false, spin: (Math.random() - 0.5) * 0.2 });
     }
@@ -66,9 +71,13 @@ export class Decor {
     const k = game.kLast - (far ? 0 : Math.floor(Math.random() * 20));
     const r = track.rings.get(k) || track.last();
     const side = Math.random() < 0.5 ? -1 : 1;
-    const lateral = side * (45 + Math.random() * 110);
-    const vertical = it.name === 'cloud' ? -30 + Math.random() * 50 : it.name === 'planet' ? 40 + Math.random() * 60 : -45 + Math.random() * 55;
-    const ahead = 40 + Math.random() * 260;
+    // lejos de la pista y nunca a su altura cerca de ella: o por debajo de la carretera o muy arriba
+    const lateral = side * (75 + Math.random() * 130);
+    const low = Math.random() < 0.7;
+    const vertical = it.name === 'planet' ? 90 + Math.random() * 80
+      : it.name === 'cloud' ? (low ? -55 + Math.random() * 30 : 45 + Math.random() * 40)
+      : (low ? -70 + Math.random() * 45 : 40 + Math.random() * 35);
+    const ahead = 120 + Math.random() * 280;
     it.obj.position.copy(r.P).addScaledVector(r.F, ahead).addScaledVector(r.X, lateral).addScaledVector(r.U, vertical);
     it.obj.rotation.y = Math.random() * Math.PI * 2;
     it.k = k + ahead / 4;
@@ -82,6 +91,11 @@ export class Decor {
       if (!it.placed) this.place(it, game, track, false);
       else if (it.k < game.s - 30) this.place(it, game, track, true);
       it.obj.rotation.y += it.spin * dt;
+      // la pista curva: si algo se ha quedado cerca de ella, se lleva a otro sitio
+      if (!it.checkT || (it.checkT -= dt) <= 0) {
+        it.checkT = 0.25;
+        for (let k = Math.floor(game.s); k <= game.kLast; k += 3) { const r = track.rings.get(k); if (r && r.P.distanceTo(it.obj.position) < 65) { this.place(it, game, track, true); break; } }
+      }
     }
   }
 }

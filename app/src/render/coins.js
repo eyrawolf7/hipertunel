@@ -10,7 +10,7 @@ export class Coins {
   constructor(scene) {
     let geo = new THREE.CylinderGeometry(0.45, 0.45, 0.13, 32);
     geo.rotateX(Math.PI / 2);
-    this.mat = new THREE.MeshStandardMaterial({ color: 0xffc21a, metalness: 0.85, roughness: 0.22, emissive: 0xff9a00, emissiveIntensity: 0.28 });
+    this.mat = new THREE.MeshStandardMaterial({ color: 0xffc21a, metalness: 0.85, roughness: 0.22, emissive: 0xff9a00, emissiveIntensity: 0.15 });
     this.mesh = new THREE.InstancedMesh(geo, this.mat, MAX);
     this.mesh.frustumCulled = false; this.mesh.count = 0;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -43,10 +43,10 @@ export class Coins {
     track.frameAt(e.k - 0.5, this.fr); surf(sec, e.lane, closed, this.sp);
     const N = new THREE.Vector3().copy(this.fr.X).multiplyScalar(this.sp.nx).addScaledVector(this.fr.U, this.sp.ny);
     const p = new THREE.Vector3().copy(this.fr.P).addScaledVector(this.fr.X, this.sp.x).addScaledVector(this.fr.U, this.sp.y).addScaledVector(N, 0.85);
-    this.flying.push({ p, v: N.multiplyScalar(7).addScaledVector(this.fr.F, game.speedMS * 0.9), t: 0 });
+    this.flying.push({ p, v: N.multiplyScalar(9).addScaledVector(this.fr.F, game.speedMS * 1.05), t: 0 });
   }
 
-  update(game, track, dt) {
+  update(game, track, dt, camPos) {
     this.time += dt;
     const sec = section(game.fold), closed = game.fold === 30 || game.fold === -30;
     const { fr, sp, m, T, N, B, p } = this;
@@ -60,18 +60,20 @@ export class Coins {
       N.copy(fr.X).multiplyScalar(sp.nx).addScaledVector(fr.U, sp.ny);
       B.copy(fr.F).negate();
       const bob = Math.sin(this.time * 4 + c.k * 0.7) * 0.06;
-      p.copy(fr.P).addScaledVector(fr.X, sp.x).addScaledVector(fr.U, sp.y).addScaledVector(N, 0.85 + bob);
+      p.copy(fr.P).addScaledVector(fr.X, sp.x).addScaledVector(fr.U, sp.y).addScaledVector(N, 0.85 + bob + game.jumpAt(sMid));
       m.makeBasis(T, N, B);
       m.multiply(this.rot.makeRotationY(this.time * 5 + c.k * 0.5));
+      const dc = camPos ? p.distanceTo(camPos) : 99;
+      if (dc < 4) m.scale(this.sc.setScalar(Math.max(0, (dc - 1.2) / 2.8)));
       m.setPosition(p);
       this.mesh.setMatrixAt(n++, m);
     }
     for (let i = this.flying.length - 1; i >= 0; i--) {
       const f = this.flying[i];
-      f.t += dt; if (f.t > 0.35 || n >= MAX) { this.flying.splice(i, 1); continue; }
+      f.t += dt; if (f.t > 0.25 || n >= MAX) { this.flying.splice(i, 1); continue; }
       f.p.addScaledVector(f.v, dt);
-      const k = 1 - f.t / 0.35;
-      m.makeRotationY(this.time * 20).scale(this.sc.setScalar(0.4 + 0.8 * k)).setPosition(f.p);
+      const k = 1 - f.t / 0.25;
+      m.makeRotationY(this.time * 20).scale(this.sc.setScalar(0.8 * k)).setPosition(f.p);
       this.mesh.setMatrixAt(n++, m);
     }
     this.mesh.count = n;

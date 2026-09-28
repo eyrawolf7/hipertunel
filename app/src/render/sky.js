@@ -21,7 +21,8 @@ void main(){
   vec3 g = d * 180.0; vec3 id = floor(g); float r = hash(id);
   float st = step(0.985, r) * smoothstep(0.5, 0.0, length(fract(g) - 0.5)) * (0.6 + 0.4 * sin(uTime * 2.0 + r * 40.0));
   col += vec3(st) * uStars * smoothstep(-0.2, 0.3, h);
-  col = mix(col, vec3(0.02, 0.02, 0.05) + st * 0.6, uInvert * 0.85);
+  vec3 night = mix(vec3(0.02, 0.015, 0.06), vec3(0.09, 0.04, 0.16), smoothstep(-0.3, 0.6, h)) + vec3(st) * 1.2;
+  col = mix(col, night, uInvert);
   gl_FragColor = vec4(col, 1.0);
 }`;
 

@@ -109,6 +109,7 @@ export class Game {
     this.coins = [];                   // { k, lane, got }
     this.coinRun = null;
     this.coinsGot = 0;
+    this.gaps = [];                    // tramos sin carretera (salto entre mundos), solo visual
     this.coinStreak = 0; this.coinStreakT = 0;
 
     for (let i = 0; i < ROWS; i++) this.pushRow(true);
@@ -391,6 +392,9 @@ export class Game {
       // Tunnel::switchStateWithTransition: estado invertido 24 filas y después el mundo nuevo
       this.world = Math.min(6, this.world + 1);
       this.worldRows = 24;
+      // En el estado invertido no sale ninguna caja: el render aprovecha ese hueco para cortar la
+      // carretera y hacer un salto entre mundos. Es solo visual, no cambia ninguna regla.
+      if (this.inverted) this.gaps.push({ from: this.kLast + 4, to: this.kLast + 19 });
       this.event('foldEnd', { toIn: this.foldToIn, world: this.world });
     }
   }
@@ -571,6 +575,7 @@ export class Game {
     if (this.boxes.length && this.boxes[0].k < k0) this.boxes = this.boxes.filter((b) => b.k >= k0);
     if (this.pads.length && this.pads[0].k < k0) this.pads = this.pads.filter((p) => p.k >= k0);
     if (this.coins.length && this.coins[0].k < k0) this.coins = this.coins.filter((c) => c.k >= k0);
+    if (this.gaps.length && this.gaps[0].to < k0 - 4) this.gaps.shift();
   }
 
   event(type, data) { this.events.push(Object.assign({ type, frame: this.frame }, data)); }
@@ -595,6 +600,16 @@ export class Game {
     for (let l = 0; l < LANES && res.length < 2; l++) if (this.onStrip(l)) res.push(l);
     return res;
   }
+
+  // altura del salto sobre la carretera en la posición s (en filas); 0 fuera de los huecos
+  jumpAt(s) {
+    for (const g of this.gaps) {
+      const a = g.from - 3, b = g.to + 1;
+      if (s > a && s < b) { const t = (s - a) / (b - a); return 4 * 5.5 * t * (1 - t); }
+    }
+    return 0;
+  }
+  inGap(k) { for (const g of this.gaps) if (k >= g.from && k <= g.to) return true; return false; }
 
   get distanceM() { return this.rowsPassed * ROW_M; }
   get speedMS() { return this.v * 60 * M_PER_UNIT; }

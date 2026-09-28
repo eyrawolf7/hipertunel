@@ -25,10 +25,10 @@ void main(){
   vec2 q = abs(uv - 0.5);
   float border = smoothstep(0.5, 0.44, max(q.x, q.y));
   float c = chev(uv) * smoothstep(0.46, 0.34, q.x);
-  vec3 blue = mix(vec3(0.02, 0.35, 1.0), vec3(0.2, 0.85, 1.0), uv.y);
+  vec3 blue = mix(vec3(0.02, 0.2, 1.0), vec3(0.08, 0.72, 1.0), uv.y);
   vec3 col = mix(blue, vec3(1.0), c);
   float a = vMain > 0.5 ? border : c * vAlpha;
-  vec3 outc = vMain > 0.5 ? col * 1.7 : vec3(0.35, 0.8, 1.0) * 1.3;
+  vec3 outc = vMain > 0.5 ? col * 1.6 + vec3(1.0) * c * 1.2 : vec3(0.3, 0.7, 1.0) * 1.5;
   if (a < 0.01) discard;
   gl_FragColor = vec4(outc, a);
 }`;
@@ -64,7 +64,7 @@ export class Pads {
       T.copy(fr.X).multiplyScalar(sp.tx).addScaledVector(fr.U, sp.ty);
       N.copy(fr.X).multiplyScalar(-sp.ty).addScaledVector(fr.U, sp.tx);
       B.copy(fr.F).negate();
-      p.copy(fr.P).addScaledVector(fr.X, sp.x).addScaledVector(fr.U, sp.y).addScaledVector(N, 0.03);
+      p.copy(fr.P).addScaledVector(fr.X, sp.x).addScaledVector(fr.U, sp.y).addScaledVector(N, 0.03 + game.jumpAt(sMid));
       m.makeBasis(T, N, B);
       m.scale(this.T.set(CELL_W * 0.94, 1, ROW_M * 0.94));
       T.copy(fr.X).multiplyScalar(sp.tx).addScaledVector(fr.U, sp.ty);
