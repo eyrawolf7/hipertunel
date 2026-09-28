@@ -1275,7 +1275,9 @@ let useTilt = true, tiltInv = false;
 try { useTilt = localStorage.getItem('hipertunel-tilt') !== '0'; tiltInv = localStorage.getItem('hipertunel-inv') === '1'; } catch (e) {}
 
 // ---------- geometría del túnel
-const LANES = 16, LW = TAU / LANES, R = 4;          // R = distancia del eje al centro de cada carril
+const QS = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');   // el harness de pruebas no tiene location
+const qnum = (k, d) => { const v = parseFloat(QS.get(k)); return isFinite(v) ? v : d; };
+const LANES = Math.max(4, Math.round(qnum('lanes', 6))), LW = TAU / LANES, R = 4;   // Boost 2 usa 6 carriles
 const RV = R / Math.cos(LW / 2);                     // radio a las aristas del polígono
 const LANE_W = 2 * R * Math.tan(LW / 2);             // anchura de un carril
 const SEG = 4, NR = 72;                              // longitud de baldosa y nº de anillos visibles
@@ -1291,8 +1293,6 @@ const dirX = (a) => Math.sin(a), dirY = (a) => -Math.cos(a);
 
 // ---------- render
 // Parámetros de imagen ajustables por URL (?expo=0.8&bloom=0.5) para poder calibrar con capturas
-const QS = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');   // el harness de pruebas no tiene location
-const qnum = (k, d) => { const v = parseFloat(QS.get(k)); return isFinite(v) ? v : d; };
 const EXPO = qnum('expo', 0.72);
 const FOG_NEAR = qnum('fnear', 25), FOG_FAR = qnum('ffar', 170);
 // Antelación del aviso. Cuanto más larga, más carriles pintados a la vez y menos avisa el color.
@@ -1783,7 +1783,7 @@ function placeObj(o){
     o.parts.forEach((p, i) => placeAt(p, zc, o.laneF + i - (o.w - 1) / 2, lift, rot));
     return;
   }
-  if (o.type === 'boost') { o.pads.forEach((p, i) => { const zz = o.z + 1.8 + i * 3.3, k = Math.max(0, kappa(zz)), sag = k > 1e-5 ? (1 - Math.cos(k * LANE_W / 2)) / k : 0; placeAt(p, zz, o.lane, 0.05 + sag); }); return; }
+  if (o.type === 'boost') { o.pads.forEach((p) => { const zz = o.z + p.userData.dz, k = Math.max(0, kappa(zz)), w = LANE_W / PAD_SUB, sag = k > 1e-5 ? (1 - Math.cos(k * w / 2)) / k : 0; placeAt(p, zz, o.lane + p.userData.du, 0.05 + sag); }); return; }
   const bob = 0;
   if (o.type === 'block') { o.h = lerp(0.95, o.hOut, sideM(zc)); const v = o.vis === undefined ? 1 : o.vis; o.g.scale.y = o.h * v; o.g.visible = v > 0.02; }
   placeAt(o.g, zc, o.lane, o.h * (o.type === 'block' && o.vis !== undefined ? o.vis : 1) / 2 + bob);
@@ -1803,10 +1803,20 @@ function addBlock(z, lane, len, color, wallLook){
   const o = { type: 'block', z, len, lane, color, out, h, hOut, g, warn, sh };
   placeObj(o); objs.push(o); byLane[lane].push(o); return o;
 }
+// Con carriles anchos, una placa plana se despega de la carretera, que es curva. Se parte en tiras
+// a lo ancho y cada tira se apoya por separado, así queda pegada sea cual sea la curvatura.
+const PAD_SUB = Math.max(1, Math.ceil(LANE_W / 1.7));
 function addBoost(z, lane){
   lane = laneMod(lane); if (z > lastBoostZ) lastBoostZ = z;
   const parts = [];
-  for (let i = 0; i < 3; i++) { const g = new THREE.Group(); const m = new THREE.Mesh(padGeo, arrowMat); m.scale.set(LANE_W * 0.98, 1, 3.1); g.add(m); const ch = new THREE.Mesh(padGeo, chevMat); ch.position.y = 0.012; ch.scale.set(LANE_W * 0.8, 1, 2.7); g.add(ch); scene.add(g); parts.push(g); }
+  const wSub = LANE_W / PAD_SUB;
+  for (let i = 0; i < 3; i++) for (let j = 0; j < PAD_SUB; j++) {
+    const g = new THREE.Group();
+    const m = new THREE.Mesh(padGeo, arrowMat); m.scale.set(wSub * 0.98, 1, 3.1); g.add(m);
+    const ch = new THREE.Mesh(padGeo, chevMat); ch.position.y = 0.012; ch.scale.set(wSub * 0.82, 1, 2.7); g.add(ch);
+    scene.add(g); g.userData.dz = 1.8 + i * 3.3; g.userData.du = (j - (PAD_SUB - 1) / 2) / PAD_SUB;
+    parts.push(g);
+  }
   const o = { type: 'boost', z, len: 10, lane, out: sideM(z) > 0.5, h: 0, g: parts[0], pads: parts };
   placeObj(o); objs.push(o); byLane[lane].push(o); return o;
 }
@@ -2112,7 +2122,8 @@ function spawnNext(z){
   const lo = Math.min(pathL, prevPathL), hi = Math.max(pathL, prevPathL);
   const safe = (l) => { for (let q = lo; q <= hi; q++) if (laneMod(l) === laneMod(q)) return true; return false; };
   const W = waveAt(z);
-  const anchoDe = (a) => ri(a[0], a[1]);
+  const kL = LANES / 16;   // las oleadas están escritas para 16 carriles; se escalan a los que haya
+  const anchoDe = (a) => Math.max(1, Math.round(ri(a[0], a[1]) * kL));
 
   // Serie en curso: se van soltando sus piezas paso a paso. La espiral gira alrededor del túnel,
   // que es lo que obliga a no soltar el volante.
@@ -2139,7 +2150,7 @@ function spawnNext(z){
     if (esEspiral || esColec) {
       colec = {
         left: ri(W.n[0], W.n[1]),
-        lane: laneMod(pathL + (Math.random() < 0.5 ? 1 : -1) * ri(3, 7)),
+        lane: laneMod(pathL + (Math.random() < 0.5 ? 1 : -1) * Math.max(1, Math.round(ri(3, 7) * kL))),
         giro: esEspiral ? (Math.random() < 0.5 ? 1 : -1) * (Math.random() < 0.3 ? 2 : 1) : 0,
         w: esEspiral ? 1 : anchoDe(W.w),
         len: esEspiral ? rr(3, 4.5) : rr(3, 5),
@@ -2149,7 +2160,7 @@ function spawnNext(z){
     }
     // bloque suelto: una franja del ancho de la oleada, toda del mismo color para que se lea como
     // un solo aviso y no como varios
-    const l = Math.random() < 0.7 ? pathL + ri(-6, 6) : ri(0, LANES - 1);
+    const l = Math.random() < 0.7 ? pathL + ri(-Math.ceil(6 * kL), Math.ceil(6 * kL)) : ri(0, LANES - 1);
     if (!safe(l)) {
       const largo = Math.random() < 0.08 + D * 0.12;
       const len = largo ? rr(8, 16 + D * 10) : rr(3, 5);
@@ -2283,9 +2294,15 @@ try { best = +(localStorage.getItem('hipertunel-best') || 0) || 0; } catch (e) {
 const keys = new Set();
 const hold = { dir: 0, t: 0 };
 function stepLane(d, soft){ if (state !== 'play' || d === 0) return; lane = Math.round(lane) + d; laneSoft = !!soft; }
-const cont = { dir: 0 };            // movimiento continuo (tecla mantenida / inclinación fuerte)
-function glide(d, rate, dt){ lane += d * rate * dt; cont.dir = d; }
-function endGlide(){ if (cont.dir !== 0) { lane = cont.dir > 0 ? Math.ceil(lane - 0.25) : Math.floor(lane + 0.25); cont.dir = 0; } }
+const cont = { dir: 0, libre: false };   // movimiento continuo; libre = sin encajar en carril (giroscopio)
+// Con el giroscopio la posición ES el ángulo integrado, como en Boost 2: se mueve directamente, sin
+// perseguir un carril destino y sin encajar en el carril al soltar. Ese encaje era el "saltito".
+// Con toques y teclado sí hay destino y animación, que es lo que se quiere de un control discreto.
+function glide(d, rate, dt, directo){
+  lane += d * rate * dt; cont.dir = d;
+  if (directo) playerLaneF = lane;
+}
+function endGlide(){ if (cont.dir !== 0) { if (!cont.libre) lane = cont.dir > 0 ? Math.ceil(lane - 0.25) : Math.floor(lane + 0.25); cont.dir = 0; cont.libre = false; } }
 addEventListener('keydown', (e) => {
   if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code)) e.preventDefault();
   if ((e.code === 'Space' || e.code === 'Enter' || e.code.startsWith('Arrow')) && (state === 'title' || (state === 'over' && performance.now() > restartAt))) { e.preventDefault(); start(); return; }
@@ -2324,7 +2341,9 @@ const SENS = qnum('sens', 1);
 // estás deslizando de verdad, solo para la red de seguridad del cero.
 // Valores del original (Boost 2): zona muerta de 1,1 grados y 0,2 rad por fotograma a 60 fps por
 // unidad de seno, que en nuestros 16 carriles son 30,56 carriles por segundo a 90 grados.
-const TILT_DEAD = qnum('tdead', 0.0194 / SENS), TILT_GAIN = qnum('tgain', 30.56 * SENS), TILT_HOLD = qnum('thold', 10 / SENS);
+// TILT_GAIN sale de la ganancia del original (0,2 carriles por fotograma a 60 fps sobre sus 6
+// carriles = 1,9 vueltas al túnel por segundo), reescalada a los carriles que tengamos.
+const TILT_DEAD = qnum('tdead', 0.0194 / SENS), TILT_GAIN = qnum('tgain', 2.037 * LANES * SENS), TILT_HOLD = qnum('thold', 10 / SENS);
 const TILT_RATE = qnum('trate', 28 * SENS), TILT_DELAY = qnum('tdelay', 0.12), TILT_SMOOTH = qnum('tsmooth', 1), LANE_SOFT = qnum('lanesoft', 0.62);
 // HOLD_T: lo que tarda un toque mantenido en empezar a deslizar · SLIDE_*: carriles por segundo
 const HOLD_T = qnum('holdt', 0.06), SLIDE_MIN = qnum('slidemin', 11), SLIDE_MAX = qnum('slidemax', 26);
@@ -2393,7 +2412,7 @@ let gpPrev = { l: false, r: false, a: false }, gpT = 0, gamepadOK = true;   // a
 let testStep = null;
 function pollInput(dt){
   // repetición al mantener
-  let gd = 0, rate = 0;
+  let gd = 0, rate = 0, gTilt = false;
   const kd = (keys.has('ArrowLeft') || keys.has('KeyA') ? -1 : 0) + (keys.has('ArrowRight') || keys.has('KeyD') ? 1 : 0);
   if (kd !== 0 && kd === hold.dir) { hold.t += dt; if (hold.t > HOLD_T) { gd = kd; rate = Math.min(SLIDE_MAX, SLIDE_MIN + (hold.t - HOLD_T) * 34); } } else hold.dir = kd;
   let tl = false, tr = false;
@@ -2422,7 +2441,7 @@ function pollInput(dt){
     // centro y recorrido largo al girar mucho, en vez de saturar pronto.
     const sa = Math.abs(Math.sin(deg * Math.PI / 180));
     if (tiltInv) dir = -dir;
-    if (sa >= TILT_DEAD) { gd = dir; rate = sa * TILT_GAIN; }
+    if (sa >= TILT_DEAD) { gd = dir; rate = sa * TILT_GAIN; gTilt = true; }
   }
   // mando
   let gps = null;
@@ -2437,7 +2456,7 @@ function pollInput(dt){
     if (a && !gpPrev.a && state !== 'play' && state !== 'dying') start();
     gpPrev = { l, r, a }; break;
   }
-  if (state === 'play') { if (gd !== 0) glide(gd, rate, dt); else endGlide(); }
+  if (state === 'play') { if (gd !== 0) { cont.libre = !!gTilt; glide(gd, rate, dt, gTilt); } else endGlide(); }
   if (testStep) { const d = testStep(); if (d) stepLane(d); }
 }
 
@@ -2891,7 +2910,7 @@ requestAnimationFrame(frame);
 window.__game = { tubeDbg(){
     let lo = 9, hi = -9; for (let i = 0; i < NV; i++) { const r = tCol[i * 4]; if (r < lo) lo = r; if (r > hi) hi = r; }
     const k = kappa(s + 20); return { kappa: +k.toFixed(4), shadeAtCam: +tubeShade(0, k).toFixed(3), shadeOpp: +tubeShade(LANE_W * 8, k).toFixed(3), colLo: +lo.toFixed(3), colHi: +hi.toFixed(3), fog: [scene.fog.near | 0, scene.fog.far | 0], kIn: +((kappa(s) / K0 + 1) / 2).toFixed(2) };
-  }, fps(){ return fpsStats(); }, fpsReset(){ fpsBuf.length = 0; }, gfx(){ return { hdr: hdrOK, expo: EXPO, dpr: DPR }; }, kill(){ die(null); }, chordGap(){ let worst = 1e9; for (const o of objs) if (o.type === 'boost') o.pads.forEach((p, i) => { const zz = o.z + 1.8 + i * 3.3; const du0 = wrapL(o.lane - camLane + twr(zz)); if (Math.abs(du0) > 5) return; const a = surfPt(zz, du0 - 0.5, new THREE.Vector3()), b = surfPt(zz, du0 + 0.5, new THREE.Vector3()); const c = a.add(b).multiplyScalar(0.5); const Y = new THREE.Vector3(0, 1, 0).applyQuaternion(p.quaternion); worst = Math.min(worst, p.position.clone().sub(c).dot(Y)); }); return worst; }, motion(x, y){ onMotion({ accelerationIncludingGravity: { x, y, z: 0 } }); }, tiltState(){ return { has: tilt.has, phi0: tilt.phi0 }; }, encLog, diffAt: (z) => diffAt(z), cxAt: (z) => cx(z), cyAt: (z) => cy(z), perm: () => PERM.slice(), padErr(){ let worst = 0; for (const o of objs) if (o.type === 'boost') for (let i = 0; i < 3; i++) { const p = o.pads[i]; const zz = o.z + 1.8 + i * 3.3; const du0 = wrapL(o.lane - camLane + twr(zz)); if (Math.abs(du0) > 6) continue; for (const dz of [-1.5, 1.5]) { const du = du0 + twr(zz + dz) - twr(zz); const pt = surfPt(zz + dz, du, new THREE.Vector3()); const loc = pt.clone().sub(p.position).applyQuaternion(p.quaternion.clone().invert()); worst = Math.max(worst, Math.abs(loc.y + 0.06)); } } return worst; }, jellies, jump(){ startJump(); }, airH(){ return airH(); }, dbg(){ return { snow: snowballs.length, jel: jellies.length, cur: currents.length, air: !!air, inCur: inCurrent, biome: biomeAt(s).key }; }, warp(z){ clearObjs(); clearMechanics(); s = sPrev = z; cursor = z + 60; lastBoostZ = z; }, get hyper(){ return hyper; }, get combo(){ return combo; }, get nstars(){ return starsArr.length; }, get score(){ return score; }, update, start, get state(){ return state; }, get s(){ return s; }, get speed(){ return speed; }, get side(){ return side; }, get level(){ return level; }, get lane(){ return laneMod(Math.round(playerLaneF)); }, get laneF(){ return playerLaneF; }, byLane, objs, setStep(fn){ testStep = fn; }, hold(d){ keys.clear(); if (d) keys.add(d < 0 ? 'ArrowLeft' : 'ArrowRight'); } };
+  }, fps(){ return fpsStats(); }, fpsReset(){ fpsBuf.length = 0; }, gfx(){ return { hdr: hdrOK, expo: EXPO, dpr: DPR }; }, kill(){ die(null); }, chordGap(){ let worst = 1e9; for (const o of objs) if (o.type === 'boost') o.pads.forEach((p) => { const zz = o.z + p.userData.dz; const du0 = wrapL(o.lane + p.userData.du - camLane + twr(zz)); if (Math.abs(du0) > 5) return; const h = 0.5 / PAD_SUB; const a = surfPt(zz, du0 - h, new THREE.Vector3()), b = surfPt(zz, du0 + h, new THREE.Vector3()); const c = a.add(b).multiplyScalar(0.5); const Y = new THREE.Vector3(0, 1, 0).applyQuaternion(p.quaternion); worst = Math.min(worst, p.position.clone().sub(c).dot(Y)); }); return worst; }, motion(x, y){ onMotion({ accelerationIncludingGravity: { x, y, z: 0 } }); }, tiltState(){ return { has: tilt.has, phi0: tilt.phi0 }; }, encLog, diffAt: (z) => diffAt(z), cxAt: (z) => cx(z), cyAt: (z) => cy(z), perm: () => PERM.slice(), padErr(){ let worst = 0; for (const o of objs) if (o.type === 'boost') for (const p of o.pads) { const zz = o.z + p.userData.dz; const du0 = wrapL(o.lane + p.userData.du - camLane + twr(zz)); if (Math.abs(du0) > 6) continue; for (const dz of [-1.5, 1.5]) { const du = du0 + twr(zz + dz) - twr(zz); const pt = surfPt(zz + dz, du, new THREE.Vector3()); const loc = pt.clone().sub(p.position).applyQuaternion(p.quaternion.clone().invert()); worst = Math.max(worst, Math.abs(loc.y + 0.06)); } } return worst; }, jellies, jump(){ startJump(); }, airH(){ return airH(); }, dbg(){ return { snow: snowballs.length, jel: jellies.length, cur: currents.length, air: !!air, inCur: inCurrent, biome: biomeAt(s).key }; }, warp(z){ clearObjs(); clearMechanics(); s = sPrev = z; cursor = z + 60; lastBoostZ = z; }, get hyper(){ return hyper; }, get combo(){ return combo; }, get nstars(){ return starsArr.length; }, get score(){ return score; }, update, start, get state(){ return state; }, get s(){ return s; }, get speed(){ return speed; }, get side(){ return side; }, get level(){ return level; }, get lane(){ return laneMod(Math.round(playerLaneF)); }, get laneF(){ return playerLaneF; }, get lanes(){ return LANES; }, byLane, objs, setStep(fn){ testStep = fn; }, hold(d){ keys.clear(); if (d) keys.add(d < 0 ? 'ArrowLeft' : 'ArrowRight'); } };
 })();
 </script>
 </body>

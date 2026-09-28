@@ -5,7 +5,7 @@
 // Guarda tests/<carpeta>/zNNN.png y escribe un resumen de fps por distancia.
 const puppeteer = require('puppeteer'); const fs = require('fs'); const path = require('path');
 const BOT = (z) => {
-  const G = window.__game, L = 16, lm = (l) => ((l % L) + L) % L;
+  const G = window.__game, L = G.lanes, lm = (l) => ((l % L) + L) % L;
   G.warp(z); let cd = 0;
   const bl = (l, a, c) => G.byLane[lm(l)].some((o) => o.type === 'block' && o.z < c && o.z + o.len > a);
   G.setStep(() => { cd--; if (cd > 0) return 0; const s = G.s, c = G.lane; if (!bl(c, s - 1, s + 30)) return 0; for (let k = 1; k < 8; k++) for (const sg of [1, -1]) if (!bl(c + sg * k, s - 1, s + 30)) { cd = 4; return sg; } return 0; });

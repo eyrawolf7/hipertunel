@@ -16,7 +16,7 @@ const { execFileSync } = require('child_process');
   await new Promise((r) => setTimeout(r, 1500)); await p.click('#bPlay');
   // bot que esquiva y busca las placas de impulso, como en tests/ritmo.js
   await p.evaluate(() => {
-    const G = window.__game, L = 16, lm = (l) => ((l % L) + L) % L;
+    const G = window.__game, L = G.lanes, lm = (l) => ((l % L) + L) % L;
     let cd = 0;
     const bl = (l, a, c) => G.byLane[lm(l)].some((o) => (o.type === 'block' || o.type === 'roller') && o.z < c && o.z + o.len > a);
     const pl = (l, a, c) => G.byLane[lm(l)].some((o) => o.type === 'boost' && o.z < c && o.z + o.len > a);

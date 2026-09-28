@@ -7,7 +7,7 @@ const mins = parseFloat(args[0]) > 0 ? parseFloat(args[0]) : 4;
 const params = {};
 for (const a of args.slice(1)) { const [k, v] = a.split('='); if (k && v !== undefined) params[k] = v; }
 const G = require('./harness')(params);
-const L = 16, lm = (l) => ((l % L) + L) % L;
+const L = G.lanes, lm = (l) => ((l % L) + L) % L;
 
 // Bot: se queda en su carril salvo que venga algo; entonces busca el hueco más cercano.
 // Prefiere pisar las placas de impulso si le pillan de paso.

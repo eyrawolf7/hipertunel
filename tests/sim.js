@@ -1,5 +1,5 @@
 // Simulación rápida: un bot juega 2,5 minutos y se comprueba que no hay errores.
-const G = require('./harness')(); const L = 16, lm = (l) => ((l % L) + L) % L;
+const G = require('./harness')(); const L = G.lanes, lm = (l) => ((l % L) + L) % L;
 const blocked = (l, a, b) => G.byLane[lm(l)].some((o) => o.type === 'block' && o.z < b && o.z + o.len > a);
 let cd = 0;
 G.setStep(() => { cd--; if (cd > 0) return 0; const s = G.s, c = G.lane; if (!blocked(c, s - 1, s + 30)) return 0;

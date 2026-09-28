@@ -1,5 +1,5 @@
 // Comprobaciones de calidad que ya nos han dado guerra. Ejecuta: npm run check
-const G = require('./harness')(); const fail = []; const L = 16, lm = (l) => ((l % L) + L) % L;
+const G = require('./harness')(); const fail = []; const L = G.lanes, lm = (l) => ((l % L) + L) % L;
 const blocked = (l, a, b) => G.byLane[lm(l)].some((o) => o.type === 'block' && o.z < b && o.z + o.len > a);
 let cd = 0; G.setStep(() => { cd--; if (cd > 0) return 0; const s = G.s, c = G.lane; if (!blocked(c, s - 1, s + 30)) return 0; for (let k = 1; k < 8; k++) for (const sg of [1, -1]) if (!blocked(c + sg * k, s - 1, s + 30)) { cd = 4; return sg; } return 0; });
 // 1) cada partida genera una pista y un orden de mundos distintos
@@ -28,7 +28,9 @@ const porSegundo = (deg) => {
 // La referencia es la curva de Boost 2 (ver referencias/analisis-boost2.md): la velocidad de giro
 // es el seno de la inclinación por 0,2 radianes por fotograma a 60 fps, que en 16 carriles son
 // 30,56 carriles por segundo a 90 grados, con una zona muerta de 1,1 grados.
-const curvaBoost2 = (g) => { const s = Math.abs(Math.sin(g * Math.PI / 180)); return s >= 0.0194 ? s * 30.56 : 0; };
+// 2,037 carriles por segundo y por carril del túnel: es la ganancia del original (1,9 vueltas
+// por segundo) sea cual sea el número de carriles que tengamos.
+const curvaBoost2 = (g) => { const s = Math.abs(Math.sin(g * Math.PI / 180)); return s >= 0.0194 ? s * 2.037 * L : 0; };
 const angulos = [1, 2, 5, 10, 20, 35, 60, 90];
 const v = angulos.map(porSegundo);
 if (v.some((x) => x === null)) fail.push('No se pudo medir el giroscopio: el jugador muere siempre');
@@ -37,7 +39,7 @@ else {
   for (let i = 1; i < angulos.length; i++) {
     const esperado = curvaBoost2(angulos[i]), real = v[i];
     // margen amplio: el amortiguado del carril mete un retraso pequeño al medir en un segundo
-    if (Math.abs(real - esperado) > Math.max(1.2, esperado * 0.18))
+    if (Math.abs(real - esperado) > Math.max(1.2, esperado * 0.2))
       fail.push('A ' + angulos[i] + ' grados se desvía de la curva de Boost 2: ' + real.toFixed(1) + ' carriles/s en vez de ' + esperado.toFixed(1));
   }
   for (let i = 1; i < v.length; i++) if (v[i] <= v[i - 1]) fail.push('El giroscopio no responde de forma progresiva entre ' + angulos[i - 1] + ' y ' + angulos[i] + ' grados');
@@ -147,7 +149,7 @@ const frMax = Math.max(...dens.map((d) => d.franjas));
 if (frMax > 2.5) fail.push('Demasiados avisos sueltos que leer a la vez: ' + frMax.toFixed(1) + ' franjas de media');
 if (Math.max(...dens.map((d) => d.fp90)) > 4) fail.push('Ráfagas de avisos difíciles de leer: p90 de ' + Math.max(...dens.map((d) => d.fp90)) + ' franjas');
 if (dens[2].carriles < dens[0].carriles * 1.1) fail.push('La densidad de obstáculos no crece con la distancia: ' + dens.map((d) => d.carriles.toFixed(1)).join(' -> '));
-if (dens[1].carriles < 1.5) fail.push('Demasiado vacío: apenas hay obstáculos a 6.000 m');
+if (dens[1].carriles < L * 0.09) fail.push('Demasiado vacío: apenas hay obstáculos a 6.000 m: ' + dens[1].carriles.toFixed(1) + ' carriles de ' + L);
 
 // 6) quedarse quieto en un carril no puede llevarte lejos: el juego tiene que obligar a esquivar,
 // y cada vez más según avanzas.

@@ -1,8 +1,8 @@
-// Cuántos carriles de 16 se ven pintados de aviso a la vez. Si son demasiados, el color deja de
+// Cuántos carriles se ven pintados de aviso a la vez. Si son demasiados, el color deja de
 // significar "viene un obstáculo" y la pantalla se vuelve ilegible: en el original nunca pasan de 4.
 // Uso: node tests/densidad.js [warns] [warnmin] [warnmax]
 const G = require('./harness')({ warns: process.argv[2], warnmin: process.argv[3], warnmax: process.argv[4] });
-const L = 16;
+const L = G.lanes;
 G.setStep(() => 0);
 const VISTA = 110;   // metros por delante que entran en pantalla
 const filas = [];
