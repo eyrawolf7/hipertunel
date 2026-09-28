@@ -1134,16 +1134,18 @@ cv.addEventListener('pointerup', endP); cv.addEventListener('pointercancel', end
 cv.addEventListener('contextmenu', (e) => e.preventDefault());
 
 // giroscopio (fuera del visor de Claude): inclinar = saltar carriles
-const tilt = { on: false, has: false, phi: 0, phi0: null, t: 0, armed: true, cal: 0 };
+const tilt = { on: false, has: false, phi: 0, phi0: null, t: 0, armed: true, cal: 0, phiPrev: 0, vel: 0, roll: 0 };
 // Grados: saltar un carril, volver a armar, y a partir de dónde se encadenan vueltas seguidas.
 // Un toque corto mueve un carril; mantener el móvil girado da vueltas rápidas al túnel, que es
 // parte de la gracia. TILT_REARM es solo antirrebote del sensor, no un freno.
 // ?sens=1.5 sube toda la sensibilidad de golpe (umbrales más bajos y vueltas más rápidas);
 // cada umbral se puede afinar aparte con ?tstep, ?thold, ?trate...
 const SENS = qnum('sens', 1);
-const TILT_STEP = qnum('tstep', 5 / SENS), TILT_REARM = qnum('trearm', 2.5 / SENS), TILT_HOLD = qnum('thold', 12 / SENS);
-const TILT_RATE = qnum('trate', 20 * SENS), TILT_DELAY = qnum('tdelay', 0.16), TILT_SMOOTH = qnum('tsmooth', 0.55), LANE_SOFT = qnum('lanesoft', 0.62);
-const TILT_CAL = qnum('tcal', 0.7), TILT_DRIFT = qnum('tdrift', 0.55);   // segundos calibrando y velocidad del recentrado
+const TILT_STEP = qnum('tstep', 3.5 / SENS), TILT_REARM = qnum('trearm', 2.5 / SENS), TILT_HOLD = qnum('thold', 12 / SENS);
+const TILT_RATE = qnum('trate', 20 * SENS), TILT_DELAY = qnum('tdelay', 0.12), TILT_SMOOTH = qnum('tsmooth', 0.85), LANE_SOFT = qnum('lanesoft', 0.62);
+const TILT_CAL = qnum('tcal', 0.3), TILT_DRIFT = qnum('tdrift', 3), TILT_QUIET = qnum('tquiet', 10);
+// TILT_CAL: segundos fijando el cero al empezar · TILT_DRIFT: rapidez del recentrado con el móvil
+// quieto · TILT_QUIET: por debajo de estos grados por segundo se considera que no lo estás girando
 let tiltCheckT = 0, tiltWarned = false, motionN = 0, orientN = 0;
 function onOrient(e){
   orientN++; if (motionN > 5 || e.beta == null || e.gamma == null) return;
@@ -1209,10 +1211,19 @@ function pollInput(dt){
     // El cero se toma al pulsar Jugar, justo cuando aún estás recolocando el móvil, así que durante
     // un momento se sigue recalibrando. Después se recentra muy despacio: si sostienes el móvil algo
     // torcido, el reposo se adapta en vez de dejarte girando solo, pero un giro a propósito aguanta.
+    // Velocidad de giro del móvil: sirve para distinguir una postura de un giro de verdad.
+    const vel = Math.abs(wrap(tilt.phi - tilt.phiPrev)) / Math.max(dt, 1e-4) * 180 / Math.PI;
+    tilt.phiPrev = tilt.phi; tilt.vel += (vel - tilt.vel) * 0.3;
+    const quieto = tilt.vel < TILT_QUIET;
     if (tilt.cal > 0) { tilt.cal -= dt; tilt.phi0 = tilt.phi; }
     const deg = wrap(tilt.phi - tilt.phi0) * 180 / Math.PI, a = Math.abs(deg), dir = Math.sign(deg);
-    // el recentrado casi se detiene mientras estás girando de verdad, o te frenaría las vueltas
-    if (tilt.cal <= 0) tilt.phi0 += wrap(tilt.phi - tilt.phi0) * clamp(TILT_DRIFT * (a < TILT_HOLD ? 1 : 0.06) * dt, 0, 1);
+    // El cero solo se recentra con el móvil quieto: así una postura torcida se corrige enseguida,
+    // pero un giro (aunque sea lento) no se persigue, que era lo que le metía retardo.
+    if (a >= TILT_HOLD) { tilt.roll += dt; if (a < TILT_REARM) tilt.roll = 0; } else tilt.roll = 0;
+    // Red de seguridad, nada más: si lleva dando vueltas sin parar con el móvil quieto, eso ya no es
+    // un giro sino un cero mal cogido, y se corrige. Fuera de ese caso no se toca el cero: cualquier
+    // recentrado persigue los giros lentos y es justo lo que se siente como retardo.
+    if (tilt.cal <= 0 && quieto && tilt.roll > 2.5) tilt.phi0 += wrap(tilt.phi - tilt.phi0) * clamp(TILT_DRIFT * dt, 0, 1);
     if (a < TILT_REARM) { tilt.armed = true; tilt.t = 0; }
     else if (a > TILT_STEP && tilt.armed) { stepLane(dir, true); tilt.armed = false; tilt.t = 0; }
     // solo con el móvil bien girado se encadenan carriles seguidos, y más despacio que antes

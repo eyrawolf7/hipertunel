@@ -48,6 +48,19 @@ for (let intento = 0; intento < 12 && respuesta === null; intento++) {
 }
 if (respuesta === null) fail.push('Una inclinación de 12 grados no llega a mover el carril en 1 s');
 else if (respuesta > 0.15) fail.push('El giroscopio responde tarde: ' + respuesta.toFixed(2) + ' s hasta cambiar de carril');
+// 4c) tiene que sentirse ágil también girando despacio. Cualquier recentrado del cero persigue los
+// giros lentos y hace que no reaccionen nunca, que se siente como un retardo enorme.
+for (const vel of [8, 15, 40]) {
+  let grados = null;
+  for (let intento = 0; intento < 10 && grados === null; intento++) {
+    G.start(); feed(0, 1.2);                      // sujetando el móvil recto y quieto
+    const l0 = G.lane; let ang = 0;
+    for (let i = 0; i < 180 && grados === null; i++) { ang += vel / 60; feed(ang, 1 / 60); if (G.lane !== l0) grados = ang; }
+    if (G.state !== 'play') grados = null;
+  }
+  if (grados === null) fail.push('Girando a ' + vel + ' grados por segundo no llega a cambiar de carril en 3 s');
+  else if (grados > 9) fail.push('Girando a ' + vel + ' grados por segundo hay que girar ' + grados.toFixed(1) + ' grados para que reaccione');
+}
 // 4b) el cero del giroscopio. Al pulsar Jugar estás tocando la pantalla y recolocando el móvil, así
 // que la referencia se toma en mitad de ese movimiento. Si se coge mal, la partida arranca girando
 // sola. Aquí se recoloca el móvil durante el primer cuarto de segundo y luego se sujeta quieto.
