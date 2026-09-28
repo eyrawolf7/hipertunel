@@ -13,7 +13,8 @@
     "densidad": "node tests/densidad.js",
     "ritmo": "node tests/ritmo.js",
     "partida": "node tests/partida.js",
-    "orientacion": "node tests/orientacion.js"
+    "orientacion": "node tests/orientacion.js",
+    "controles": "node tests/controles.js"
   },
   "devDependencies": {
     "puppeteer": "^23.0.0",

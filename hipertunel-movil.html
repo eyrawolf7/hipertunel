@@ -69,6 +69,10 @@ body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
 .tz.l{left:calc(env(safe-area-inset-left,0px) + 20px)} .tz.r{right:calc(env(safe-area-inset-right,0px) + 20px)}
 .tz{border-color:rgba(20,20,30,.35);color:rgba(20,20,30,.55)}
 .tz.down{background:rgba(255,154,18,.25);border-color:#ff9a12;color:#1b1b22}
+.opt{display:flex;gap:10px;align-items:flex-start;margin:14px 0 0;padding:10px 12px;border-radius:12px;background:rgba(43,34,87,.06);cursor:pointer;text-align:left}
+.opt input{width:22px;height:22px;margin:1px 0 0;accent-color:#e8403a;flex:0 0 auto}
+.opt span{font-size:16px;font-weight:600;line-height:1.25}
+.opt small{display:block;font-size:13px;font-weight:500;opacity:.66;margin-top:2px}
 .screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;z-index:5;overflow:auto}
 @media (max-height:540px){
   .screen{padding:10px calc(env(safe-area-inset-right,0px) + 12px) 10px calc(env(safe-area-inset-left,0px) + 12px)}
@@ -167,6 +171,7 @@ h2{margin:0;font-size:32px;font-style:italic}
     <h1 class="logo">Hipertúnel</h1>
     <p class="tag">Cambia de carril, esquiva los cubos y pisa las placas azules para acelerar. Cada placa te deja atravesar un obstáculo.</p>
     <button class="big" id="bPlay">Jugar</button>
+    <label class="opt" id="optTilt" hidden><input type="checkbox" id="cbTilt" checked><span>Girar el móvil para conducir<small>Si lo desmarcas, juegas con las flechas de la pantalla</small></span></label>
     <div id="sens" hidden><span id="sensTxt">Buscando giroscopio…</span><i class="meter"><b id="sensBar"></b></i></div>
     <div class="help" id="help"></div>
     <p class="rule">Tienes hasta <b>3 impulsos</b>. Si chocas, pierdes uno. Si chocas sin ninguno, se acabó. Cuantos más impulsos llevas, más rápido vas y más puntos sumas.</p>
@@ -1261,6 +1266,9 @@ const rr = (a,b) => a + (b - a) * Math.random();
 const ri = (a,b) => Math.floor(rr(a, b + 1));
 const sm = (t) => t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t);
 const COARSE = !!(window.matchMedia && matchMedia('(pointer: coarse)').matches);
+// El jugador elige en la pantalla de inicio: giroscopio (por defecto) o flechas en pantalla.
+let useTilt = true;
+try { useTilt = localStorage.getItem('hipertunel-tilt') !== '0'; } catch (e) {}
 
 // ---------- geometría del túnel
 const LANES = 16, LW = TAU / LANES, R = 4;          // R = distancia del eje al centro de cada carril
@@ -2200,10 +2208,10 @@ function onMotion(e, fromOrient){
   const phi = Math.atan2(a.y, a.x);
   tilt.phi = tilt.has ? tilt.phi + wrap(phi - tilt.phi) * TILT_SMOOTH : phi;   // filtrado justo para quitar el temblor, sin restar respuesta
   tilt.has = true; if (tilt.phi0 === null) { tilt.phi0 = tilt.phi; tilt.cal = TILT_CAL; }
-  if (state === 'play') $('tz').classList.remove('on');
+  if (state === 'play' && useTilt) $('tz').classList.remove('on');
 }
 function enableTilt(){
-  if (tilt.on) return;
+  if (tilt.on || !useTilt) return;
   const go = () => { if (!tilt.on) { addEventListener('devicemotion', onMotion); addEventListener('deviceorientation', onOrient); } tilt.on = true; };
   try {
     if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function')
@@ -2214,6 +2222,7 @@ function enableTilt(){
 if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission !== 'function') enableTilt();
 function sensorStatus(){
   const el = $('sens'); if (!el) return;
+  if (!useTilt) { el.hidden = true; return; }
   if (!COARSE && motionN + orientN === 0) { el.hidden = true; return; }
   el.hidden = false;
   let txt, ok = false;
@@ -2235,6 +2244,11 @@ function goLandscape(){
 }
 const isPortrait = () => COARSE && innerHeight > innerWidth;
 let wasPortrait = false;
+function applyTiltPref(){
+  try { localStorage.setItem('hipertunel-tilt', useTilt ? '1' : '0'); } catch (e) {}
+  if (COARSE) $('tz').classList.toggle('on', !useTilt || !tilt.has);
+  sensorStatus();
+}
 addEventListener('orientationchange', () => { tilt.phi0 = null; tilt.has = false; });
 let gpPrev = { l: false, r: false, a: false }, gpT = 0, gamepadOK = true;   // algunos visores bloquean el mando: se desactiva sin errores
 let testStep = null;
@@ -2248,7 +2262,7 @@ function pollInput(dt){
   $('tzl').classList.toggle('down', tl); $('tzr').classList.toggle('down', tr);
   // giroscopio: un carril por inclinación. Hay que volver cerca del centro (TILT_REARM) para
   // encadenar otro, o el sensor dispara varios de golpe al inclinar despacio.
-  if (tilt.has && tilt.phi0 !== null) {
+  if (useTilt && tilt.has && tilt.phi0 !== null) {
     // El cero se toma al pulsar Jugar, justo cuando aún estás recolocando el móvil, así que durante
     // un momento se sigue recalibrando. Después se recentra muy despacio: si sostienes el móvil algo
     // torcido, el reposo se adapta en vez de dejarte girando solo, pero un giro a propósito aguanta.
@@ -2300,9 +2314,20 @@ function popChev(i){ const c = chevs[i]; if (!c) return; c.classList.add('pop');
 function popText(t){ const p = $('pop'); p.textContent = t; p.classList.remove('show'); void p.offsetWidth; p.classList.add('show'); }
 function whiteFlash(){ const f = $('wflash'); if (!f) return; f.classList.add('on'); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove('on'))); }
 function flash(){ const f = $('flash'); f.classList.add('on'); requestAnimationFrame(() => requestAnimationFrame(() => f.classList.remove('on'))); }
-$('help').innerHTML = COARSE
-  ? '<span class="k">Inclina el móvil</span><span>Como un volante, en horizontal: poco = un carril, mucho = varios</span><span class="k">O toca</span><span>La izquierda o la derecha de la pantalla</span><span class="k">Mantener</span><span>Salta carriles seguidos</span>'
-  : '<span class="k">← → o A D</span><span>Saltar al carril de al lado</span><span class="k">Mantener</span><span>Salta carriles seguidos</span><span class="k">Espacio</span><span>Empezar</span><span class="k">Mando</span><span>Stick o cruceta</span>';
+function setHelp(){
+  $('help').innerHTML = !COARSE
+    ? '<span class="k">← → o A D</span><span>Saltar al carril de al lado</span><span class="k">Mantener</span><span>Salta carriles seguidos</span><span class="k">Espacio</span><span>Empezar</span><span class="k">Mando</span><span>Stick o cruceta</span>'
+    : useTilt
+      ? '<span class="k">Inclina el móvil</span><span>Como un volante, en horizontal: poco = un carril, mucho = varios</span><span class="k">O toca</span><span>La izquierda o la derecha de la pantalla</span><span class="k">Mantener</span><span>Salta carriles seguidos</span>'
+      : '<span class="k">Toca</span><span>La izquierda o la derecha de la pantalla</span><span class="k">Mantener</span><span>Salta carriles seguidos</span>';
+}
+if (COARSE) {
+  const cb = $('cbTilt');
+  $('optTilt').hidden = false; cb.checked = useTilt;
+  cb.addEventListener('change', () => { useTilt = cb.checked; if (useTilt) enableTilt(); applyTiltPref(); setHelp(); });
+}
+setHelp();
+applyTiltPref();
 const fmt = (n) => Math.floor(n).toLocaleString('es-ES');
 let hudRecT = 0;
 function showBestHud(){
@@ -2363,7 +2388,7 @@ function start(){
   spawnAhead();
   state = 'play';
   $('title').hidden = true; $('over').hidden = true; $('hud').classList.add('on');
-  if (COARSE && !tilt.has) $('tz').classList.add('on'); tiltCheckT = 2.5;
+  if (COARSE && (!useTilt || !tilt.has)) $('tz').classList.add('on'); tiltCheckT = useTilt ? 2.5 : 0;
   setLevelHUD(); showBestHud();
 }
 let killer = null;
