@@ -236,6 +236,15 @@ const laneMod = (l) => ((l % LANES) + LANES) % LANES;
 const dirX = (a) => Math.sin(a), dirY = (a) => -Math.cos(a);
 
 // ---------- render
+// Parámetros de imagen ajustables por URL (?expo=0.8&bloom=0.5) para poder calibrar con capturas
+const QS = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');   // el harness de pruebas no tiene location
+const qnum = (k, d) => { const v = parseFloat(QS.get(k)); return isFinite(v) ? v : d; };
+const EXPO = qnum('expo', 0.72);
+const FOG_NEAR = qnum('fnear', 25), FOG_FAR = qnum('ffar', 170);
+const SHOWFPS = QS.has('fps');
+// Gestión de color: los colores se escriben en sRGB (como se ven) y se convierten a lineal para
+// iluminar. Sin esto, el sombreado se aplasta al mostrarlo y todo parece plano.
+try { if (THREE.ColorManagement) THREE.ColorManagement.legacyMode = false; } catch (e) {}
 let renderer;
 try { renderer = new THREE.WebGLRenderer({ canvas: $('view'), antialias: true, powerPreference: 'high-performance' }); }
 catch (e) { fatal('Tu navegador no pudo iniciar los gráficos 3D (WebGL). Prueba con otro navegador.'); return; }
@@ -243,6 +252,8 @@ const DPR = Math.min(window.devicePixelRatio || 1, COARSE ? 1.5 : 2);
 renderer.setPixelRatio(DPR);
 renderer.setSize(innerWidth, innerHeight, false);
 renderer.setClearColor(0xcfe9ff, 1);
+// las texturas dibujadas en canvas llevan el color ya en sRGB: hay que declararlo o salen apagadas
+const ctex = (c) => { const t = new THREE.CanvasTexture(c); t.encoding = THREE.sRGBEncoding; return t; };
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xfff1d6, 30, 190);
 const FOG_IN = new THREE.Color(0xfff1d6), FOG_OUT = new THREE.Color(0xd4ecff);
@@ -259,12 +270,20 @@ const ZoomBlur = {
     ' gl_FragColor = acc / tot; }'
 };
 const Grade = {
-  uniforms: { tDiffuse: { value: null }, sat: { value: 1.16 }, contrast: { value: 1.07 }, tint: { value: new THREE.Vector3(1.03, 1.0, 0.96) }, vig: { value: 0.24 }, ca: { value: 0 }, hyper: { value: 0 }, tt: { value: 0 }, lines: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, sat: { value: 1.16 }, contrast: { value: 1.07 }, tint: { value: new THREE.Vector3(1.03, 1.0, 0.96) }, vig: { value: 0.24 }, ca: { value: 0 }, hyper: { value: 0 }, tt: { value: 0 }, lines: { value: 0 }, expo: { value: 1 }, tm: { value: 0 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-  fragmentShader: 'uniform sampler2D tDiffuse; uniform float sat; uniform float contrast; uniform vec3 tint; uniform float vig; uniform float ca; uniform float hyper; uniform float tt; uniform float lines; varying vec2 vUv;\n' +
+  fragmentShader: 'uniform sampler2D tDiffuse; uniform float sat; uniform float contrast; uniform vec3 tint; uniform float vig; uniform float ca; uniform float hyper; uniform float tt; uniform float lines; uniform float expo; uniform float tm; varying vec2 vUv;\n' +
     'vec3 hue(float x){ return clamp(abs(mod(x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0); }\n' +
+    // curva de cine: comprime las altas luces en vez de recortarlas, que es lo que quemaba la imagen
+    'vec3 aces(vec3 x){ return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0); }\n' +
+    'vec3 toSRGB(vec3 c){ c = max(c, vec3(0.0)); return mix(c * 12.92, 1.055 * pow(c, vec3(0.4166667)) - 0.055, step(vec3(0.0031308), c)); }\n' +
     'void main(){ vec2 dd = vUv - 0.5; float a = ca * length(dd);\n' +
     ' vec3 col = vec3(texture2D(tDiffuse, vUv + dd * a).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - dd * a).b);\n' +
+    ' if (tm > 0.5) { vec3 hdr = col * expo; vec3 mapped = aces(hdr);\n' +
+    '   float lh = dot(hdr, vec3(0.2126, 0.7152, 0.0722)), lm = dot(mapped, vec3(0.2126, 0.7152, 0.0722));\n' +
+    // recupera el color que la curva se lleva por delante: sin esto los tonos vivos salen lavados
+    '   mapped = mix(mapped, clamp(hdr * (lm / max(lh, 1e-4)), 0.0, 1.0), 0.45);\n' +
+    '   col = toSRGB(mapped); }\n' +
     ' float l = dot(col, vec3(0.299, 0.587, 0.114)); col = mix(vec3(l), col, sat); col = (col - 0.5) * contrast + 0.5; col *= tint;\n' +
     ' vec2 d = dd * vec2(1.0, 0.85); float v = 1.0 - smoothstep(0.2, 0.78, length(d)); col *= mix(1.0 - vig, 1.0, v);\n' +
     ' float ang = atan(dd.y, dd.x); float hs = fract(sin(floor(ang * 64.0) * 12.9898 + floor(tt * 20.0) * 78.233) * 43758.5453);\n' +
@@ -274,15 +293,26 @@ const Grade = {
     ' col = mix(col, vec3(1.0), sl * lines);\n' +
     ' gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0); }'
 };
-let composer = null, blur = null, bloom = null, gradePass = null;
+let composer = null, blur = null, bloom = null, gradePass = null, hdrOK = false;
 if (THREE.EffectComposer && THREE.RenderPass && THREE.ShaderPass) {
   try {
-    composer = new THREE.EffectComposer(renderer);
+    // Buffers de coma flotante: sin ellos todo lo que pasa de blanco se recorta antes de poder
+    // corregirlo y la imagen sale quemada. Con ellos el brillo sobrevive hasta el tono final.
+    let rt = null;
+    try {
+      if (renderer.capabilities.isWebGL2 || renderer.extensions.get('OES_texture_half_float')) {
+        rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, encoding: THREE.LinearEncoding });
+        hdrOK = true;
+      }
+    } catch (e) { rt = null; hdrOK = false; }
+    composer = new THREE.EffectComposer(renderer, rt || undefined);
     composer.setPixelRatio(DPR); composer.setSize(innerWidth, innerHeight);
     composer.addPass(new THREE.RenderPass(scene, camera));
     blur = new THREE.ShaderPass(ZoomBlur); composer.addPass(blur);
-    if (THREE.UnrealBloomPass) { const bs = COARSE ? 0.5 : 0.7; bloom = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth * bs, innerHeight * bs), 0.55, 0.5, 0.9); composer.addPass(bloom); }
+    // con HDR el umbral puede subir de 1: así solo brilla lo que de verdad emite luz, no todo lo claro
+    if (THREE.UnrealBloomPass) { const bs = COARSE ? 0.5 : 0.7; bloom = new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth * bs, innerHeight * bs), qnum('bloom', hdrOK ? 0.42 : 0.55), 0.62, qnum('bthr', hdrOK ? 1.05 : 0.9)); composer.addPass(bloom); }
     gradePass = new THREE.ShaderPass(Grade); composer.addPass(gradePass);
+    if (hdrOK) { gradePass.uniforms.tm.value = 1; gradePass.uniforms.expo.value = EXPO; }
   } catch (e) { composer = null; }
 }
 
@@ -360,7 +390,7 @@ const tileTex = (() => {
       g.fillStyle = lg; rrect(g, x0 + 28, 50, 72, 156, 14); g.fill();
     }
   }
-  const t = new THREE.CanvasTexture(c);
+  const t = ctex(c);
   try { t.anisotropy = renderer.capabilities.getMaxAnisotropy(); } catch (e) {}
   return t;
 })();
@@ -409,7 +439,7 @@ const sky = (() => {
   m.userData.paintC = (tp, hz, bt) => { top.copy(tp); hor.copy(hz); bot.copy(bt); for (let i = 0; i < pos.count; i++) { const t = pos.getY(i) / 520; if (t > 0) c.copy(hor).lerp(top, Math.pow(t, 0.6)); else c.copy(hor).lerp(bot, Math.min(1, -t * 3)); col.set([c.r, c.g, c.b], i * 3); } g.attributes.color.needsUpdate = true; };
   m.renderOrder = -10; m.frustumCulled = false; scene.add(m); return m;
 })();
-const sunTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,255,245,1)'); gr.addColorStop(0.2, 'rgba(255,248,215,.95)'); gr.addColorStop(0.5, 'rgba(255,230,170,.3)'); gr.addColorStop(1, 'rgba(255,230,170,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(c); })();
+const sunTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,255,245,1)'); gr.addColorStop(0.2, 'rgba(255,248,215,.95)'); gr.addColorStop(0.5, 'rgba(255,230,170,.3)'); gr.addColorStop(1, 'rgba(255,230,170,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); return ctex(c); })();
 const sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunTex, fog: false, depthWrite: false, transparent: true }));
 sun.scale.set(140, 140, 1); sun.renderOrder = -9; scene.add(sun);
 const outsideWorld = new THREE.Group(); scene.add(outsideWorld);
@@ -426,7 +456,7 @@ const planet = (() => {
   g.save(); g.translate(128, 128); g.rotate(-0.35); g.strokeStyle = 'rgba(255,220,180,.8)'; g.lineWidth = 10; g.beginPath(); g.ellipse(0, 0, 122, 30, 0, Math.PI, TAU); g.stroke(); g.restore();
   g.fillStyle = gr; g.beginPath(); g.arc(128, 128, 78, 0, TAU); g.fill();
   g.save(); g.translate(128, 128); g.rotate(-0.35); g.strokeStyle = 'rgba(255,220,180,.9)'; g.lineWidth = 10; g.beginPath(); g.ellipse(0, 0, 122, 30, 0, 0, Math.PI); g.stroke(); g.restore();
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), fog: false, depthWrite: false, transparent: true }));
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: ctex(c), fog: false, depthWrite: false, transparent: true }));
   sp.scale.set(170, 170, 1); sp.renderOrder = -8; scene.add(sp); return sp;
 })();
 const endGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: sunTex, color: 0xfff3d6, fog: false, depthWrite: false, transparent: true, blending: THREE.AdditiveBlending }));
@@ -460,7 +490,7 @@ const grassMat = new THREE.MeshLambertMaterial({ color: 0x7ccf4f, flatShading: t
 const rockMat = new THREE.MeshLambertMaterial({ color: 0xc8a482, flatShading: true });
 const trunkMat = new THREE.MeshLambertMaterial({ color: 0x9a6a45 });
 const leafMats = [0x4fbf4a, 0x6fd35a, 0x3ea85a].map((c) => new THREE.MeshLambertMaterial({ color: c, flatShading: true }));
-const fallTex = (() => { const c = document.createElement('canvas'); c.width = 32; c.height = 128; const g = c.getContext('2d'); for (let y = 0; y < 128; y += 4) { g.fillStyle = y % 16 < 8 ? 'rgba(255,255,255,.95)' : 'rgba(170,225,255,.85)'; g.fillRect(0, y, 32, 4); } const t = new THREE.CanvasTexture(c); t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 3); return t; })();
+const fallTex = (() => { const c = document.createElement('canvas'); c.width = 32; c.height = 128; const g = c.getContext('2d'); for (let y = 0; y < 128; y += 4) { g.fillStyle = y % 16 < 8 ? 'rgba(255,255,255,.95)' : 'rgba(170,225,255,.85)'; g.fillRect(0, y, 32, 4); } const t = ctex(c); t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 3); return t; })();
 const fallMat = new THREE.MeshBasicMaterial({ map: fallTex, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
 const islands = [];
 function makeIsland(){
@@ -588,7 +618,7 @@ function emblemTex(hex){
   g.fillStyle = 'rgba(255,255,255,.18)'; rrect(g, 8, 8, 112, 112, 20); g.fill();
   g.fillStyle = col; rrect(g, 14, 14, 100, 100, 16); g.fill();
   g.fillStyle = '#fff7ef'; g.beginPath(); g.moveTo(64, 30); g.lineTo(98, 64); g.lineTo(64, 98); g.lineTo(30, 64); g.closePath(); g.fill();
-  return new THREE.CanvasTexture(c);
+  return ctex(c);
 }
 const PAL_HEX = [0xe8413c, 0x9b5de5, 0xf15bb5, 0x3fbf4f, 0xff8c42, 0xd62f6f];
 const blockMats = PAL_HEX.map((h) => new THREE.MeshPhongMaterial({ map: emblemTex(h), emissive: 0x2a1515, emissiveIntensity: 0.45, specular: 0x666666, shininess: 70 }));
@@ -606,17 +636,17 @@ const padTex = (() => {
   g.fillStyle = '#10204a'; rrect(g, 0, 0, 128, 192, 18); g.fill();
   g.fillStyle = '#9ff0ff'; rrect(g, 7, 7, 114, 178, 14); g.fill();
   g.fillStyle = gr; rrect(g, 13, 13, 102, 166, 10); g.fill();
-  return new THREE.CanvasTexture(c);
+  return ctex(c);
 })();
 const chevTex = (() => {
   const c = document.createElement('canvas'); c.width = 128; c.height = 96; const g = c.getContext('2d');
   g.strokeStyle = '#ffffff'; g.lineWidth = 17; g.lineJoin = 'round'; g.lineCap = 'round';
   g.beginPath(); g.moveTo(30, 68); g.lineTo(64, 30); g.lineTo(98, 68); g.stroke();
-  const t = new THREE.CanvasTexture(c); t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 2.2); return t;
+  const t = ctex(c); t.wrapS = THREE.ClampToEdgeWrapping; t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 2.2); return t;
 })();
 const chevMat = new THREE.MeshBasicMaterial({ map: chevTex, transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
 const padGeo = new THREE.PlaneGeometry(1, 1); padGeo.rotateX(-Math.PI / 2);
-const softTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 4, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+const softTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 4, 32, 32, 32); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return ctex(c); })();
 const shadowMat = new THREE.MeshBasicMaterial({ map: softTex, color: 0x3a2a55, transparent: true, opacity: 0.35, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
 const padGlowMat = new THREE.MeshBasicMaterial({ map: softTex, color: 0x3fc6ff, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
 const ARROW_ORANGE = 0x19a8ff;
@@ -1246,7 +1276,9 @@ function start(){
   SND.key = 0; lastBiome = 0; applyTheme(); nearT = 0; nextMilestone = 1000; recordPassed = false;
   achRun = []; toastQ = []; toastT = 0; $('toast').classList.remove('show');
   starsArr.length = 0; combo = 0; comboT = 0; hyper = 0; hypMeter = 0; hitstop = 0; maxStage = 0; starsGot = 0; maxCombo = 0;
-  enableTilt(); goLandscape(); tilt.phi0 = null; tilt.armed = true; tilt.t = 0; laneSoft = false;
+  // tilt.has = false obliga a tomar la referencia con una lectura limpia: si se arrastra el valor
+  // filtrado de la partida anterior, el cero queda torcido y el piloto se va solo hacia un lado.
+  enableTilt(); goLandscape(); tilt.phi0 = null; tilt.has = false; tilt.armed = true; tilt.t = 0; laneSoft = false;
   SND.init(); SND.startMusic(); SND.play('start');
   clearObjs(); clearMechanics(); buildSections(); lastBoostZ = 0; killer = null; sinceRest = 0; lastEnc = ''; encLog.length = 0; pathL = 0; prevPathL = 0; pathT = 60; evCool = 60;
   s = sPrev = 0; speed = 16; lane = 0; playerLaneF = 0; camLane = 0; lastLaneInt = 0; cont.dir = 0; level = 0; score = 0; invul = 0; shake = 0; kick = 0; lastOut = false;
@@ -1408,6 +1440,16 @@ function tileColor(k, l, out, target){
     if (z >= o.litFrom && z <= o.z + o.len) { target.copy(PALETTE[o.color]); tileHasWarn = true; return; }
   }
 }
+// Los 6 vértices de cada baldosa son A,B,C,A,C,D: B y C caen en el borde de fuera del carril.
+const VSHADE = [0, 1, 1, 0, 1, 0];
+const TUBE_AMB = qnum('amb', 0.30), TUBE_DIF = qnum('dif', 0.74), WARN_SHADE = qnum('wsh', 0.42);
+const shP = [0, 0, 0, 0];
+function tubeShade(u, k){
+  prof(u, k, shP);
+  // luz algo desplazada a la izquierda: un tubo simétrico no deja leer el volumen
+  const d = shP[3] * 0.94 - shP[2] * 0.34;
+  return TUBE_AMB + TUBE_DIF * (0.5 + 0.5 * d);
+}
 function buildTube(){
   const k0 = Math.floor((s - 8) / SEG) - 1;
   let v = 0;
@@ -1428,13 +1470,17 @@ function buildTube(){
       tPos[o+6] = Cx; tPos[o+7] = Cy; tPos[o+8] = -zb; tPos[o+9] = Ax; tPos[o+10] = Ay; tPos[o+11] = -za;
       tPos[o+12] = Cx; tPos[o+13] = Cy; tPos[o+14] = -zb; tPos[o+15] = Dx; tPos[o+16] = Dy; tPos[o+17] = -zb;
       tileColor(k, l, false, tmpA);
-      prof(du * LANE_W, ka, P);
-      const ny = P[3], shade = 0.74 + 0.26 * (0.5 + 0.5 * ny) + (ny < -0.3 ? 0.06 : 0);
-      tmpA.multiplyScalar(shade * 0.9);
+      // Luz por vértice en los dos bordes del carril: da un degradado continuo alrededor del tubo.
+      // Antes era un único valor por baldosa y con muy poco recorrido, y el túnel parecía de papel.
+      let sh0 = tubeShade(u0, ka), sh1 = tubeShade(u1, ka);
+      if (tileHasWarn) { sh0 = 1 + (sh0 - 1) * WARN_SHADE; sh1 = 1 + (sh1 - 1) * WARN_SHADE; }   // el aviso no debe perder fuerza
       let alpha = 1;
       if (gA > 0 && !tileHasWarn) { const w = sm((Math.abs(du) - 2.4) / 1.4) * gA; if (w > 0) { alpha = 1 - 0.84 * w; tmpA.lerp(tmpB.setRGB(0.85, 0.97, 1), 0.35 * w); } }
       const oc = v * 4;
-      for (let q = 0; q < 6; q++) { tCol[oc + q * 4] = tmpA.r; tCol[oc + q * 4 + 1] = tmpA.g; tCol[oc + q * 4 + 2] = tmpA.b; tCol[oc + q * 4 + 3] = alpha; }
+      for (let q = 0; q < 6; q++) {
+        const sh = VSHADE[q] ? sh1 : sh0;
+        tCol[oc + q * 4] = tmpA.r * sh; tCol[oc + q * 4 + 1] = tmpA.g * sh; tCol[oc + q * 4 + 2] = tmpA.b * sh; tCol[oc + q * 4 + 3] = alpha;
+      }
       const ux = tileLight(k, l) && sideM(za) < 0.5 ? 0.5 : 0, uo = v * 2;
       tUV[uo] = ux + 0.01; tUV[uo+1] = 0; tUV[uo+2] = ux + 0.49; tUV[uo+3] = 0; tUV[uo+4] = ux + 0.49; tUV[uo+5] = 1;
       tUV[uo+6] = ux + 0.01; tUV[uo+7] = 0; tUV[uo+8] = ux + 0.49; tUV[uo+9] = 1; tUV[uo+10] = ux + 0.01; tUV[uo+11] = 1;
@@ -1524,7 +1570,7 @@ function update(dt){
   if (blur) blur.uniforms.strength.value = (0.006 + sp * 0.03 + kick * 0.05 + hv * 0.02) * lerp(0.5, 1, kIn);
   if (gradePass) { gradePass.uniforms.ca.value = 0.004 + sp * 0.01 + hv * 0.01 + kick * 0.008; gradePass.uniforms.hyper.value = hv; gradePass.uniforms.tt.value = time; gradePass.uniforms.lines.value = clamp((speed - 52) / 45, 0, 1) * 0.22 + hv * 0.22 + kick * 0.12; }
   if (hv > 0) stMat.color.setHSL((time * 0.9) % 1, 0.9, 0.62); else stMat.color.setRGB(1, 1, 1);
-  scene.fog.far = lerp(560, 170, kIn); scene.fog.near = lerp(150, 25, kIn);
+  scene.fog.far = lerp(560, FOG_FAR, kIn); scene.fog.near = lerp(150, FOG_NEAR, kIn);
   scene.fog.color.copy(FOG_OUT).lerp(FOG_IN, kIn); renderer.setClearColor(scene.fog.color, 1);
 
   for (const o of objs) placeObj(o);
@@ -1545,11 +1591,21 @@ function update(dt){
 
 function render(){ if (composer) composer.render(); else renderer.render(scene, camera); }
 let last = performance.now();
+const fpsBuf = [];
+let fpsEl = null, fpsT = 0;
+if (SHOWFPS) { fpsEl = document.createElement('div'); fpsEl.style.cssText = 'position:fixed;left:8px;top:8px;z-index:99;font:600 13px/1.3 monospace;color:#fff;background:rgba(0,0,0,.55);padding:4px 7px;border-radius:6px;pointer-events:none;white-space:pre'; document.body.appendChild(fpsEl); }
+function fpsStats(){
+  if (!fpsBuf.length) return { avg: 0, p5: 0, n: 0 };
+  const a = fpsBuf.slice().sort((x, y) => x - y);
+  return { avg: +(fpsBuf.reduce((p, c) => p + c, 0) / fpsBuf.length).toFixed(1), p5: +a[Math.floor(a.length * 0.05)].toFixed(1), n: fpsBuf.length };
+}
 function frame(now){
   requestAnimationFrame(frame);
   let dt = (now - last) / 1000; last = now;
   if (!(dt > 0)) dt = 0; dt = Math.min(dt, 1 / 20);
+  if (dt > 0) { fpsBuf.push(1 / dt); if (fpsBuf.length > 600) fpsBuf.shift(); }
   update(dt); render();
+  if (fpsEl) { fpsT += dt; if (fpsT > 0.25) { fpsT = 0; const f = fpsStats(); fpsEl.textContent = f.avg + ' fps  (1% peor ' + f.p5 + ')\n' + (hdrOK ? 'HDR' : 'sin HDR') + ' · dpr ' + DPR.toFixed(1); } }
 }
 function resize(){
   const w = innerWidth, h = innerHeight;
@@ -1564,7 +1620,10 @@ cursor = 1e9;
 resize();
 requestAnimationFrame(frame);
 
-window.__game = { kill(){ die(null); }, chordGap(){ let worst = 1e9; for (const o of objs) if (o.type === 'boost') o.pads.forEach((p, i) => { const zz = o.z + 1.8 + i * 3.3; const du0 = wrapL(o.lane - camLane + twr(zz)); if (Math.abs(du0) > 5) return; const a = surfPt(zz, du0 - 0.5, new THREE.Vector3()), b = surfPt(zz, du0 + 0.5, new THREE.Vector3()); const c = a.add(b).multiplyScalar(0.5); const Y = new THREE.Vector3(0, 1, 0).applyQuaternion(p.quaternion); worst = Math.min(worst, p.position.clone().sub(c).dot(Y)); }); return worst; }, motion(x, y){ onMotion({ accelerationIncludingGravity: { x, y, z: 0 } }); }, tiltState(){ return { has: tilt.has, phi0: tilt.phi0 }; }, encLog, diffAt: (z) => diffAt(z), cxAt: (z) => cx(z), cyAt: (z) => cy(z), perm: () => PERM.slice(), padErr(){ let worst = 0; for (const o of objs) if (o.type === 'boost') for (let i = 0; i < 3; i++) { const p = o.pads[i]; const zz = o.z + 1.8 + i * 3.3; const du0 = wrapL(o.lane - camLane + twr(zz)); if (Math.abs(du0) > 6) continue; for (const dz of [-1.5, 1.5]) { const du = du0 + twr(zz + dz) - twr(zz); const pt = surfPt(zz + dz, du, new THREE.Vector3()); const loc = pt.clone().sub(p.position).applyQuaternion(p.quaternion.clone().invert()); worst = Math.max(worst, Math.abs(loc.y + 0.06)); } } return worst; }, jellies, jump(){ startJump(); }, airH(){ return airH(); }, dbg(){ return { snow: snowballs.length, jel: jellies.length, cur: currents.length, air: !!air, inCur: inCurrent, biome: biomeAt(s).key }; }, warp(z){ clearObjs(); clearMechanics(); s = sPrev = z; cursor = z + 60; lastBoostZ = z; }, get hyper(){ return hyper; }, get combo(){ return combo; }, get nstars(){ return starsArr.length; }, get score(){ return score; }, update, start, get state(){ return state; }, get s(){ return s; }, get side(){ return side; }, get level(){ return level; }, get lane(){ return laneMod(Math.round(playerLaneF)); }, byLane, objs, setStep(fn){ testStep = fn; } };
+window.__game = { tubeDbg(){
+    let lo = 9, hi = -9; for (let i = 0; i < NV; i++) { const r = tCol[i * 4]; if (r < lo) lo = r; if (r > hi) hi = r; }
+    const k = kappa(s + 20); return { kappa: +k.toFixed(4), shadeAtCam: +tubeShade(0, k).toFixed(3), shadeOpp: +tubeShade(LANE_W * 8, k).toFixed(3), colLo: +lo.toFixed(3), colHi: +hi.toFixed(3), fog: [scene.fog.near | 0, scene.fog.far | 0], kIn: +((kappa(s) / K0 + 1) / 2).toFixed(2) };
+  }, fps(){ return fpsStats(); }, fpsReset(){ fpsBuf.length = 0; }, gfx(){ return { hdr: hdrOK, expo: EXPO, dpr: DPR }; }, kill(){ die(null); }, chordGap(){ let worst = 1e9; for (const o of objs) if (o.type === 'boost') o.pads.forEach((p, i) => { const zz = o.z + 1.8 + i * 3.3; const du0 = wrapL(o.lane - camLane + twr(zz)); if (Math.abs(du0) > 5) return; const a = surfPt(zz, du0 - 0.5, new THREE.Vector3()), b = surfPt(zz, du0 + 0.5, new THREE.Vector3()); const c = a.add(b).multiplyScalar(0.5); const Y = new THREE.Vector3(0, 1, 0).applyQuaternion(p.quaternion); worst = Math.min(worst, p.position.clone().sub(c).dot(Y)); }); return worst; }, motion(x, y){ onMotion({ accelerationIncludingGravity: { x, y, z: 0 } }); }, tiltState(){ return { has: tilt.has, phi0: tilt.phi0 }; }, encLog, diffAt: (z) => diffAt(z), cxAt: (z) => cx(z), cyAt: (z) => cy(z), perm: () => PERM.slice(), padErr(){ let worst = 0; for (const o of objs) if (o.type === 'boost') for (let i = 0; i < 3; i++) { const p = o.pads[i]; const zz = o.z + 1.8 + i * 3.3; const du0 = wrapL(o.lane - camLane + twr(zz)); if (Math.abs(du0) > 6) continue; for (const dz of [-1.5, 1.5]) { const du = du0 + twr(zz + dz) - twr(zz); const pt = surfPt(zz + dz, du, new THREE.Vector3()); const loc = pt.clone().sub(p.position).applyQuaternion(p.quaternion.clone().invert()); worst = Math.max(worst, Math.abs(loc.y + 0.06)); } } return worst; }, jellies, jump(){ startJump(); }, airH(){ return airH(); }, dbg(){ return { snow: snowballs.length, jel: jellies.length, cur: currents.length, air: !!air, inCur: inCurrent, biome: biomeAt(s).key }; }, warp(z){ clearObjs(); clearMechanics(); s = sPrev = z; cursor = z + 60; lastBoostZ = z; }, get hyper(){ return hyper; }, get combo(){ return combo; }, get nstars(){ return starsArr.length; }, get score(){ return score; }, update, start, get state(){ return state; }, get s(){ return s; }, get side(){ return side; }, get level(){ return level; }, get lane(){ return laneMod(Math.round(playerLaneF)); }, byLane, objs, setStep(fn){ testStep = fn; } };
 })();
 </script>
 </body>

@@ -2,7 +2,9 @@
 
 Juego de runner en túnel, en primera persona, inspirado en **Boost 3D** (iPhone, 2009). Es una demo interna de Víctor (SDG) para enseñar lo que se puede hacer con IA. Víctor habla en español de España, en tono informal. Prueba en el móvil, en horizontal, y te pasará capturas y opiniones.
 
-Estado actual: versión 0.31. El juego completo es un único archivo, `index.html` (Three.js r147 cargado por CDN). `hipertunel-movil.html` es el mismo juego con las librerías incrustadas, para abrirlo sin conexión.
+Estado actual: versión 0.32. El juego completo es un único archivo, `index.html` (Three.js r147 cargado por CDN). **`hipertunel-movil.html` ya no se edita a mano: se genera con `npm run build`.**
+
+Publicado en https://eyrawolf7.github.io/hipertunel/ (repo `eyrawolf7/hipertunel`, cuenta personal de Víctor, **no** la del trabajo). Ahí funciona el giroscopio, porque necesita https.
 
 ## Reglas de diseño (NO romper; salen del feedback de Víctor)
 
@@ -41,7 +43,14 @@ npm run check        # comprobaciones de calidad (deben salir "Todo OK")
 npm run sim          # 2,5 min de juego con bot, sin errores
 npm run serve        # en otra terminal
 npm run shots -- 150,1500,3000,6000   # capturas reales en tests/shots/
+npm run compare -- despues 150,1500,3000,6000   # capturas + fps, para comparar cambios visuales
+npm run build        # regenera hipertunel-movil.html desde index.html
 ```
+
+Para calibrar la imagen sin tocar el código hay parámetros en la URL:
+`?expo=0.72&amb=0.30&dif=0.74&bloom=0.42&bthr=1.05&fnear=25&ffar=170&fps`.
+`?fps` muestra fps y el 1% peor en pantalla; `window.__game.fps()` lo devuelve para los tests.
+Las capturas de partida (v0.31) están en `tests/base-v031/`.
 
 Mira las capturas y compáralas con `referencias/video-original/` (fotogramas del original, 1 por segundo) y `referencias/estilo-visual/` (el estilo al que aspira). Sé autocrítico: juega, graba, compara y corrige en bucle. Cuando cambies algo que ya ha dado guerra (placas, avisos, densidad, giroscopio), añade una comprobación en `tests/checks.js`.
 

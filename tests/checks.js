@@ -15,14 +15,23 @@ const D = [0, 1000, 3000, 6000, 10000].map((z) => G.diffAt(z)); for (let i = 1; 
 // 4) el giroscopio: una inclinación normal mueve un carril y solo uno, por brusco que sea el sensor
 G.setStep(() => 0); G.start(); const feed = (deg, sec) => { for (let i = 0; i < sec * 60; i++) { const r = deg * Math.PI / 180; G.motion(9.8 * Math.cos(Math.PI / 2 + r), 9.8 * Math.sin(Math.PI / 2 + r)); G.update(1 / 60); } };
 const dl = (a, b) => ((a - b + 8 + 16) % 16) - 8;   // diferencia de carriles teniendo en cuenta la vuelta al túnel
-feed(0, 0.5); let l0 = G.lane; feed(14, 0.8);
-if (G.lane === l0) fail.push('La inclinación no cambia de carril');
-else if (Math.abs(dl(G.lane, l0)) !== 1) fail.push('Una inclinación normal salta ' + Math.abs(dl(G.lane, l0)) + ' carriles en vez de 1');
-feed(0, 0.5); l0 = G.lane; feed(14, 0.8);   // volver al centro rearma: otro carril, de uno en uno
-if (Math.abs(dl(G.lane, l0)) !== 1) fail.push('Volviendo al centro no se mueve otro carril de uno en uno');
-feed(0, 0.5); l0 = G.lane; feed(14, 2.5);   // mantener una inclinación normal NO debe encadenar carriles
-if (Math.abs(dl(G.lane, l0)) !== 1) fail.push('Mantener el móvil inclinado encadena carriles solo: ' + Math.abs(dl(G.lane, l0)));
-feed(0, 0.5); l0 = G.lane; feed(38, 1.6);   // con el móvil muy girado sí se encadenan
-if (Math.abs(dl(G.lane, l0)) < 2) fail.push('Con el móvil muy girado no se encadenan carriles');
+// moverse mucho hace chocar contra un bloque, y al morir ya no se cambia de carril: se reintenta
+// con otra pista hasta conseguir una medida con el jugador vivo.
+const mover = (deg, sec) => {
+  for (let intento = 0; intento < 12; intento++) {
+    G.start(); feed(0, 0.5); const a = G.lane;
+    feed(deg, sec);
+    if (G.state === 'play') return Math.abs(dl(G.lane, a));
+  }
+  return null;
+};
+const uno = mover(14, 0.8);
+if (uno === null) fail.push('No se pudo medir la inclinación: el jugador muere siempre');
+else if (uno === 0) fail.push('La inclinación no cambia de carril');
+else if (uno !== 1) fail.push('Una inclinación normal salta ' + uno + ' carriles en vez de 1');
+const mantenido = mover(14, 2.5);   // mantener una inclinación normal NO debe encadenar carriles
+if (mantenido !== null && mantenido !== 1) fail.push('Mantener el móvil inclinado encadena carriles solo: ' + mantenido);
+const girado = mover(38, 1.2);      // con el móvil muy girado sí se encadenan
+if (girado !== null && girado < 2) fail.push('Con el móvil muy girado no se encadenan carriles: ' + girado);
 console.log(fail.length ? 'FALLOS:\n- ' + fail.join('\n- ') : 'Todo OK', JSON.stringify({ chordMin: +chord.toFixed(3), padGapMax: +gap.toFixed(3), diff: D.map((d) => +d.toFixed(2)) }));
 process.exit(fail.length ? 1 : 0);
