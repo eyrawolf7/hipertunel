@@ -29,24 +29,30 @@ const v = [2, 6, 10, 15, 22, 35].map(porSegundo);
 if (v.some((x) => x === null)) fail.push('No se pudo medir el giroscopio: el jugador muere siempre');
 else {
   if (v[0] > 0.2) fail.push('El giroscopio se mueve con el móvil casi recto (2 grados): ' + v[0].toFixed(1) + ' carriles/s, el pulso de la mano ya desviaría');
-  if (v[1] < 0.6) fail.push('Con un gesto pequeño (6 grados) apenas desliza: ' + v[1].toFixed(1) + ' carriles/s');
-  if (v[2] < 2.5) fail.push('A 10 grados debería cruzar un carril en menos de medio segundo, y va a ' + v[2].toFixed(1) + ' carriles/s');
-  if (v[5] < 12) fail.push('Con el móvil bien girado no se desliza rápido: ' + v[5].toFixed(1) + ' carriles/s');
+  if (v[1] < 2.5) fail.push('Con un gesto pequeño (6 grados) apenas desliza: ' + v[1].toFixed(1) + ' carriles/s');
+  if (v[2] < 6) fail.push('A 10 grados debería cruzar un carril en menos de 0,2 s, y va a ' + v[2].toFixed(1) + ' carriles/s');
+  if (v[5] < 20) fail.push('Con el móvil bien girado no se desliza rápido: ' + v[5].toFixed(1) + ' carriles/s');
   // y la respuesta tiene que crecer de forma continua, sin escalones
   for (let i = 1; i < v.length; i++) if (v[i] <= v[i - 1]) fail.push('El giroscopio no responde de forma progresiva entre ' + [2, 6, 10, 15, 22, 35][i - 1] + ' y ' + [2, 6, 10, 15, 22, 35][i] + ' grados');
 }
-// el cambio de carril tiene que deslizar, no saltar: ni instantáneo ni con rebote que se pase
-{
+// El cambio de carril tiene que deslizar, no saltar, y comportarse igual aunque al móvil le bajen
+// los fotogramas: una integración ingenua del muelle se vuelve inestable por debajo de 40 fps y
+// rebota sin parar, que es exactamente la sensación de ir a saltitos.
+for (const fps of [60, 40, 30, 22]) {
+  const dt = 1 / fps;
   let paso = 0; G.setStep(() => { const d = paso; paso = 0; return d; });
-  G.start(); for (let i = 0; i < 30; i++) G.update(1 / 60);
+  G.start(); for (let i = 0; i < Math.round(0.5 * fps); i++) G.update(dt);
   const ini = G.laneF; paso = 1;
   const tray = [];
-  for (let i = 0; i < 45; i++) { G.update(1 / 60); tray.push(G.laneF - ini); }
-  const t90 = tray.findIndex((x) => x >= 0.9) / 60;
-  if (Math.max(...tray) > 1.06) fail.push('Al cambiar de carril se pasa y vuelve: llega a ' + Math.max(...tray).toFixed(2));
-  if (t90 < 0) fail.push('El cambio de carril no llega a completarse');
-  else if (t90 < 0.08) fail.push('El cambio de carril es un salto seco (' + t90.toFixed(2) + ' s), no desliza');
-  else if (t90 > 0.35) fail.push('El cambio de carril va lento y flotante: ' + t90.toFixed(2) + ' s');
+  for (let i = 0; i < Math.round(1.2 * fps); i++) { G.update(dt); tray.push(G.laneF - ini); }
+  const t90 = tray.findIndex((x) => x >= 0.9);
+  let rebotes = 0;
+  for (let i = 2; i < tray.length; i++) { const u = tray[i] - tray[i - 1], w = tray[i - 1] - tray[i - 2]; if (u * w < 0 && Math.abs(u) > 0.004) rebotes++; }
+  if (Math.max(...tray) > 1.08) fail.push('A ' + fps + ' fps el cambio de carril se dispara hasta ' + Math.max(...tray).toFixed(1) + ' carriles');
+  else if (rebotes > 1) fail.push('A ' + fps + ' fps el cambio de carril rebota ' + rebotes + ' veces: se siente a saltitos');
+  else if (t90 < 0) fail.push('A ' + fps + ' fps el cambio de carril no llega a completarse');
+  else if (t90 * dt < 0.06) fail.push('A ' + fps + ' fps el cambio de carril es un salto seco, no desliza');
+  else if (t90 * dt > 0.3) fail.push('A ' + fps + ' fps el cambio de carril va lento y flotante: ' + (t90 * dt).toFixed(2) + ' s');
   G.setStep(() => 0);
 }
 // tiene que responder en cuanto giras de verdad, sin retardo: cualquier recentrado del cero

@@ -220,6 +220,16 @@ const TAU = Math.PI * 2;
 const clamp = (v,a,b) => v < a ? a : v > b ? b : v;
 const lerp = (a,b,t) => a + (b - a) * t;
 const damp = (a,b,k,dt) => lerp(a, b, 1 - Math.exp(-k * dt));
+// Deslizamiento suave hacia un objetivo en un tiempo dado, con velocidad propia (laneV): acelera y
+// frena sin rebotar, y no se descontrola aunque el móvil baje de fotogramas.
+let laneV2 = 0;
+function slide(pos, dest, t, dt){
+  const om = 2 / Math.max(t, 1e-4), x = om * dt;
+  const ex = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+  const dif = pos - dest, tmp = (laneV2 + om * dif) * dt;
+  laneV2 = (laneV2 - om * tmp) * ex;
+  return dest + (dif + tmp) * ex;
+}
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const rr = (a,b) => a + (b - a) * Math.random();
 const ri = (a,b) => Math.floor(rr(a, b + 1));
@@ -1104,7 +1114,7 @@ const SND = {
 // ---------- estado
 let state = 'title';
 let s = 0, sPrev = 0, speed = 0, lane = 0, playerLaneF = 0, camLane = 0, side = 0, lastOut = false, lastLaneInt = 0;
-let laneSoft = false, laneV = 0;   // laneV: velocidad lateral, para que el cambio de carril deslice
+let laneSoft = false;
 let level = 0, score = 0, invul = 0, shake = 0, dieT = 0, time = 0, kick = 0, hitFlash = 0;
 let best = 0;
 try { best = +(localStorage.getItem('hipertunel-best') || 0) || 0; } catch (e) {}
@@ -1152,11 +1162,11 @@ const SENS = qnum('sens', 1);
 // TILT_DEAD: grados de holgura antes de empezar a deslizar (el sensor tiembla un par de grados)
 // TILT_K: carriles por segundo que se ganan por cada grado de más · TILT_HOLD: a partir de aquí
 // se considera que estás deslizando de verdad, solo para la red de seguridad del cero.
-const TILT_DEAD = qnum('tdead', 3 / SENS), TILT_K = qnum('tk', 0.62 * SENS), TILT_HOLD = qnum('thold', 12 / SENS);
-const TILT_RATE = qnum('trate', 20 * SENS), TILT_DELAY = qnum('tdelay', 0.12), TILT_SMOOTH = qnum('tsmooth', 0.85), LANE_SOFT = qnum('lanesoft', 0.62);
+const TILT_DEAD = qnum('tdead', 2 / SENS), TILT_K = qnum('tk', 1.15 * SENS), TILT_HOLD = qnum('thold', 10 / SENS);
+const TILT_RATE = qnum('trate', 28 * SENS), TILT_DELAY = qnum('tdelay', 0.12), TILT_SMOOTH = qnum('tsmooth', 0.85), LANE_SOFT = qnum('lanesoft', 0.62);
 // HOLD_T: lo que tarda un toque mantenido en empezar a deslizar · SLIDE_*: carriles por segundo
 const HOLD_T = qnum('holdt', 0.07), SLIDE_MIN = qnum('slidemin', 4), SLIDE_MAX = qnum('slidemax', 15);
-const LANE_SPRING = qnum('spring', 400);   // rigidez del deslizamiento al carril de al lado
+const LANE_T = qnum('lanet', 0.085);   // segundos en acomodarse al carril de al lado
 const TILT_CAL = qnum('tcal', 0.3), TILT_DRIFT = qnum('tdrift', 3), TILT_QUIET = qnum('tquiet', 10);
 // TILT_CAL: segundos fijando el cero al empezar · TILT_DRIFT: rapidez del recentrado con el móvil
 // quieto · TILT_QUIET: por debajo de estos grados por segundo se considera que no lo estás girando
@@ -1339,7 +1349,7 @@ function start(){
   starsArr.length = 0; combo = 0; comboT = 0; hyper = 0; hypMeter = 0; hitstop = 0; maxStage = 0; starsGot = 0; maxCombo = 0;
   // tilt.has = false obliga a tomar la referencia con una lectura limpia: si se arrastra el valor
   // filtrado de la partida anterior, el cero queda torcido y el piloto se va solo hacia un lado.
-  enableTilt(); goLandscape(); tilt.phi0 = null; tilt.has = false; tilt.armed = true; tilt.t = 0; tilt.cal = TILT_CAL; laneSoft = false; laneV = 0;
+  enableTilt(); goLandscape(); tilt.phi0 = null; tilt.has = false; tilt.armed = true; tilt.t = 0; tilt.cal = TILT_CAL; laneSoft = false; laneV2 = 0;
   SND.init(); SND.startMusic(); SND.play('start');
   clearObjs(); clearMechanics(); buildSections(); lastBoostZ = 0; killer = null; sinceRest = 0; lastEnc = ''; encLog.length = 0; pathL = 0; prevPathL = 0; pathT = 60; evCool = 60;
   s = sPrev = 0; speed = 16; lane = 0; playerLaneF = 0; camLane = 0; lastLaneInt = 0; cont.dir = 0; level = 0; score = 0; invul = 0; shake = 0; kick = 0; lastOut = false;
@@ -1574,11 +1584,10 @@ function update(dt){
 
   if (state === 'play') {
     const bkS = biomeAt(s).key;
-    // Muelle amortiguado en vez del salto seco de antes: arranca, coge velocidad y frena al llegar,
-    // que es lo que se siente como resbalar. Sin rebote, para no pasarse de carril.
-    const kSpring = LANE_SPRING * (bkS === 'snow' ? 0.45 : 1);
-    laneV += (-(playerLaneF - lane) * kSpring - laneV * 2 * Math.sqrt(kSpring)) * dt;
-    playerLaneF += laneV * dt;
+    // Deslizamiento al carril: arranca, coge velocidad y frena al llegar. La fórmula es estable a
+    // cualquier tasa de fotogramas; la versión ingenua oscilaba por debajo de 40 fps y eso se veía
+    // justo como saltitos, que es lo contrario de lo que se busca.
+    playerLaneF = slide(playerLaneF, lane, LANE_T * (bkS === 'snow' ? 2.2 : 1), dt);
     if (air) { air.t += dt; if (air.t >= air.dur) { air = null; shake = Math.max(shake, 0.35); SND.play('land'); } }
     for (const h0 of hints) if (!h0.done && s >= h0.z - 40) { h0.done = true; popText(h0.text); }
     const Lc = laneMod(Math.round(playerLaneF));
@@ -1692,7 +1701,7 @@ requestAnimationFrame(frame);
 window.__game = { tubeDbg(){
     let lo = 9, hi = -9; for (let i = 0; i < NV; i++) { const r = tCol[i * 4]; if (r < lo) lo = r; if (r > hi) hi = r; }
     const k = kappa(s + 20); return { kappa: +k.toFixed(4), shadeAtCam: +tubeShade(0, k).toFixed(3), shadeOpp: +tubeShade(LANE_W * 8, k).toFixed(3), colLo: +lo.toFixed(3), colHi: +hi.toFixed(3), fog: [scene.fog.near | 0, scene.fog.far | 0], kIn: +((kappa(s) / K0 + 1) / 2).toFixed(2) };
-  }, fps(){ return fpsStats(); }, fpsReset(){ fpsBuf.length = 0; }, gfx(){ return { hdr: hdrOK, expo: EXPO, dpr: DPR }; }, kill(){ die(null); }, chordGap(){ let worst = 1e9; for (const o of objs) if (o.type === 'boost') o.pads.forEach((p, i) => { const zz = o.z + 1.8 + i * 3.3; const du0 = wrapL(o.lane - camLane + twr(zz)); if (Math.abs(du0) > 5) return; const a = surfPt(zz, du0 - 0.5, new THREE.Vector3()), b = surfPt(zz, du0 + 0.5, new THREE.Vector3()); const c = a.add(b).multiplyScalar(0.5); const Y = new THREE.Vector3(0, 1, 0).applyQuaternion(p.quaternion); worst = Math.min(worst, p.position.clone().sub(c).dot(Y)); }); return worst; }, motion(x, y){ onMotion({ accelerationIncludingGravity: { x, y, z: 0 } }); }, tiltState(){ return { has: tilt.has, phi0: tilt.phi0 }; }, encLog, diffAt: (z) => diffAt(z), cxAt: (z) => cx(z), cyAt: (z) => cy(z), perm: () => PERM.slice(), padErr(){ let worst = 0; for (const o of objs) if (o.type === 'boost') for (let i = 0; i < 3; i++) { const p = o.pads[i]; const zz = o.z + 1.8 + i * 3.3; const du0 = wrapL(o.lane - camLane + twr(zz)); if (Math.abs(du0) > 6) continue; for (const dz of [-1.5, 1.5]) { const du = du0 + twr(zz + dz) - twr(zz); const pt = surfPt(zz + dz, du, new THREE.Vector3()); const loc = pt.clone().sub(p.position).applyQuaternion(p.quaternion.clone().invert()); worst = Math.max(worst, Math.abs(loc.y + 0.06)); } } return worst; }, jellies, jump(){ startJump(); }, airH(){ return airH(); }, dbg(){ return { snow: snowballs.length, jel: jellies.length, cur: currents.length, air: !!air, inCur: inCurrent, biome: biomeAt(s).key }; }, warp(z){ clearObjs(); clearMechanics(); s = sPrev = z; cursor = z + 60; lastBoostZ = z; }, get hyper(){ return hyper; }, get combo(){ return combo; }, get nstars(){ return starsArr.length; }, get score(){ return score; }, update, start, get state(){ return state; }, get s(){ return s; }, get speed(){ return speed; }, get side(){ return side; }, get level(){ return level; }, get lane(){ return laneMod(Math.round(playerLaneF)); }, get laneF(){ return playerLaneF; }, get laneV(){ return laneV; }, byLane, objs, setStep(fn){ testStep = fn; } };
+  }, fps(){ return fpsStats(); }, fpsReset(){ fpsBuf.length = 0; }, gfx(){ return { hdr: hdrOK, expo: EXPO, dpr: DPR }; }, kill(){ die(null); }, chordGap(){ let worst = 1e9; for (const o of objs) if (o.type === 'boost') o.pads.forEach((p, i) => { const zz = o.z + 1.8 + i * 3.3; const du0 = wrapL(o.lane - camLane + twr(zz)); if (Math.abs(du0) > 5) return; const a = surfPt(zz, du0 - 0.5, new THREE.Vector3()), b = surfPt(zz, du0 + 0.5, new THREE.Vector3()); const c = a.add(b).multiplyScalar(0.5); const Y = new THREE.Vector3(0, 1, 0).applyQuaternion(p.quaternion); worst = Math.min(worst, p.position.clone().sub(c).dot(Y)); }); return worst; }, motion(x, y){ onMotion({ accelerationIncludingGravity: { x, y, z: 0 } }); }, tiltState(){ return { has: tilt.has, phi0: tilt.phi0 }; }, encLog, diffAt: (z) => diffAt(z), cxAt: (z) => cx(z), cyAt: (z) => cy(z), perm: () => PERM.slice(), padErr(){ let worst = 0; for (const o of objs) if (o.type === 'boost') for (let i = 0; i < 3; i++) { const p = o.pads[i]; const zz = o.z + 1.8 + i * 3.3; const du0 = wrapL(o.lane - camLane + twr(zz)); if (Math.abs(du0) > 6) continue; for (const dz of [-1.5, 1.5]) { const du = du0 + twr(zz + dz) - twr(zz); const pt = surfPt(zz + dz, du, new THREE.Vector3()); const loc = pt.clone().sub(p.position).applyQuaternion(p.quaternion.clone().invert()); worst = Math.max(worst, Math.abs(loc.y + 0.06)); } } return worst; }, jellies, jump(){ startJump(); }, airH(){ return airH(); }, dbg(){ return { snow: snowballs.length, jel: jellies.length, cur: currents.length, air: !!air, inCur: inCurrent, biome: biomeAt(s).key }; }, warp(z){ clearObjs(); clearMechanics(); s = sPrev = z; cursor = z + 60; lastBoostZ = z; }, get hyper(){ return hyper; }, get combo(){ return combo; }, get nstars(){ return starsArr.length; }, get score(){ return score; }, update, start, get state(){ return state; }, get s(){ return s; }, get speed(){ return speed; }, get side(){ return side; }, get level(){ return level; }, get lane(){ return laneMod(Math.round(playerLaneF)); }, get laneF(){ return playerLaneF; }, get laneV(){ return laneV2; }, byLane, objs, setStep(fn){ testStep = fn; } };
 })();
 </script>
 </body>
