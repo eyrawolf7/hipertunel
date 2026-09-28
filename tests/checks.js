@@ -12,69 +12,70 @@ if (chord < 0.02) fail.push('Placas por debajo de la baldosa: ' + chord.toFixed(
 if (gap > 0.15) fail.push('Placas separadas de la carretera: ' + gap.toFixed(3) + ' m');
 // 3) la dificultad crece de forma constante
 const D = [0, 1000, 3000, 6000, 10000].map((z) => G.diffAt(z)); for (let i = 1; i < D.length; i++) if (D[i] <= D[i - 1]) fail.push('La dificultad no crece entre ' + i);
-// 4) el giroscopio: una inclinación normal mueve un carril y solo uno, por brusco que sea el sensor
+// 4) el giroscopio es un volante analógico: el ángulo no da saltos de carril, da velocidad de
+// deslizamiento. Los saltitos de carril rompen la sensación de velocidad.
 G.setStep(() => 0); G.start(); const feed = (deg, sec) => { for (let i = 0; i < sec * 60; i++) { const r = deg * Math.PI / 180; G.motion(9.8 * Math.cos(Math.PI / 2 + r), 9.8 * Math.sin(Math.PI / 2 + r)); G.update(1 / 60); } };
-const dl = (a, b) => ((a - b + 8 + 16) % 16) - 8;   // diferencia de carriles teniendo en cuenta la vuelta al túnel
-// moverse mucho hace chocar contra un bloque, y al morir ya no se cambia de carril: se reintenta
-// con otra pista hasta conseguir una medida con el jugador vivo.
-// Se acumula carril a carril: dando vueltas al túnel, la diferencia entre inicio y final da la
-// vuelta y se pierde la cuenta (16 carriles recorridos parecerían 0).
-const mover = (deg, sec) => {
-  for (let intento = 0; intento < 12; intento++) {
-    G.start(); feed(0, 1.1);   // se espera a que termine la calibración inicial del cero
-    let prev = G.lane, acc = 0;
-    for (let i = 0; i < sec * 60; i++) { feed(deg, 1 / 60); acc += Math.abs(dl(G.lane, prev)); prev = G.lane; }
-    if (G.state === 'play') return acc;
+// carriles recorridos en un segundo sosteniendo el móvil a X grados (tras calibrar recto)
+const porSegundo = (deg) => {
+  for (let intento = 0; intento < 10; intento++) {
+    G.start(); feed(0, 1.25);
+    const ini = G.laneF;
+    feed(deg, 1);
+    if (G.state === 'play') return Math.abs(G.laneF - ini);
   }
   return null;
 };
-const uno = mover(9, 0.8);   // gesto pequeño: un carril y solo uno
-if (uno === null) fail.push('No se pudo medir la inclinación: el jugador muere siempre');
-else if (uno === 0) fail.push('La inclinación no cambia de carril');
-else if (uno !== 1) fail.push('Una inclinación normal salta ' + uno + ' carriles en vez de 1');
-const mantenido = mover(9, 2.5);   // mantener un gesto pequeño NO debe encadenar carriles
-if (mantenido !== null && mantenido !== 1) fail.push('Mantener el móvil inclinado encadena carriles solo: ' + mantenido);
-// Mantener el móvil girado tiene que dar vueltas rápidas al túnel: es parte de la gracia y de la
-// pericia. Ojo al tocar los umbrales: es fácil matar esto sin querer buscando precisión.
-const girado = mover(38, 1.0);
-if (girado !== null && girado < 8) fail.push('Con el móvil girado no se dan vueltas rápidas: solo ' + girado + ' carriles en 1 s');
-// y tiene que responder al momento, no sentirse pesado
-let respuesta = null;
-for (let intento = 0; intento < 12 && respuesta === null; intento++) {
-  G.start(); feed(0, 1.1);
-  const l0 = G.lane; let t = 0;
-  for (let i = 0; i < 60 && respuesta === null; i++) { feed(12, 1 / 60); t += 1 / 60; if (G.lane !== l0) respuesta = t; }
-  if (G.state !== 'play') respuesta = null;
+const v = [2, 6, 10, 15, 22, 35].map(porSegundo);
+if (v.some((x) => x === null)) fail.push('No se pudo medir el giroscopio: el jugador muere siempre');
+else {
+  if (v[0] > 0.2) fail.push('El giroscopio se mueve con el móvil casi recto (2 grados): ' + v[0].toFixed(1) + ' carriles/s, el pulso de la mano ya desviaría');
+  if (v[1] < 0.6) fail.push('Con un gesto pequeño (6 grados) apenas desliza: ' + v[1].toFixed(1) + ' carriles/s');
+  if (v[2] < 2.5) fail.push('A 10 grados debería cruzar un carril en menos de medio segundo, y va a ' + v[2].toFixed(1) + ' carriles/s');
+  if (v[5] < 12) fail.push('Con el móvil bien girado no se desliza rápido: ' + v[5].toFixed(1) + ' carriles/s');
+  // y la respuesta tiene que crecer de forma continua, sin escalones
+  for (let i = 1; i < v.length; i++) if (v[i] <= v[i - 1]) fail.push('El giroscopio no responde de forma progresiva entre ' + [2, 6, 10, 15, 22, 35][i - 1] + ' y ' + [2, 6, 10, 15, 22, 35][i] + ' grados');
 }
-if (respuesta === null) fail.push('Una inclinación de 12 grados no llega a mover el carril en 1 s');
-else if (respuesta > 0.15) fail.push('El giroscopio responde tarde: ' + respuesta.toFixed(2) + ' s hasta cambiar de carril');
-// 4c) tiene que sentirse ágil también girando despacio. Cualquier recentrado del cero persigue los
-// giros lentos y hace que no reaccionen nunca, que se siente como un retardo enorme.
+// el cambio de carril tiene que deslizar, no saltar: ni instantáneo ni con rebote que se pase
+{
+  let paso = 0; G.setStep(() => { const d = paso; paso = 0; return d; });
+  G.start(); for (let i = 0; i < 30; i++) G.update(1 / 60);
+  const ini = G.laneF; paso = 1;
+  const tray = [];
+  for (let i = 0; i < 45; i++) { G.update(1 / 60); tray.push(G.laneF - ini); }
+  const t90 = tray.findIndex((x) => x >= 0.9) / 60;
+  if (Math.max(...tray) > 1.06) fail.push('Al cambiar de carril se pasa y vuelve: llega a ' + Math.max(...tray).toFixed(2));
+  if (t90 < 0) fail.push('El cambio de carril no llega a completarse');
+  else if (t90 < 0.08) fail.push('El cambio de carril es un salto seco (' + t90.toFixed(2) + ' s), no desliza');
+  else if (t90 > 0.35) fail.push('El cambio de carril va lento y flotante: ' + t90.toFixed(2) + ' s');
+  G.setStep(() => 0);
+}
+// tiene que responder en cuanto giras de verdad, sin retardo: cualquier recentrado del cero
+// persigue los giros lentos y hace que no reaccionen nunca.
 for (const vel of [8, 15, 40]) {
   let grados = null;
   for (let intento = 0; intento < 10 && grados === null; intento++) {
-    G.start(); feed(0, 1.2);                      // sujetando el móvil recto y quieto
-    const l0 = G.lane; let ang = 0;
-    for (let i = 0; i < 180 && grados === null; i++) { ang += vel / 60; feed(ang, 1 / 60); if (G.lane !== l0) grados = ang; }
+    G.start(); feed(0, 1.25);
+    const l0 = G.laneF; let ang = 0;
+    // con un volante analógico la respuesta es que EMPIECE a deslizar, no que complete medio carril
+    for (let i = 0; i < 180 && grados === null; i++) { ang += vel / 60; feed(ang, 1 / 60); if (Math.abs(G.laneF - l0) > 0.05) grados = ang; }
     if (G.state !== 'play') grados = null;
   }
-  if (grados === null) fail.push('Girando a ' + vel + ' grados por segundo no llega a cambiar de carril en 3 s');
-  else if (grados > 9) fail.push('Girando a ' + vel + ' grados por segundo hay que girar ' + grados.toFixed(1) + ' grados para que reaccione');
+  if (grados === null) fail.push('Girando a ' + vel + ' grados por segundo no llega a moverse en 3 s');
+  else if (grados > 8) fail.push('Girando a ' + vel + ' grados por segundo hay que girar ' + grados.toFixed(1) + ' grados antes de que se mueva nada');
 }
-// 4b) el cero del giroscopio. Al pulsar Jugar estás tocando la pantalla y recolocando el móvil, así
-// que la referencia se toma en mitad de ese movimiento. Si se coge mal, la partida arranca girando
-// sola. Aquí se recoloca el móvil durante el primer cuarto de segundo y luego se sujeta quieto.
+// el cero del giroscopio. Al pulsar Jugar estás tocando la pantalla y recolocando el móvil, así que
+// la referencia se toma en mitad de ese movimiento. Si se coge mal, la partida arranca girando sola.
 for (const giro of [15, 25, 40]) {
   let mov = null;
   for (let intento = 0; intento < 12 && mov === null; intento++) {
     G.start();
-    for (let i = 0; i < 15; i++) feed(giro * (i / 15), 1 / 60);   // recolocando el móvil
+    for (let i = 0; i < 18; i++) feed(giro * (i / 18), 1 / 60);   // recolocando el móvil
     feed(giro, 0.6);                                              // ya quieto, sujetándolo así
-    let prev = G.lane, acc = 0;
-    for (let i = 0; i < 60 * 3; i++) { feed(giro, 1 / 60); acc += Math.abs(dl(G.lane, prev)); prev = G.lane; }
-    if (G.state === 'play') mov = acc;
+    const ini = G.laneF;
+    feed(giro, 3);
+    if (G.state === 'play') mov = Math.abs(G.laneF - ini);
   }
-  if (mov !== null && mov > 1) fail.push('Recolocando el móvil ' + giro + ' grados al empezar, la partida arranca girando sola: ' + mov + ' carriles en 3 s');
+  if (mov !== null && mov > 1) fail.push('Recolocando el móvil ' + giro + ' grados al empezar, la partida arranca deslizando sola: ' + mov.toFixed(1) + ' carriles en 3 s');
 }
 // 5) el color solo avisa si es raro: con medio túnel pintado deja de significar nada.
 // En el original nunca se ven más de 2-4 carriles de color a la vez. Pero tampoco debe quedar
