@@ -106,6 +106,8 @@ export function createInput(target) {
       const L = Math.PI / 6, u = theta / L;
       if (d !== 0) {
         if (d !== st.dir) { st.holdT = 0; st.target = d > 0 ? Math.floor(u + 0.35) + 1 : Math.ceil(u - 0.35) - 1; }
+        // en la lámina abierta no hay carriles fuera del 0..11: el objetivo se queda dentro
+        if (open) st.target = Math.max(0, Math.min(11, st.target));
         else st.holdT += dt;
         st.dir = d; src = 'digital';
         if (st.holdT < HOLD) a = assist(st.target * L - theta, open);
@@ -115,7 +117,11 @@ export function createInput(target) {
         if (st.target !== null) {
           const diff = st.target * L - theta;
           const dd = open ? diff : Math.atan2(Math.sin(diff), Math.cos(diff));
-          if (Math.abs(dd) < 0.006) st.target = null; else { a = assist(diff, open); src = 'digital'; }
+          if (open && (st.target < 0 || st.target > 11)) st.target = Math.max(0, Math.min(11, st.target));
+          a = assist(diff, open);
+          // se da por llegado antes de caer por debajo de la zona muerta de la simulación (0,019):
+          // si no, la asistencia se quedaría pidiendo un giro que no mueve y bloquearía la inclinación
+          if (Math.abs(dd) < 0.01 || Math.abs(a) < 0.02) { st.target = null; a = 0; } else src = 'digital';
         }
       }
       if (!a && st.pad.x) { a = st.pad.x * 0.42; src = 'pad'; st.target = null; }

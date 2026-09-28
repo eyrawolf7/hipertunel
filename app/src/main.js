@@ -128,7 +128,7 @@ function startGame(m) {
 }
 
 function pause() { if (state !== 'play') return; pausedFrom = state; state = 'paused'; ui.show('pause'); audio.pause(true); }
-function resume() { if (state !== 'paused') return; state = 'countdown'; countdown = 1.2; ui.show('hud'); audio.pause(false); audio.play('countdown'); }
+function resume() { if (state !== 'paused') return; state = 'countdown'; countdown = 1.0; ui.show('hud'); audio.pause(false); audio.play('countdown'); }
 function toMenu() { audio.pause(false); attract(); }
 
 function finish() {
@@ -181,6 +181,7 @@ function frame(now) {
     const before = Math.ceil(countdown);
     countdown -= dt;
     if (Math.ceil(countdown) !== before && countdown > 0) audio.play('countdown');
+    if (!$('rotate').hidden) countdown = Math.max(countdown, 0.5);   // en vertical no arranca
     if (countdown <= 0) { state = 'play'; audio.play('go'); }
   }
   if (window.__freeze) { acc = 0; }

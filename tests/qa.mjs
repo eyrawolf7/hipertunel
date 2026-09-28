@@ -403,6 +403,334 @@ await run(10, async () => {
   await page.close();
 });
 
+// ================================================================== ronda 2
+// observador de avisos: guarda el texto de cada aviso nuevo
+const toastProbe = (page) => page.evaluate(() => {
+  const box = document.querySelector('.toasts'); window.__qaToasts = [];
+  new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1) window.__qaToasts.push({ t: Math.round(performance.now()), txt: n.textContent.trim() }); }).observe(box, { childList: true });
+});
+const toastsRead = (page) => page.evaluate(() => window.__qaToasts.map((x) => x.txt));
+const PORTRAIT = { width: 390, height: 844, deviceScaleFactor: 1, isMobile: true, hasTouch: true, isLandscape: false };
+
+// ------------------------------------------------------------------ 11. cuenta atrás 3-2-1-¡YA!
+await run(11, async () => {
+  const { page, errors } = await open(DESKTOP);
+  const seqProbe = () => page.evaluate(() => {
+    const el = document.querySelector('[data-hud="count"]'); const seq = []; let lastTxt = null; const t0 = performance.now();
+    window.__qaCd = { seq, on: true };
+    (function f() { if (!window.__qaCd.on) return; const tx = el.textContent; const vis = getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden'; if (tx !== lastTxt) { seq.push({ tx, st: window.__hip.state, ms: Math.round(performance.now() - t0), vis }); lastTxt = tx; } requestAnimationFrame(f); })();
+  });
+  await seqProbe();
+  await clickIn(page, 'title', '[data-act="play"]');
+  await sleep(4200);
+  const r = await page.evaluate(() => { window.__qaCd.on = false; return window.__qaCd.seq; });
+  const txt = r.map((x) => x.tx).filter((x) => x !== '');
+  rec(11, 'cuenta atrás muestra 3, 2, 1, ¡YA! en orden', JSON.stringify(txt) === JSON.stringify(['3', '2', '1', '¡YA!']), r);
+  const ya = r.find((x) => x.tx === '¡YA!'), three = r.find((x) => x.tx === '3');
+  rec(11, '¡YA! coincide con el paso a play (~3 s)', ya && ya.st === 'play' && ya.ms - (three?.ms || 0) > 2700 && ya.ms - (three?.ms || 0) < 3400, { three: three?.ms, ya: ya?.ms, st: ya?.st });
+  rec(11, 'el texto se borra tras ¡YA!', r[r.length - 1].tx === '', r[r.length - 1]);
+  // la simulación no avanza durante la cuenta atrás
+  await page.click('.hud-pause'); await sleep(100);
+  const s0 = await page.evaluate(() => window.__hip.game.s);
+  await seqProbe();
+  await clickIn(page, 'pause', '[data-act="resume"]');
+  await sleep(300);
+  const mid = await page.evaluate(() => ({ s: window.__hip.game.s, st: window.__hip.state }));
+  await sleep(1800);
+  const r2 = await page.evaluate(() => { window.__qaCd.on = false; return window.__qaCd.seq.map((x) => x.tx).filter((x) => x); });
+  rec(11, 'al reanudar: sin avance durante la cuenta atrás', mid.st === 'countdown' && mid.s === s0, { s0, mid });
+  note(11, 'secuencia al reanudar (countdown = 1,2 s)', r2);
+  if (errors.length) rec(11, 'sin errores', false, errors);
+  await page.close();
+});
+
+// ------------------------------------------------------------------ 12. consejos de primera partida
+await run(12, async () => {
+  for (const [name, vp] of [['escritorio', DESKTOP], ['móvil', PHONE]]) {
+    const { page, errors } = await open(vp);
+    await toastProbe(page);
+    await clickIn(page, 'title', '[data-act="play"]');
+    await sleep(4800);
+    const t1 = await toastsRead(page);
+    const cnt1 = await page.evaluate(() => localStorage.getItem('hipertunel-partidas'));
+    const want = vp.hasTouch ? /Toca a la izquierda|Inclina/ : /Gira con/;
+    rec(12, `${name}: 1.ª partida muestra el consejo de giro y el de las flechas`, t1.some((t) => want.test(t)) && t1.some((t) => /flechas azules/.test(t)) && cnt1 === '1', { toasts: t1, partidas: cnt1 });
+    // a partir de la 4.ª partida, sin consejos
+    await page.evaluate(() => { localStorage.setItem('hipertunel-partidas', '3'); window.__qaToasts.length = 0; });
+    await page.click('.hud-pause').catch(() => {}); await sleep(100);
+    await clickIn(page, 'pause', '[data-act="restart"]');
+    await sleep(4800);
+    const t2 = await toastsRead(page);
+    rec(12, `${name}: con 3 partidas ya no salen consejos`, !t2.some((t) => /Gira con|Toca a la izquierda|Inclina|flechas azules/.test(t)), t2);
+    if (errors.length) rec(12, `${name}: sin errores`, false, errors);
+    await page.close();
+  }
+});
+
+// ------------------------------------------------------------------ 13. vertical en táctil, pantalla completa y calidad por defecto
+await run(13, async () => {
+  {
+    const { page, errors } = await open(PHONE);
+    const env = await page.evaluate(() => ({ coarse: matchMedia('(pointer: coarse)').matches, q: window.__hip.renderer.quality, sel: document.querySelector('.seg button.sel')?.dataset.q, rotHidden: document.getElementById('rotate').hidden }));
+    rec(13, 'táctil: calidad por defecto "media"', env.coarse && env.q === 'media' && env.sel === 'media', env);
+    rec(13, 'táctil en horizontal: sin aviso de girar', env.rotHidden === true, env);
+    // tocar Jugar: pantalla completa + bloqueo en horizontal (lo que permita el navegador)
+    await page.waitForSelector('.scr[data-screen="title"] [data-act="play"]', { visible: true }); await sleep(250);
+    await page.tap('.scr[data-screen="title"] [data-act="play"]'); await sleep(400);
+    const fs = await page.evaluate(() => ({ fs: !!document.fullscreenElement, st: window.__hip.state }));
+    rec(13, 'tocar Jugar arranca y no lanza errores (pantalla completa/bloqueo)', fs.st === 'countdown' && errors.length === 0, { ...fs, errors: errors.slice(0, 3) });
+    await waitState(page, 'play', 4000); await invul(page);
+    const vis = () => page.evaluate(() => { const e = document.getElementById('rotate'); return { hidden: e.hidden, display: getComputedStyle(e).display, st: window.__hip.state, scr: document.getElementById('ui').dataset.screen }; });
+    await page.setViewport(PORTRAIT); await sleep(300);
+    const p1 = await vis();
+    rec(13, 'jugando, girar a vertical: aviso visible y pausa', !p1.hidden && p1.display !== 'none' && p1.st === 'paused', p1);
+    const sP = await page.evaluate(() => window.__hip.game.s); await sleep(500);
+    const sP2 = await page.evaluate(() => window.__hip.game.s);
+    rec(13, 'en vertical la partida no avanza', sP === sP2, { sP, sP2 });
+    await page.setViewport(PHONE); await sleep(300);
+    const p2 = await vis();
+    rec(13, 'volver a horizontal: aviso oculto y sigue en pausa', p2.hidden && p2.st === 'paused', p2);
+    // vertical durante la cuenta atrás
+    await clickIn(page, 'pause', '[data-act="resume"]');
+    await page.setViewport(PORTRAIT); await sleep(200);
+    const c0 = await vis();
+    await sleep(1600);
+    const c1 = await vis();
+    const sC = await page.evaluate(() => window.__hip.game.s); await sleep(400); const sC2 = await page.evaluate(() => window.__hip.game.s);
+    rec(13, 'girar a vertical durante la cuenta atrás: no empieza a jugar detrás del aviso', c1.st !== 'play' && sC === sC2, { alGirar: c0, tras1_6s: c1, avanza: +(sC2 - sC).toFixed(2) });
+    await page.setViewport(PHONE); await sleep(300);
+    // vertical en el título: aviso visible
+    await page.evaluate(() => window.__hip.ui.show('title'));
+    await page.setViewport(PORTRAIT); await sleep(300);
+    const t1 = await vis();
+    rec(13, 'título en vertical (táctil): aviso visible', !t1.hidden, t1);
+    if (errors.length) rec(13, 'táctil: sin errores', false, errors);
+    await page.close();
+  }
+  {
+    const { page, errors } = await open({ width: 600, height: 900, deviceScaleFactor: 1 });
+    const d = await page.evaluate(() => ({ hidden: document.getElementById('rotate').hidden, q: window.__hip.renderer.quality, coarse: matchMedia('(pointer: coarse)').matches }));
+    rec(13, 'escritorio en ventana vertical: sin aviso y calidad "alta"', d.hidden && d.q === 'alta' && !d.coarse, d);
+    await clickIn(page, 'title', '[data-act="play"]'); await sleep(200);
+    const fs = await page.evaluate(() => !!document.fullscreenElement);
+    rec(13, 'escritorio: Jugar no pide pantalla completa', !fs, { fs });
+    if (errors.length) rec(13, 'escritorio: sin errores', false, errors);
+    await page.close();
+  }
+});
+
+// ------------------------------------------------------------------ 14. ¡Impulsos perdidos! y demo del título
+await run(14, async () => {
+  const { page, errors } = await open(DESKTOP);
+  // demo: arranca en la fila 300 y no se estrella
+  const at = await page.evaluate(() => ({ st: window.__hip.state, s: +window.__hip.game.s.toFixed(1), own: Object.prototype.hasOwnProperty.call(window.__hip.game, 'crash') }));
+  rec(14, 'demo del título arranca en la fila ≥300 con choque anulado', at.st === 'attract' && at.s >= 300 && at.s < 400 && at.own, at);
+  const demo = await page.evaluate(() => { window.__freeze = true; const h = window.__hip; const g = h.game; let n = 0; while (n < 60 * 180 && g.alive) { g.step({ steer: h.bot(g) }); n++; } const r = { frames: n, alive: g.alive, s: +g.s.toFixed(0), hits: g.boxes.filter((b) => b.hit).length, level: g.level }; window.__freeze = false; return r; });
+  rec(14, 'demo: 3 min de bot sin morir', demo.alive, demo);
+  await clickIn(page, 'title', '[data-act="play"]');
+  const leak = await page.evaluate(() => Object.prototype.hasOwnProperty.call(window.__hip.game, 'crash'));
+  rec(14, 'la invulnerabilidad de la demo no pasa a la partida real', !leak, { ownCrash: leak });
+  await waitState(page, 'play', 4000);
+  await toastProbe(page);
+  // choque no mortal: siempre con impulso antes de chocar
+  await page.evaluate(() => { const g = window.__hip.game; const oc = g.crash.bind(g); window.__qaCr = 0; g.crash = (b) => { if (g.invul > 0 || b.hit) return; if (!g.boostOn) g.initBoost(); window.__qaCr++; oc(b); }; });
+  const t0 = Date.now(); let c = 0;
+  while (Date.now() - t0 < 40000) { c = await page.evaluate(() => window.__hip.game.crashes); if (c >= 1) break; await sleep(100); }
+  await sleep(150);
+  const r = await page.evaluate(() => ({ crashes: window.__hip.game.crashes, alive: window.__hip.game.alive, level: window.__hip.game.level, st: window.__hip.state }));
+  const tt = await toastsRead(page);
+  rec(14, 'choque no mortal muestra "¡Impulsos perdidos!"', r.crashes >= 1 && r.alive && tt.includes('¡Impulsos perdidos!'), { ...r, toasts: tt });
+  // choque mortal: sin aviso de impulsos perdidos
+  await page.evaluate(() => { const g = window.__hip.game; delete g.crash; g.disableBoost(); g.initBoost = () => {}; g.invul = 0; window.__qaToasts.length = 0; });
+  const w = await waitState(page, ['dying', 'over'], 60000);
+  const tt2 = await toastsRead(page);
+  rec(14, 'choque mortal no muestra "¡Impulsos perdidos!"', w.ok && !tt2.includes('¡Impulsos perdidos!'), { st: w.s, toasts: tt2 });
+  if (errors.length) rec(14, 'sin errores', false, errors);
+  await page.close();
+});
+
+// ------------------------------------------------------------------ 15. asistencia de carril (control digital)
+await run(15, async () => {
+  const { page, errors } = await open(PHONE);
+  await page.evaluate(() => { window.__freeze = true; window.__hip.start('classic', 11); const g = window.__hip.game; g.crash = (b) => { b.hit = true; }; });
+  // simulación determinista: el mismo camino que stepSim (input.steer → game.step)
+  const sim = (cases) => page.evaluate((cases) => {
+    const h = window.__hip, inp = h.input, L = Math.PI / 6, out = [];
+    const T = inp.state.touches;
+    for (const c of cases) {
+      const g = h.game; g.theta = c.u * L; g.omega = 0; inp.state.target = null; inp.state.dir = 0; T.clear(); inp.steer(1 / 60, g.theta, false);
+      const u0 = g.theta / L; let acc = 0, last = g.theta;
+      const tick = () => { const open = g.fold !== 30 && g.fold !== -30; const a = inp.steer(1 / 60, g.theta, open); g.step({ steer: a }); let d = g.theta - last; if (d > Math.PI) d -= 2 * Math.PI; else if (d < -Math.PI) d += 2 * Math.PI; acc += d; last = g.theta; };
+      for (const [dir, n, gap] of c.taps) { T.set(1, { d: dir, t: 0 }); for (let i = 0; i < n; i++) tick(); T.clear(); for (let i = 0; i < gap; i++) tick(); }
+      for (let i = 0; i < 60; i++) tick();
+      const uEnd = u0 + acc / L;
+      out.push({ name: c.name, u0: +u0.toFixed(2), moved: +(acc / L).toFixed(3), uEnd: +uEnd.toFixed(3), offCenter: +Math.abs(uEnd - Math.round(uEnd)).toFixed(3), lane: g.lane, target: inp.state.target });
+    }
+    return out;
+  }, cases);
+  const r = await sim([
+    { name: 'centro, toque dcha 100 ms', u: 0, taps: [[1, 6, 0]] },
+    { name: 'centro, toque izda 100 ms', u: 3, taps: [[-1, 6, 0]] },
+    { name: 'toque muy corto 33 ms', u: 2, taps: [[1, 2, 0]] },
+    { name: 'u=0,30 toque dcha', u: 0.3, taps: [[1, 6, 0]] },
+    { name: 'u=0,50 (frontera) toque dcha', u: 0.5, taps: [[1, 6, 0]] },
+    { name: 'u=0,64 toque dcha', u: 0.64, taps: [[1, 6, 0]] },
+    { name: 'u=0,66 toque dcha', u: 0.66, taps: [[1, 6, 0]] },
+    { name: 'u=0,50 (frontera) toque izda', u: 0.5, taps: [[-1, 6, 0]] },
+    { name: 'vuelta: carril 11 toque dcha', u: 11, taps: [[1, 6, 0]] },
+    { name: 'vuelta: carril 0 toque izda', u: 0, taps: [[-1, 6, 0]] },
+    { name: 'doble toque rápido dcha', u: 0, taps: [[1, 5, 3], [1, 5, 0]] },
+    { name: 'dos toques separados dcha', u: 0, taps: [[1, 6, 30], [1, 6, 0]] },
+    { name: 'mantener 600 ms y soltar', u: 0, taps: [[1, 36, 0]] },
+    { name: 'dcha y enseguida izda', u: 4, taps: [[1, 5, 2], [-1, 5, 0]] },
+  ]);
+  const by = Object.fromEntries(r.map((x) => [x.name, x]));
+  const one = (n, sign) => Math.abs(by[n].moved - sign) < 0.02 && by[n].offCenter < 0.02;
+  rec(15, 'toque desde el centro = exactamente 1 carril (dcha/izda/corto)', one('centro, toque dcha 100 ms', 1) && one('centro, toque izda 100 ms', -1) && one('toque muy corto 33 ms', 1), [by['centro, toque dcha 100 ms'], by['centro, toque izda 100 ms'], by['toque muy corto 33 ms']]);
+  rec(15, 'toques en fronteras acaban centrados en un carril', ['u=0,30 toque dcha', 'u=0,50 (frontera) toque dcha', 'u=0,64 toque dcha', 'u=0,66 toque dcha', 'u=0,50 (frontera) toque izda'].every((n) => by[n].offCenter < 0.02 && Math.sign(by[n].moved) === (n.includes('izda') ? -1 : 1)), r.slice(3, 8));
+  rec(15, 'toques con vuelta 11→0 y 0→11', one('vuelta: carril 11 toque dcha', 1) && one('vuelta: carril 0 toque izda', -1), [by['vuelta: carril 11 toque dcha'], by['vuelta: carril 0 toque izda']]);
+  rec(15, 'dos toques separados = 2 carriles', one('dos toques separados dcha', 2), by['dos toques separados dcha']);
+  rec(15, 'doble toque rápido (80 ms entre toques) = 2 carriles', one('doble toque rápido dcha', 2), by['doble toque rápido dcha']);
+  rec(15, 'mantener desliza >1 carril y al soltar encaja', by['mantener 600 ms y soltar'].moved > 1.5 && by['mantener 600 ms y soltar'].offCenter < 0.02, by['mantener 600 ms y soltar']);
+  note(15, 'dcha y enseguida izda', by['dcha y enseguida izda']);
+  // lámina abierta: toque hacia fuera del borde y después inclinación
+  const sheet = await page.evaluate(() => {
+    const h = window.__hip, inp = h.input; let g = h.game; let n = 0;
+    while ((g.fold === 30 || g.fold === -30) && n < 60 * 600) { g.step({ steer: h.bot(g) }); n++; }
+    if (g.fold === 30 || g.fold === -30) return { skipped: true };
+    const fold0 = g.fold; g.theta = 0; inp.state.target = null; inp.state.dir = 0;
+    const T = inp.state.touches; T.set(1, { d: -1, t: 0 });
+    for (let i = 0; i < 6; i++) g.step({ steer: inp.steer(1 / 60, g.theta, true) });
+    T.clear();
+    for (let i = 0; i < 20; i++) g.step({ steer: inp.steer(1 / 60, g.theta, g.fold !== 30 && g.fold !== -30) });
+    const th1 = g.theta;
+    inp.state.has = true; inp.state.raw = 0.25; inp.state.cal = 0; inp.state.tiltOn = true;
+    const src = [];
+    for (let i = 0; i < 40; i++) { g.step({ steer: inp.steer(1 / 60, g.theta, g.fold !== 30 && g.fold !== -30) }); if (i % 10 === 0) src.push(inp.state.src); }
+    const r = { fold0: +fold0.toFixed(1), foldNow: +g.fold.toFixed(1), thetaTrasToque: +th1.toFixed(3), thetaTrasInclinar: +g.theta.toFixed(3), target: inp.state.target, src };
+    inp.state.has = false; inp.state.raw = 0; inp.state.target = null;
+    return r;
+  });
+  rec(15, 'lámina abierta: tras tocar hacia fuera del borde, la inclinación vuelve a mandar', sheet.skipped || sheet.thetaTrasInclinar > sheet.thetaTrasToque + 0.2, sheet);
+  // tubo cerrado: un toque y después inclinación (jugador que mezcla los dos controles)
+  const mix = await page.evaluate(() => {
+    const h = window.__hip, inp = h.input; h.start('classic', 11); const g = h.game; g.crash = (b) => { b.hit = true; };
+    g.theta = 0; inp.state.target = null; inp.state.dir = 0; const T = inp.state.touches;
+    T.set(1, { d: 1, t: 0 }); for (let i = 0; i < 6; i++) g.step({ steer: inp.steer(1 / 60, g.theta, false) }); T.clear();
+    for (let i = 0; i < 60; i++) g.step({ steer: inp.steer(1 / 60, g.theta, false) });
+    const th1 = g.theta, tgt = inp.state.target, residual = +(inp.steer(1 / 60, g.theta, false)).toFixed(4);
+    inp.state.has = true; inp.state.raw = 0.25; inp.state.cal = 0; inp.state.tiltOn = true;
+    for (let i = 0; i < 40; i++) g.step({ steer: inp.steer(1 / 60, g.theta, false) });
+    const r = { thetaTrasToque: +th1.toFixed(4), targetTrasToque: tgt, aResidual: residual, thetaTrasInclinar: +g.theta.toFixed(4), src: inp.state.src };
+    inp.state.has = false; inp.state.raw = 0; inp.state.target = null;
+    return r;
+  });
+  rec(15, 'tubo cerrado: 1 s después de un toque, la inclinación vuelve a mandar', mix.thetaTrasInclinar > mix.thetaTrasToque + 0.2, mix);
+  // toques reales (CDP) en tiempo real sobre el lienzo
+  await page.evaluate(() => { window.__freeze = false; window.__hip.start('classic', 11); const g = window.__hip.game; g.crash = (b) => { b.hit = true; }; });
+  const cdp = await page.createCDPSession();
+  const real = {};
+  for (const [name, u, x] of [['centro dcha', 0, 700], ['frontera u=0,5 dcha', 0.5, 700], ['centro izda', 6, 140]]) {
+    await page.evaluate((u) => { const g = window.__hip.game; g.theta = u * Math.PI / 6; window.__hip.input.state.target = null; }, u);
+    await thetaProbe(page);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y: 220, id: 1 }] });
+    await sleep(100);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await sleep(700);
+    const d = await probeRead(page) / (Math.PI / 6);
+    const uEnd = u + d;
+    real[name] = { moved: +d.toFixed(3), offCenter: +Math.abs(uEnd - Math.round(uEnd)).toFixed(3) };
+  }
+  rec(15, 'toques reales de 100 ms: 1 carril y centrado', Math.abs(real['centro dcha'].moved - 1) < 0.03 && Math.abs(real['centro izda'].moved + 1) < 0.03 && real['frontera u=0,5 dcha'].offCenter < 0.03, real);
+  if (errors.length) rec(15, 'sin errores', false, errors);
+  await page.close();
+});
+
+// ------------------------------------------------------------------ 16. salto entre mundos
+await run(16, async () => {
+  const { page, errors } = await open(DESKTOP);
+  const r = await page.evaluate(() => {
+    window.__freeze = true;
+    const h = window.__hip; h.start('classic', 21);
+    const g = h.game; g.crash = (b) => { b.hit = true; };
+    const twin = new g.constructor({ mode: 'classic', seed: 21 }); twin.crash = (b) => { b.hit = true; };
+    const R = h.renderer, cam = R.camera;
+    let n = 0;
+    const both = (steer) => { g.step({ steer }); twin.step({ steer }); twin.gaps.length = 0; R.onEvents(g.events, g); R.update(g, g.s, g.theta, 1 / 60); n++; };
+    while (!g.gaps.length && n < 60 * 900) both(h.bot(g));
+    if (!g.gaps.length) return { noGap: true, n, s: g.s };
+    const gap = { ...g.gaps[0] };
+    const inBoxes = g.boxes.filter((b) => b.k >= gap.from && b.k <= gap.to).length, inPads = g.pads.filter((p) => p.k >= gap.from && p.k <= gap.to).length, inCoins = g.coins.filter((c) => c.k >= gap.from && c.k <= gap.to).length;
+    const th0 = g.theta, lane0 = g.lane, sAt = g.s;
+    let bad = 0, maxJump = 0, maxDist = 0, maxStep = 0, prev = cam.position.clone(), desync = 0, rendered = 0;
+    const cams = [];
+    while (g.s < gap.to + 6 && n < 60 * 1200) {
+      both(0);
+      const p = cam.position; const fin = [p.x, p.y, p.z, cam.quaternion.x, cam.quaternion.y, cam.quaternion.z, cam.quaternion.w, cam.fov].every(Number.isFinite);
+      if (!fin) bad++;
+      maxJump = Math.max(maxJump, g.jumpAt(g.s - 0.12));
+      maxStep = Math.max(maxStep, p.distanceTo(prev)); prev.copy(p);
+      if (g.s !== twin.s || g.theta !== twin.theta || g.v !== twin.v || g.boxes.length !== twin.boxes.length) desync++;
+      if (n % 20 === 0) { R.render(); rendered++; cams.push([+p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1)]); }
+    }
+    return { gap, sAt: +sAt.toFixed(1), sEnd: +g.s.toFixed(1), frames: n, bad, maxJump: +maxJump.toFixed(2), maxCamStep: +maxStep.toFixed(2), thetaSame: g.theta === th0, lane0, lane1: g.lane, desync, inBoxes, inPads, inCoins, alive: g.alive, fold: g.fold, gapsNow: g.gaps.length, rendered, cams: cams.slice(0, 8) };
+  });
+  if (r.noGap) { rec(16, 'salto entre mundos: aparece un hueco', false, r); await page.close(); return; }
+  rec(16, 'aparece un hueco (game.gaps) tras volver a plegar', true, { gap: r.gap, s: r.sAt, frames: r.frames });
+  rec(16, 'cámara finita en todo el salto (sin NaN)', r.bad === 0, { bad: r.bad, maxJump: r.maxJump, maxCamStep: r.maxCamStep });
+  rec(16, 'la cámara se eleva en arco (jumpAt ~5,5)', r.maxJump > 4 && r.maxJump < 6, r.maxJump);
+  rec(16, 'theta y carril no cambian con el salto (steer 0)', r.thetaSame && r.lane0 === r.lane1, { lane0: r.lane0, lane1: r.lane1 });
+  rec(16, 'la simulación es idéntica con y sin huecos (gemelo)', r.desync === 0, { desync: r.desync });
+  rec(16, 'no hay cajas, placas ni monedas dentro del hueco', r.inBoxes + r.inPads + r.inCoins === 0, { boxes: r.inBoxes, pads: r.inPads, coins: r.inCoins });
+  note(16, 'posiciones de cámara durante el salto (cada 20 pasos)', r.cams);
+  // captura a mitad del salto (tiempo real congelado)
+  const shot = await page.evaluate(() => {
+    const h = window.__hip; h.start('classic', 21); const g = h.game; g.crash = (b) => { b.hit = true; };
+    let n = 0; while (!g.gaps.length && n < 60 * 900) { h.step(1); n++; }
+    if (!g.gaps.length) return null;
+    const gp = g.gaps[0]; while (g.s < (gp.from + gp.to) / 2) { h.step(1, 0); }
+    return { s: +g.s.toFixed(1), jump: +g.jumpAt(g.s).toFixed(2) };
+  });
+  await page.evaluate(() => new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res))));
+  await page.screenshot({ path: `${SHOTS}qa-long/salto-mitad.png` });
+  note(16, 'captura a mitad del salto (tests/shots/qa-long/salto-mitad.png)', shot);
+  rec(16, 'sin errores', errors.length === 0, errors.slice(0, 5));
+  await page.close();
+});
+
+// ------------------------------------------------------------------ 17. partida larga (10 min) con memoria
+await run(17, async () => {
+  const MIN = +(opt.long || 10);
+  const { page, errors } = await open(DESKTOP);
+  await page.evaluate(() => { window.__freeze = true; window.__hip.start('classic', 33); const g = window.__hip.game; g.crash = (b) => { b.hit = true; }; });
+  const snap = () => page.evaluate(() => { if (window.gc) window.gc(); const i = window.__hip.renderer.renderer.info; const g = window.__hip.game; return { heapMB: performance.memory ? +(performance.memory.usedJSHeapSize / 1048576).toFixed(1) : null, geo: i.memory.geometries, tex: i.memory.textures, prog: i.programs ? i.programs.length : -1, boxes: g.boxes.length, pads: g.pads.length, coins: g.coins.length, gaps: g.gaps.length, rows: g.rows ? g.rows.length : -1 }; });
+  const log = []; let bad = 0, lastS = -1, gapsSeen = 0, worlds = new Set(), folds = 0;
+  for (let chunk = 1; chunk <= MIN * 6; chunk++) {
+    const r = await page.evaluate(() => {
+      const h = window.__hip; const g = h.game; const R = h.renderer; const t0 = performance.now(); let nan = 0, gp = 0, fo = 0; let lastGap = window.__qaLastGap ?? -1;
+      for (let i = 0; i < 600; i++) {
+        h.step(1);
+        for (const e of g.events) if (e.type === 'foldEnd') fo++;
+        if (g.gaps.length && g.gaps[g.gaps.length - 1].from !== lastGap) { lastGap = g.gaps[g.gaps.length - 1].from; gp++; }
+        if (i % 4 === 0) { R.update(g, g.s, g.theta, 4 / 60); const p = R.camera.position; if (![p.x, p.y, p.z].every(Number.isFinite)) nan++; }
+        if (!Number.isFinite(g.s + g.theta + g.v + g.fold)) nan++;
+      }
+      window.__qaLastGap = lastGap;
+      R.render();
+      return { ms: +(performance.now() - t0).toFixed(0), s: +g.s.toFixed(1), distM: g.distanceM, world: g.world, fold: +g.fold.toFixed(1), level: g.level, alive: g.alive, nan, gp, fo };
+    });
+    if (r.nan || r.s <= lastS || !r.alive) bad++;
+    lastS = r.s; gapsSeen += r.gp; folds += r.fo; worlds.add(r.world);
+    if (chunk % 6 === 0 || chunk === 1) { const m = await snap(); log.push({ min: +(chunk / 6).toFixed(2), ...r, ...m }); }
+  }
+  for (const l of log) console.log('      ', JSON.stringify(l));
+  const a = log[1] || log[0], b = log[log.length - 1];
+  rec(17, `${MIN} min de clásico (bot invulnerable): sin NaN, s creciente, sin errores`, bad === 0 && errors.length === 0, { bad, errors: errors.slice(0, 3), distM: b.distM, worlds: [...worlds], folds, saltos: gapsSeen });
+  rec(17, 'memoria estable (montón, geometrías, texturas, programas)', (a.heapMB == null || b.heapMB <= a.heapMB * 1.25 + 5) && b.geo <= a.geo * 1.15 + 5 && b.tex <= a.tex + 2 && b.prog <= a.prog + 2, { min1: { heap: a.heapMB, geo: a.geo, tex: a.tex, prog: a.prog }, fin: { heap: b.heapMB, geo: b.geo, tex: b.tex, prog: b.prog } });
+  rec(17, 'listas de la simulación acotadas', b.boxes < 200 && b.pads < 60 && b.coins < 200 && b.gaps <= 2, { boxes: b.boxes, pads: b.pads, coins: b.coins, gaps: b.gaps, rows: b.rows });
+  await page.close();
+});
+
 if (reloads.length) note(0, 'recargas inesperadas de la página (HMR de Vite): pruebas afectadas pueden fallar', reloads.length);
 await browser.close();
 writeFileSync(SHOTS + 'qa-report.json', JSON.stringify(results, null, 1));
