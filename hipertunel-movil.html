@@ -1283,7 +1283,10 @@ const qnum = (k, d) => { const v = parseFloat(QS.get(k)); return isFinite(v) ? v
 const EXPO = qnum('expo', 0.72);
 const FOG_NEAR = qnum('fnear', 25), FOG_FAR = qnum('ffar', 170);
 // Antelación del aviso. Cuanto más larga, más carriles pintados a la vez y menos avisa el color.
-const WARN_S = qnum('warns', 1.25), WARN_MIN = qnum('warnmin', 30), WARN_MAX = qnum('warnmax', 100);
+const WARN_S = qnum('warns', 0.95), WARN_MIN = qnum('warnmin', 30), WARN_MAX = qnum('warnmax', 70);
+// Densidad de obstáculos y velocidad: se calibran juntas, una compensa a la otra.
+const LAM_MAX = qnum('lam', 0.25), PAR_2 = qnum('par2', 0.15), PAR_3 = qnum('par3', 0.05);
+const SPD_MAX = qnum('spdmax', 54), SPD_K = qnum('spdk', 0.007);
 const SHOWFPS = QS.has('fps');
 // Gestión de color: los colores se escriben en sRGB (como se ven) y se convierten a lineal para
 // iluminar. Sin esto, el sombreado se aplasta al mostrarlo y todo parece plano.
@@ -1967,7 +1970,7 @@ function clearMechanics(){
 }
 
 // ---------- patrones
-const baseSpeedAt = (z) => 22 + Math.min(34, z * 0.0045);
+const baseSpeedAt = (z) => 22 + Math.min(SPD_MAX, z * SPD_K);
 const stageAt = (z) => Math.floor(z / BIOME_LEN);                 // cada bioma es un nivel nuevo
 const freeLane = () => ri(0, LANES - 1);
 // ================= GENERADOR POR RITMO =================
@@ -2006,7 +2009,9 @@ function spawnNext(z){
   if (pathT <= 0) { pathL += (Math.random() < 0.5 ? 1 : -1) * (Math.random() < 0.25 + D * 0.35 ? 2 : 1); pathT = lerp(60, 22, clamp(D, 0, 1)) * rr(0.7, 1.3); }
   const lo = Math.min(pathL, prevPathL), hi = Math.max(pathL, prevPathL);
   const safe = (l) => { for (let q = lo; q <= hi; q++) if (laneMod(l) === laneMod(q)) return true; return false; };
-  const lam = lerp(0.24, 1.9, clamp(D, 0, 1.2) / 1.2);
+  // Menos bloques a la vez: con la densidad antigua casi todos los carriles acababan pintados de
+  // aviso y el color dejaba de avisar. La dificultad se compensa con velocidad, no con muro.
+  const lam = lerp(0.24, LAM_MAX, clamp(D, 0, 1.2) / 1.2);
   const n = Math.floor(lam) + (Math.random() < lam % 1 ? 1 : 0);
   for (let i = 0; i < n; i++) {
     const l = Math.random() < 0.7 ? pathL + ri(-6, 6) : ri(0, LANES - 1);
@@ -2017,7 +2022,7 @@ function spawnNext(z){
     if (!laneFree(l, zz - 4, zz + len + 4)) continue;
     addBlock(zz, l, len, ri(0, PALETTE.length - 1));
     const col0 = ri(0, PALETTE.length - 1);
-    if (Math.random() < 0.3 + D * 0.2) { const dir = Math.random() < 0.5 ? 1 : -1; for (let q = 1; q <= (Math.random() < 0.2 + D * 0.3 ? 2 : 1); q++) { const l2 = l + dir * q; if (safe(l2) || !laneFree(l2, zz - 4, zz + len + 4)) break; addBlock(zz, l2, len, col0); } }
+    if (Math.random() < PAR_2 + D * 0.2) { const dir = Math.random() < 0.5 ? 1 : -1; for (let q = 1; q <= (Math.random() < PAR_3 + D * 0.2 ? 2 : 1); q++) { const l2 = l + dir * q; if (safe(l2) || !laneFree(l2, zz - 4, zz + len + 4)) break; addBlock(zz, l2, len, col0); } }
   }
   evCool -= STEP;
   const bk = biomeAt(z).key;
@@ -2666,7 +2671,7 @@ requestAnimationFrame(frame);
 window.__game = { tubeDbg(){
     let lo = 9, hi = -9; for (let i = 0; i < NV; i++) { const r = tCol[i * 4]; if (r < lo) lo = r; if (r > hi) hi = r; }
     const k = kappa(s + 20); return { kappa: +k.toFixed(4), shadeAtCam: +tubeShade(0, k).toFixed(3), shadeOpp: +tubeShade(LANE_W * 8, k).toFixed(3), colLo: +lo.toFixed(3), colHi: +hi.toFixed(3), fog: [scene.fog.near | 0, scene.fog.far | 0], kIn: +((kappa(s) / K0 + 1) / 2).toFixed(2) };
-  }, fps(){ return fpsStats(); }, fpsReset(){ fpsBuf.length = 0; }, gfx(){ return { hdr: hdrOK, expo: EXPO, dpr: DPR }; }, kill(){ die(null); }, chordGap(){ let worst = 1e9; for (const o of objs) if (o.type === 'boost') o.pads.forEach((p, i) => { const zz = o.z + 1.8 + i * 3.3; const du0 = wrapL(o.lane - camLane + twr(zz)); if (Math.abs(du0) > 5) return; const a = surfPt(zz, du0 - 0.5, new THREE.Vector3()), b = surfPt(zz, du0 + 0.5, new THREE.Vector3()); const c = a.add(b).multiplyScalar(0.5); const Y = new THREE.Vector3(0, 1, 0).applyQuaternion(p.quaternion); worst = Math.min(worst, p.position.clone().sub(c).dot(Y)); }); return worst; }, motion(x, y){ onMotion({ accelerationIncludingGravity: { x, y, z: 0 } }); }, tiltState(){ return { has: tilt.has, phi0: tilt.phi0 }; }, encLog, diffAt: (z) => diffAt(z), cxAt: (z) => cx(z), cyAt: (z) => cy(z), perm: () => PERM.slice(), padErr(){ let worst = 0; for (const o of objs) if (o.type === 'boost') for (let i = 0; i < 3; i++) { const p = o.pads[i]; const zz = o.z + 1.8 + i * 3.3; const du0 = wrapL(o.lane - camLane + twr(zz)); if (Math.abs(du0) > 6) continue; for (const dz of [-1.5, 1.5]) { const du = du0 + twr(zz + dz) - twr(zz); const pt = surfPt(zz + dz, du, new THREE.Vector3()); const loc = pt.clone().sub(p.position).applyQuaternion(p.quaternion.clone().invert()); worst = Math.max(worst, Math.abs(loc.y + 0.06)); } } return worst; }, jellies, jump(){ startJump(); }, airH(){ return airH(); }, dbg(){ return { snow: snowballs.length, jel: jellies.length, cur: currents.length, air: !!air, inCur: inCurrent, biome: biomeAt(s).key }; }, warp(z){ clearObjs(); clearMechanics(); s = sPrev = z; cursor = z + 60; lastBoostZ = z; }, get hyper(){ return hyper; }, get combo(){ return combo; }, get nstars(){ return starsArr.length; }, get score(){ return score; }, update, start, get state(){ return state; }, get s(){ return s; }, get side(){ return side; }, get level(){ return level; }, get lane(){ return laneMod(Math.round(playerLaneF)); }, byLane, objs, setStep(fn){ testStep = fn; } };
+  }, fps(){ return fpsStats(); }, fpsReset(){ fpsBuf.length = 0; }, gfx(){ return { hdr: hdrOK, expo: EXPO, dpr: DPR }; }, kill(){ die(null); }, chordGap(){ let worst = 1e9; for (const o of objs) if (o.type === 'boost') o.pads.forEach((p, i) => { const zz = o.z + 1.8 + i * 3.3; const du0 = wrapL(o.lane - camLane + twr(zz)); if (Math.abs(du0) > 5) return; const a = surfPt(zz, du0 - 0.5, new THREE.Vector3()), b = surfPt(zz, du0 + 0.5, new THREE.Vector3()); const c = a.add(b).multiplyScalar(0.5); const Y = new THREE.Vector3(0, 1, 0).applyQuaternion(p.quaternion); worst = Math.min(worst, p.position.clone().sub(c).dot(Y)); }); return worst; }, motion(x, y){ onMotion({ accelerationIncludingGravity: { x, y, z: 0 } }); }, tiltState(){ return { has: tilt.has, phi0: tilt.phi0 }; }, encLog, diffAt: (z) => diffAt(z), cxAt: (z) => cx(z), cyAt: (z) => cy(z), perm: () => PERM.slice(), padErr(){ let worst = 0; for (const o of objs) if (o.type === 'boost') for (let i = 0; i < 3; i++) { const p = o.pads[i]; const zz = o.z + 1.8 + i * 3.3; const du0 = wrapL(o.lane - camLane + twr(zz)); if (Math.abs(du0) > 6) continue; for (const dz of [-1.5, 1.5]) { const du = du0 + twr(zz + dz) - twr(zz); const pt = surfPt(zz + dz, du, new THREE.Vector3()); const loc = pt.clone().sub(p.position).applyQuaternion(p.quaternion.clone().invert()); worst = Math.max(worst, Math.abs(loc.y + 0.06)); } } return worst; }, jellies, jump(){ startJump(); }, airH(){ return airH(); }, dbg(){ return { snow: snowballs.length, jel: jellies.length, cur: currents.length, air: !!air, inCur: inCurrent, biome: biomeAt(s).key }; }, warp(z){ clearObjs(); clearMechanics(); s = sPrev = z; cursor = z + 60; lastBoostZ = z; }, get hyper(){ return hyper; }, get combo(){ return combo; }, get nstars(){ return starsArr.length; }, get score(){ return score; }, update, start, get state(){ return state; }, get s(){ return s; }, get speed(){ return speed; }, get side(){ return side; }, get level(){ return level; }, get lane(){ return laneMod(Math.round(playerLaneF)); }, byLane, objs, setStep(fn){ testStep = fn; } };
 })();
 </script>
 </body>

@@ -33,5 +33,31 @@ const mantenido = mover(14, 2.5);   // mantener una inclinación normal NO debe 
 if (mantenido !== null && mantenido !== 1) fail.push('Mantener el móvil inclinado encadena carriles solo: ' + mantenido);
 const girado = mover(38, 1.2);      // con el móvil muy girado sí se encadenan
 if (girado !== null && girado < 2) fail.push('Con el móvil muy girado no se encadenan carriles: ' + girado);
-console.log(fail.length ? 'FALLOS:\n- ' + fail.join('\n- ') : 'Todo OK', JSON.stringify({ chordMin: +chord.toFixed(3), padGapMax: +gap.toFixed(3), diff: D.map((d) => +d.toFixed(2)) }));
+// 5) el color solo avisa si es raro: con medio túnel pintado deja de significar nada.
+// En el original nunca se ven más de 2-4 carriles de color a la vez. Pero tampoco debe quedar
+// vacío: la dificultad tiene que seguir creciendo con la distancia.
+G.setStep(() => 0);
+const pintados = (z) => {
+  const m = [];
+  for (let rep = 0; rep < 2; rep++) {
+    G.start(); G.warp(z);
+    for (let i = 0; i < 60 * 6; i++) {
+      G.update(1 / 60);
+      if (G.state !== 'play') { G.start(); G.warp(z); continue; }
+      if (i % 10) continue;
+      const s = G.s; let c = 0;
+      for (let l = 0; l < L; l++) for (const o of G.byLane[l]) { if (o.type === 'block' && o.lit && o.z + o.len >= s && o.litFrom <= s + 110) { c++; break; } }
+      m.push(c);
+    }
+  }
+  m.sort((a, b) => a - b);
+  return { media: m.reduce((p, c) => p + c, 0) / m.length, p90: m[Math.floor(m.length * 0.9)] };
+};
+const dens = [2000, 6000, 10000].map(pintados);
+const densMax = Math.max(...dens.map((d) => d.media));
+if (densMax > 5) fail.push('Demasiados carriles pintados de aviso a la vez: ' + densMax.toFixed(1) + ' de media (el color deja de avisar)');
+if (Math.max(...dens.map((d) => d.p90)) > 9) fail.push('Ráfagas de avisos demasiado grandes: p90 de ' + Math.max(...dens.map((d) => d.p90)) + ' carriles');
+if (dens[2].media <= dens[0].media) fail.push('La densidad de obstáculos no crece con la distancia');
+if (dens[0].media < 0.5) fail.push('Demasiado vacío: apenas hay obstáculos a 2.000 m');
+console.log(fail.length ? 'FALLOS:\n- ' + fail.join('\n- ') : 'Todo OK', JSON.stringify({ chordMin: +chord.toFixed(3), padGapMax: +gap.toFixed(3), diff: D.map((d) => +d.toFixed(2)), avisos: dens.map((d) => +d.media.toFixed(1)) }));
 process.exit(fail.length ? 1 : 0);
