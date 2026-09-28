@@ -78,10 +78,13 @@ export class Pads {
       this.alpha[n] = alpha; this.main[n] = main ? 1 : 0;
       n++;
     };
+    // el rastro de flechas no se pinta sobre un carril avisado: no se mezcla impulso con caja
+    const lit = game.litStrips();
+    const isLit = (lane, k) => (lit.get(lane) || []).some((st) => k >= st.from && k <= st.to);
     for (const pd of game.pads) {
       if (pd.taken) continue;
       put(pd.k, pd.lane, 1, true);
-      for (let j = 1; j <= 6; j++) put(pd.k - j, pd.lane, (7 - j) / 7 * 0.8, false);
+      for (let j = 1; j <= 6; j++) if (!isLit(pd.lane, pd.k - j)) put(pd.k - j, pd.lane, (7 - j) / 7 * 0.8, false);
     }
     this.mesh.count = n;
     this.mesh.instanceMatrix.needsUpdate = true;

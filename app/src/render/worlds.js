@@ -11,8 +11,8 @@ export const THEMES = [
     skyTop: 0x020d1c, skyMid: 0x0f4d5a, skyBot: 0x3fb8a0, sun: 0xc8fff0, stars: 1, decor: 'space', exposure: 0.95, dark: 1, inv: 0x0b2a2e },
   { name: 'Caramelo', base: 0xfdeaf3, base2: 0xeed8e6, seam: 0x7a4a6c, fog: 0xff9fd0, glow: 0xff9ecf,
     skyTop: 0x7ec8ff, skyMid: 0xffd0ea, skyBot: 0xfff6e0, sun: 0xfff8e0, stars: 0, decor: 'sky', exposure: 1.0 },
-  { name: 'Galaxia', base: 0xf5f3fb, base2: 0xdcd9e8, seam: 0x3a3270, fog: 0x120c33, glow: 0xc58bff,
-    skyTop: 0x03010f, skyMid: 0x1b0f45, skyBot: 0x4b2b8f, sun: 0xffe6ff, stars: 1, decor: 'space', exposure: 0.95, dark: 1, inv: 0x150c2e },
+  { name: 'Galaxia', base: 0xf5f3fb, base2: 0xdcd9e8, seam: 0x3a3270, fog: 0x1c0a26, glow: 0xffc857,
+    skyTop: 0x03010f, skyMid: 0x1b0f45, skyBot: 0x4b2b8f, sun: 0xffe6ff, stars: 1, decor: 'space', exposure: 0.95, dark: 1, inv: 0x2a0f3a },
 ];
 
 // Colores de caja: 10, como el original, pero sin azul (el azul es solo del impulso).

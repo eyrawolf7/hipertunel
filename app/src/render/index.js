@@ -141,7 +141,7 @@ export class Renderer {
         const p = this.boxes.positions.get(e.id);
         const bc = this.colors[(game.boxes.find((b) => b.id === e.id) || { color: 0 }).color];
         if (p) this.fx.explode(p, bc, 80, this.look, 60, 1.5);
-        this.cam.shake = 0.5; this.cam.shakeDecay = 1.4;
+        this.cam.shake = 0.5; this.cam.shakeDecay = 1.4; this.cam.rollShake = 0.25; this.cam.vigT = 0.15; this.cam.vigCol = bc.clone();
         if (e.fatal) { this.flash(0xff3040, 0.55); this.deathFocus = p ? p.clone() : null; }
         else this.flash(bc.getHex(), 0.3);
         this.cam.hit = 1;
@@ -198,7 +198,7 @@ export class Renderer {
     this.wasFlying = game.jumpAt(s) > 0.2;
     const inv = game.inverted || (this.pendingTheme > 0) ? 1 : 0;
     // fundido lineal de 0,25 s: sin fotogramas grises a medio camino
-    this.cam.invert += Math.sign(inv - this.cam.invert) * Math.min(Math.abs(inv - this.cam.invert), dt * 4);
+    this.cam.invert += Math.sign(inv - this.cam.invert) * Math.min(Math.abs(inv - this.cam.invert), dt * 2.5);
     this.hemi.intensity = 1.0 * (1 - this.cam.invert * 0.7);
     this.tunnel.uniforms.uInvert.value = this.cam.invert;
     // en el tránsito invertido la niebla también se apaga: si no, el túnel oscuro se ve gris
@@ -244,6 +244,8 @@ export class Renderer {
     const leanA = Math.max(-0.07, Math.min(0.07, this.lean)) * (reduceFx ? 0.3 : 1);
     if (leanA) cam.up.applyAxisAngle(this.look, leanA);
     cam.lookAt(target);
+    // sacudida de giro del choque (0,08 rad, 0,25 s)
+    if (c.rollShake > 0) { cam.rotateZ((Math.random() * 2 - 1) * 0.08 * (c.rollShake / 0.25) * (reduceFx ? 0.3 : 1)); c.rollShake -= dt; }
     // campo de visión: base del original, con un empujón al impulsar
     const sp01 = Math.min(1, Math.max(0, (game.speedMS - 36) / 64));
     const fov = this.baseFov + iq * 18 + sp01 * 14 + easeKick(c.kick) * (reduceFx ? 4 : 12) * (c.kickAmp || 1) + (c.foldFov > 0 ? Math.sin(Math.min(1, (1.2 - c.foldFov) / 1.2) * Math.PI) * 8 : 0);
@@ -289,7 +291,9 @@ export class Renderer {
       g.uBlur.value = (0.01 + sp01 * 0.03 + c.kick * 0.06) * (reduceFx ? 0.3 : 1);
       g.uCA.value = c.kick * 0.004;
       g.uVigCol.value.copy(this.fogColor);
-      if (c.blueVig > 0) { g.uVigCol.value.lerp(BOOST_BLUE, 0.8); g.uVig.value = 0.45; c.blueVig -= dt; } else g.uVig.value = 0.1;
+      if (c.blueVig > 0) { g.uVigCol.value.lerp(BOOST_BLUE, 0.8); g.uVig.value = 0.45; c.blueVig -= dt; }
+      else if (c.vigT > 0) { g.uVigCol.value.copy(c.vigCol).multiplyScalar(1.6); g.uVig.value = 0.5; c.vigT -= dt; }
+      else g.uVig.value = 0.1;
       g.uTime.value = this.time;
       g.uFlash.value.set(c.flashCol.r, c.flashCol.g, c.flashCol.b, c.flash * (reduceFx ? 0.4 : 1));
     }

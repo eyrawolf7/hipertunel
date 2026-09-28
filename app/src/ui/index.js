@@ -556,8 +556,9 @@ export function createUI(root, handlers = {}) {
     const t = h(`<div class="toast toast-${esc(kind)}"><span>${esc(text)}</span></div>`);
     toasts.appendChild(t);
     while (toasts.children.length > 3) toasts.firstElementChild.remove();
-    setTimeout(() => t.classList.add('out'), 1600);
-    setTimeout(() => t.remove(), 1600 + 400);
+    const life = kind === 'info' ? 2800 : 1600;
+    setTimeout(() => t.classList.add('out'), life);
+    setTimeout(() => t.remove(), life + 400);
   }
 
   // ----- fin de partida -----

@@ -31,7 +31,10 @@ void main(){
   float d = edgeDist(vUv, size);
   float px = fwidth(d) + 1e-4;
   // junta entre paneles, bisel y subdivisiones finas (el original tiene 2x2 dentro de cada celda)
-  float seam = 1.0 - smoothstep(0.02 - px, 0.02 + px, d);
+  // la junta nunca baja de ~1,6 px: a tamaño de móvil las de lejos se perdían
+  float sw = max(0.02, px * 1.6);
+  float seam = 1.0 - smoothstep(sw - px, sw + px, d);
+  float camD = length(uCam - vW);
   float bevel = smoothstep(0.03, 0.26, d);
   vec2 sub = abs(fract(vUv * vec2(2.0, 2.0)) - 0.5) * size / 2.0;
   float subD = min(sub.x, sub.y);
@@ -42,7 +45,7 @@ void main(){
   float lam = mix(0.6, 0.86, uOutside) + mix(0.4, 0.14, uOutside) * max(dot(N, uKey), 0.0);
   float hemi = 0.5 + 0.5 * N.y;
   float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-  vec3 base = mix(uBase2, uBase, hemi);
+  vec3 base = mix(uBase2, uBase, hemi) * mix(0.84, 1.0, hemi);   // techo algo más oscuro: da volumen
   // un leve degradado a lo largo de cada panel le da volumen, como plástico
   base *= 0.92 + 0.1 * vUv.y;
   vec3 col = base * lam;
@@ -72,9 +75,12 @@ void main(){
   float ringLine = (mod(vCell.y, 8.0) < 0.5) ? (1.0 - smoothstep(0.02, 0.16 + px * 2.0, vUv.y * size.y)) : 0.0;
   // en los mundos claros es una banda ancha y suave (no un aro fino en el centro de la vista)
   float ringBand = (mod(vCell.y, 8.0) < 0.5) ? (1.0 - smoothstep(0.0, 1.4, vUv.y * size.y)) : 0.0;
+  // los anillos se apagan en los últimos metros: si no, pasan como un velo por el borde
+  float ringFade = smoothstep(6.0, 18.0, camD);
+  ringLine *= ringFade; ringBand *= ringFade;
   float ring = ringLine;
   float ringB2 = (mod(vCell.y, 8.0) < 0.5) ? (1.0 - smoothstep(0.0, 0.6, vUv.y * size.y)) : 0.0;
-  col = mix(col, uRing * 1.3, ringB2 * 0.55 * (1.0 - uInvert));
+  col = mix(col, uRing * 1.3, ringB2 * ringFade * 0.55 * (1.0 - uInvert));
   // estado invertido (transición entre mundos): túnel oscuro con juntas de neón
   // mundos oscuros y estado invertido: baldosa azul noche con juntas de luz (como las texturas
   // invertidas del original). El aviso sigue siendo apagado/encendido.

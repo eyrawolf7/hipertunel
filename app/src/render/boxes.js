@@ -43,6 +43,18 @@ export class Boxes {
     this.mesh.count = 0;
     scene.add(this.mesh);
     this.outline.instanceMatrix = this.mesh.instanceMatrix;
+    // sombra de contacto: una mancha suave bajo cada caja, que la asienta en el túnel
+    const sg = new THREE.PlaneGeometry(1, 1); sg.rotateX(-Math.PI / 2);
+    this.shadow = new THREE.InstancedMesh(sg, new THREE.ShaderMaterial({
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * viewMatrix * instanceMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'varying vec2 vUv; void main(){ vec2 q = (vUv - 0.5) * 2.0; float d = length(q * vec2(1.0, 0.8)); float a = (1.0 - smoothstep(0.35, 1.0, d)) * 0.38; gl_FragColor = vec4(0.1, 0.08, 0.19, a); }',
+      transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+    }), MAX);
+    this.shadow.frustumCulled = false; this.shadow.count = 0; this.shadow.renderOrder = 1;
+    this.shadow.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    scene.add(this.shadow);
+    this.sm = new THREE.Matrix4(); this.sp2 = new THREE.Vector3(); this.ssc = new THREE.Vector3();
+    this.nShadow = 0;
     this.outline.frustumCulled = false; this.outline.count = 0;
     scene.add(this.outline);
     this.fr = makeFrame();
@@ -58,7 +70,7 @@ export class Boxes {
     const closed = game.fold === 30 || game.fold === -30;
     const on = game.playerStrips();
     const { fr, m, T, N, B, p, sc, sp } = this;
-    let n = 0;
+    let n = 0, ns = 0;
     this.positions.clear();
     for (const b of game.boxes) {
       if (b.hit || n >= MAX) continue;
@@ -97,6 +109,11 @@ export class Boxes {
       sc.set(w, h, len);
       m.scale(sc); m.setPosition(p);
       this.mesh.setMatrixAt(n, m);
+      if (!tall && ns < MAX) {
+        this.sp2.copy(fr.P).addScaledVector(fr.X, cx).addScaledVector(fr.U, cy).addScaledVector(N, 0.025);
+        this.sm.makeBasis(T, N, B).scale(this.ssc.set(w * 1.45, 1, len * 1.3)).setPosition(this.sp2);
+        this.shadow.setMatrixAt(ns++, this.sm);
+      }
       const want = on.includes(b.lane) || (b.opp >= 0 && on.includes(b.opp)) ? 1 : 0;
       const g0 = this.glowBy.get(b.id) || 0;
       const g1 = g0 + (want - g0) * Math.min(1, (want > g0 ? 10 : 5) * dt);
@@ -112,6 +129,7 @@ export class Boxes {
     this.mesh.count = n;
     this.mesh.instanceMatrix.needsUpdate = true;
     this.outline.count = n;
+    this.shadow.count = ns; this.shadow.instanceMatrix.needsUpdate = true;
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
     this.geo.attributes.aGlow.needsUpdate = true;
     if (this.glowBy.size > 200) { const live = new Set(game.boxes.map((b) => b.id)); for (const id of this.glowBy.keys()) if (!live.has(id)) this.glowBy.delete(id); }
