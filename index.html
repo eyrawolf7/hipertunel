@@ -236,7 +236,10 @@ try { useTilt = localStorage.getItem('hipertunel-tilt') !== '0'; tiltInv = local
 // ---------- geometría del túnel
 const QS = new URLSearchParams(typeof location !== 'undefined' ? location.search : '');   // el harness de pruebas no tiene location
 const qnum = (k, d) => { const v = parseFloat(QS.get(k)); return isFinite(v) ? v : d; };
-const LANES = Math.max(4, Math.round(qnum('lanes', 6))), LW = TAU / LANES, R = 4;   // Boost 2 usa 6 carriles
+// Boost 2 usa 6 carriles. Con 6 en pantalla cada aviso se come 60 grados del contorno y agobia;
+// con 8 (su misma textura de octógono) se lee mucho mejor y sigue siendo el doble de exigente
+// que los 16 de antes.
+const LANES = Math.max(4, Math.round(qnum('lanes', 8))), LW = TAU / LANES, R = 4;
 const RV = R / Math.cos(LW / 2);                     // radio a las aristas del polígono
 const LANE_W = 2 * R * Math.tan(LW / 2);             // anchura de un carril
 const SEG = 4, NR = 72;                              // longitud de baldosa y nº de anillos visibles
@@ -417,7 +420,12 @@ const tileTex = (() => {
   try { t.anisotropy = renderer.capabilities.getMaxAnisotropy(); } catch (e) {}
   return t;
 })();
-const VPT = 6, NV = NR * LANES * VPT;
+// El túnel se dibuja con más segmentos que carriles jugables: con 6 caras planas parecía estar
+// dentro de un pentágono deforme. Los carriles siguen siendo 6 para el juego; solo la geometría
+// se subdivide para que el tubo se vea redondo.
+const TSUB = Math.max(1, Math.round(qnum('tsub', LANES <= 8 ? 4 : 2)));
+const NSEG = LANES * TSUB;
+const VPT = 6, NV = NR * NSEG * VPT;
 const tPos = new Float32Array(NV * 3), tCol = new Float32Array(NV * 4), tUV = new Float32Array(NV * 2);
 
 const tubeGeo = new THREE.BufferGeometry();
@@ -765,14 +773,22 @@ function addBlock(z, lane, len, color, wallLook){
 // Con carriles anchos, una placa plana se despega de la carretera, que es curva. Se parte en tiras
 // a lo ancho y cada tira se apoya por separado, así queda pegada sea cual sea la curvatura.
 const PAD_SUB = Math.max(1, Math.ceil(LANE_W / 1.7));
+// Cada tira lleva su trozo de la textura, si no cada una repetiría el chevrón entero y la placa
+// parecería tres placas pequeñas en vez de una.
+const padGeos = Array.from({ length: PAD_SUB }, (_, j) => {
+  const g = padGeo.clone(), uv = g.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setX(i, (j + uv.getX(i)) / PAD_SUB);
+  uv.needsUpdate = true; return g;
+});
 function addBoost(z, lane){
   lane = laneMod(lane); if (z > lastBoostZ) lastBoostZ = z;
   const parts = [];
   const wSub = LANE_W / PAD_SUB;
   for (let i = 0; i < 3; i++) for (let j = 0; j < PAD_SUB; j++) {
     const g = new THREE.Group();
-    const m = new THREE.Mesh(padGeo, arrowMat); m.scale.set(wSub * 0.98, 1, 3.1); g.add(m);
-    const ch = new THREE.Mesh(padGeo, chevMat); ch.position.y = 0.012; ch.scale.set(wSub * 0.82, 1, 2.7); g.add(ch);
+    // las tiras se solapan un pelín para que no se vea la junta al curvarse
+    const m = new THREE.Mesh(padGeos[j], arrowMat); m.scale.set(wSub * 1.06, 1, 3.1); g.add(m);
+    const ch = new THREE.Mesh(padGeos[j], chevMat); ch.position.y = 0.012; ch.scale.set(wSub * 1.06, 1, 2.7); g.add(ch);
     scene.add(g); g.userData.dz = 1.8 + i * 3.3; g.userData.du = (j - (PAD_SUB - 1) / 2) / PAD_SUB;
     parts.push(g);
   }
@@ -1687,8 +1703,11 @@ function buildTube(){
     const ka = kappa(za), kb = kappa(zb);
     const cxa = cx(za), cya = cy(za), cxb = cx(zb), cyb = cy(zb), twa = twr(za), twb = twr(zb), twA = 0, twB = 0;
     const gA = glassAt(za) * (1 - sideM(za));
-    for (let l = 0; l < LANES; l++) {
-      const du = wrapL(l - camLane + twr(za)), dub = du + (twb - twa), u0 = (du - 0.5) * LANE_W, u1 = (du + 0.5) * LANE_W, v0 = (dub - 0.5) * LANE_W, v1 = (dub + 0.5) * LANE_W;
+    for (let sg = 0; sg < NSEG; sg++) {
+      const l = Math.floor(sg / TSUB), sub = sg % TSUB;
+      const du = wrapL(l - camLane + twr(za)), dub = du + (twb - twa);
+      const a0 = -0.5 + sub / TSUB, a1 = -0.5 + (sub + 1) / TSUB;   // tramo del carril que cubre este segmento
+      const u0 = (du + a0) * LANE_W, u1 = (du + a1) * LANE_W, v0 = (dub + a0) * LANE_W, v1 = (dub + a1) * LANE_W;
       prof(u0, ka, P); const Ax = cxa + P[0], Ay = cya + P[1];
       prof(u1, ka, P); const Bx = cxa + P[0], By = cya + P[1];
       prof(v1, kb, P); const Cx = cxb + P[0], Cy = cyb + P[1];
@@ -1709,9 +1728,12 @@ function buildTube(){
         const sh = VSHADE[q] ? sh1 : sh0;
         tCol[oc + q * 4] = tmpA.r * sh; tCol[oc + q * 4 + 1] = tmpA.g * sh; tCol[oc + q * 4 + 2] = tmpA.b * sh; tCol[oc + q * 4 + 3] = alpha;
       }
+      // la textura de baldosa se reparte entre los segmentos, para que el dibujo siga siendo uno por
+      // carril y no se repita en cada trozo
       const ux = tileLight(k, l) && sideM(za) < 0.5 ? 0.5 : 0, uo = v * 2;
-      tUV[uo] = ux + 0.01; tUV[uo+1] = 0; tUV[uo+2] = ux + 0.49; tUV[uo+3] = 0; tUV[uo+4] = ux + 0.49; tUV[uo+5] = 1;
-      tUV[uo+6] = ux + 0.01; tUV[uo+7] = 0; tUV[uo+8] = ux + 0.49; tUV[uo+9] = 1; tUV[uo+10] = ux + 0.01; tUV[uo+11] = 1;
+      const x0 = ux + 0.01 + 0.48 * (sub / TSUB), x1 = ux + 0.01 + 0.48 * ((sub + 1) / TSUB);
+      tUV[uo] = x0; tUV[uo+1] = 0; tUV[uo+2] = x1; tUV[uo+3] = 0; tUV[uo+4] = x1; tUV[uo+5] = 1;
+      tUV[uo+6] = x0; tUV[uo+7] = 0; tUV[uo+8] = x1; tUV[uo+9] = 1; tUV[uo+10] = x0; tUV[uo+11] = 1;
       v += 6;
     }
   }
