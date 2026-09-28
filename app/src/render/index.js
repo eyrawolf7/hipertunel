@@ -135,7 +135,8 @@ export class Renderer {
   // Sucesos de la simulación: efectos de cámara y partículas.
   onEvents(events, game) {
     for (const e of events) {
-      if (e.type === 'boost') { this.cam.kick = 1; this.cam.rollAmp = (Math.random() * 2 - 1) * 0.127; this.cam.roll = 1; this.streakKick = 1; }
+      // el empujón crece con cada nivel: +9°, +12°, +16° de campo de visión
+      if (e.type === 'boost') { this.cam.kick = 1; this.cam.kickAmp = [0, 0.75, 1, 1.35][e.level] || 1; this.cam.rollAmp = (Math.random() * 2 - 1) * 0.127; this.cam.roll = 1; this.streakKick = [0, 0.6, 0.8, 1][e.level] || 1; if (e.level === 3) this.cam.blueVig = 0.15; }
       if (e.type === 'crash') {
         const p = this.boxes.positions.get(e.id);
         const bc = this.colors[(game.boxes.find((b) => b.id === e.id) || { color: 0 }).color];
@@ -147,7 +148,8 @@ export class Renderer {
       }
       if (e.type === 'coin') this.coins.collect(game, e, this.track);
       if (e.type === 'foldStart') { this.cam.shake = Math.max(this.cam.shake, 0.12); this.cam.shakeDecay = 0.15; }
-      if (e.type === 'foldEnd') { this.flash(0xffffff, 0.8); }
+      if (e.type === 'foldEnd') { this.flash(0xffffff, 0.3); }
+      if (e.type === 'foldStart') this.cam.foldFov = 1.2;
       if (e.type === 'world') {
         // el mundo nuevo se enciende al aterrizar del salto, si lo hay
         if (!game.inverted) this.pendingTheme = (this.pendingTheme || 0) + 1;
@@ -164,6 +166,8 @@ export class Renderer {
     for (const o of hidden) o.visible = false;
   }
 
+  consumeLanding() { const l = !!this.landed; this.landed = false; return l; }
+
   flash(hex, a) { this.cam.flashCol.set(hex); this.cam.flash = Math.max(this.cam.flash, a); }
 
   // s y theta vienen interpolados entre los dos últimos pasos de la simulación
@@ -178,7 +182,7 @@ export class Renderer {
     const landing = gapAhead ? gapAhead.to + 1 : -1;
     if (this.pendingTheme && (!gapAhead || s >= landing - 0.5)) {
       this.themeFrom = this.themeIdx; this.themeIdx += this.pendingTheme; this.pendingTheme = 0; this.themeBlend = 0;
-      if (gapAhead || this.wasFlying) { this.flash(THEMES[this.themeIdx % THEMES.length].glow, 0.3); this.landT = 1.5; }
+      if (gapAhead || this.wasFlying) { this.flash(THEMES[this.themeIdx % THEMES.length].glow, 0.3); this.landT = 1.5; this.landed = true; }
     }
     this.wasFlying = game.jumpAt(s) > 0.2;
     const inv = game.inverted || (this.pendingTheme > 0) ? 1 : 0;
@@ -227,7 +231,8 @@ export class Renderer {
     cam.lookAt(target);
     // campo de visión: base del original, con un empujón al impulsar
     const sp01 = Math.min(1, Math.max(0, (game.speedMS - 36) / 64));
-    const fov = this.baseFov + sp01 * 14 + easeKick(c.kick) * (reduceFx ? 4 : 12);
+    const fov = this.baseFov + sp01 * 14 + easeKick(c.kick) * (reduceFx ? 4 : 12) * (c.kickAmp || 1) + (c.foldFov > 0 ? Math.sin(Math.min(1, (1.2 - c.foldFov) / 1.2) * Math.PI) * 8 : 0);
+    if (c.foldFov > 0) c.foldFov -= dt;
     if (!reduceFx && sp01 > 0) cam.rotateZ((Math.random() * 2 - 1) * 0.003 * sp01 * sp01);
     c.kick = Math.max(0, c.kick - dt * 1.8);
     if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
@@ -269,6 +274,7 @@ export class Renderer {
       g.uBlur.value = (0.01 + sp01 * 0.03 + c.kick * 0.06) * (reduceFx ? 0.3 : 1);
       g.uCA.value = c.kick * 0.004;
       g.uVigCol.value.copy(this.fogColor);
+      if (c.blueVig > 0) { g.uVigCol.value.lerp(BOOST_BLUE, 0.8); g.uVig.value = 0.45; c.blueVig -= dt; } else g.uVig.value = 0.1;
       g.uTime.value = this.time;
       g.uFlash.value.set(c.flashCol.r, c.flashCol.g, c.flashCol.b, c.flash * (reduceFx ? 0.4 : 1));
     }

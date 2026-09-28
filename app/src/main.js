@@ -42,7 +42,7 @@ const bestAtStart = {};
 const ui = createUI($('ui'), {
   onPlay: (m) => { audio.unlock(); input.requestTilt(); goLandscape(); startGame(m); },
   onResume: () => resume(),
-  onRestart: () => { audio.unlock(); startGame(mode); },
+  onRestart: () => { audio.unlock(); startGame(mode, true); },
   onMenu: () => toMenu(),
   onSetting: (k, v) => {
     settings[k] = v; saveSettings();
@@ -65,7 +65,7 @@ audio.setMusic(settings.music); audio.setMuted(!settings.sound);
 input.onButton = (b) => {
   if (b === 'mute') { settings.sound = !settings.sound; audio.setMuted(!settings.sound); saveSettings(); ui.settings(settings); return; }
   if (state === 'play' && (b === 'pause' || b === 'back')) { pause(); return; }
-  if (state === 'over' && b === 'ok' && overT > 0.6) { startGame(mode); return; }
+  if (state === 'over' && b === 'ok' && overT > 0.6) { startGame(mode, true); return; }
   if (state !== 'play' && state !== 'countdown') {
     if (b === 'up' || b === 'left' || b === 'down' || b === 'right') ui.navigate?.(b);
     else if (b === 'ok') ui.confirm?.();
@@ -113,18 +113,19 @@ function attract() {
   audio.setWorld(0);
 }
 
-function startGame(m) {
+function startGame(m, quick = false) {
   mode = m;
   newGame(m);
   coins = 0;
   bestAtStart[m] = bestOf(m);
-  state = 'countdown'; countdown = 3;
+  // reintento rápido: sin 3-2-1, solo un instante antes del ¡YA!
+  state = 'countdown'; countdown = quick ? 0.6 : 3; pendingChime = false; nearT = 0;
   ui.show('hud');
   audio.setWorld(0);
   audio.play('countdown');
   let seen = 0; try { seen = +(localStorage.getItem('hipertunel-partidas') || 0); localStorage.setItem('hipertunel-partidas', String(seen + 1)); } catch (e) {}
   if (seen < 3) setTimeout(() => ui.toast(input.hasTilt ? 'Inclina el móvil para girar' : (COARSE ? 'Toca a la izquierda o a la derecha para girar' : 'Gira con ← →'), 'info'), 300);
-  if (seen < 3) setTimeout(() => { if (state === 'play') ui.toast('Pisa las flechas azules para acelerar', 'boost'); }, 4200);
+  padHint = seen < 3;
   if (seen >= 3 && !input.hasTilt && settings.tilt && COARSE) setTimeout(() => { if (!input.hasTilt) ui.toast('Sin giroscopio: toca a izquierda o derecha', 'info'); }, 1500);
 }
 
@@ -147,6 +148,10 @@ function finish() {
   pushRecords();
 }
 
+// vibración (móvil): se apaga con "Reducir efectos"
+const buzz = (p) => { if (settings.reduceFx || state === 'attract') return; try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
+let nearT = 0, pendingChime = false, padHint = false;
+
 // ---------------------------------------------------------------- bucle
 let last = performance.now();
 const fps = { buf: [], el: null };
@@ -162,13 +167,28 @@ function stepSim() {
   renderer.onEvents(ev, game);
   for (const e of ev) {
     if (state === 'attract') continue;
-    if (e.type === 'boost') { audio.play('boost', { level: e.level }); ui.toast(e.level === 3 ? '¡Velocidad máxima!' : '¡Impulso ' + e.level + '!', 'boost'); }
-    else if (e.type === 'crash') { audio.play(e.fatal ? 'death' : 'crash'); if (!e.fatal) ui.toast('¡Impulsos perdidos!', 'info'); }
-    else if (e.type === 'coin') { coins = game.coinsGot; audio.play('coin', { combo: e.combo }); }
+    if (e.type === 'boost') { audio.play('boost', { level: e.level }); buzz(e.level === 3 ? [15, 40, 30] : [14 + e.level * 4]); if (e.level === 3) ui.toast('¡Velocidad máxima!', 'boost'); }
+    else if (e.type === 'crash') { audio.play(e.fatal ? 'death' : 'crash'); buzz(e.fatal ? [120, 60, 200] : [40, 30, 60]); if (!e.fatal) ui.toast('¡Impulsos perdidos!', 'info'); }
+    else if (e.type === 'coin') { coins = game.coinsGot; audio.play('coin', { combo: e.combo }); if (e.combo >= 3) buzz(8); }
     else if (e.type === 'foldStart') audio.play('foldStart');
-    else if (e.type === 'foldEnd') audio.play('foldEnd');
-    else if (e.type === 'world') { audio.setWorld(game.world); if (!game.inverted) { audio.play('world'); } }
+    else if (e.type === 'foldEnd') { audio.play('foldEnd'); buzz(25); }
+    else if (e.type === 'world') {
+      audio.setWorld(game.world);
+      // la campanilla del mundo nuevo suena al aterrizar del salto, si lo hay
+      if (!game.inverted) { if (game.gaps.some((g) => g.to + 1 > game.s)) pendingChime = true; else audio.play('world'); }
+    }
   }
+  // ¡Por los pelos!: una caja pasa rozando por el carril de al lado a más de 60 m/s (solo aviso)
+  if (state === 'play' && game.alive && game.speedMS > 60 && (nearT -= STEP) <= 0) {
+    const hw = Math.PI / 6;
+    for (const b of game.boxes) {
+      if (b.hit || b.k + 0.5 <= prev.s || b.k + 0.5 > game.s) continue;
+      let d = game.theta - (b.lane * hw); d = Math.atan2(Math.sin(d), Math.cos(d));
+      if (Math.abs(d) > hw * 0.8 && Math.abs(d) < hw * 1.6) { audio.play('nearMiss'); buzz(10); nearT = 0.4; break; }
+    }
+  }
+  if (padHint && state === 'play' && game.pads.some((p) => !p.taken && (p.k - game.s) / Math.max(1e-3, game.v / 13.176 * 60) < 1.6 && p.k > game.s)) { padHint = false; ui.toast('Pisa las flechas azules para acelerar', 'boost'); }
+  if (pendingChime && renderer.consumeLanding()) { pendingChime = false; audio.play('world'); buzz(30); }
   if (state === 'attract' && (!game.alive || game.s > 4000)) attractGame((Math.random() * 1e9) | 0);
 }
 
@@ -193,7 +213,7 @@ function frame(now) {
     if (n === 6) acc = 0;
     if (state === 'play' && !game.alive) { state = 'dying'; overT = 0; }
   }
-  if (state === 'dying') { overT += dt; if (overT > 1.3) finish(); }
+  if (state === 'dying') { overT += dt; if (overT > 0.9) finish(); }
   if (state === 'over') overT += dt;
 
   const a = window.__freeze ? 1 : state === 'play' || state === 'attract' || state === 'dying' ? acc / STEP : 1;

@@ -413,7 +413,7 @@ export function createAudio(options = {}) {
       });
     },
     coin(t, o) {
-      const c = Math.min(Math.max(0, o.combo | 0), 7);
+      const c = Math.min(Math.max(0, o.combo | 0), 12);
       const k = Math.pow(2, c / 12);
       note('square', 988 * k, t, 0.06, 0.07, nodes.sfx, { sus: 0.9, rel: 0.01, cutoff: 6000 });
       note('square', 1319 * k, t + 0.065, 0.05, 0.07, nodes.sfx, { sus: 0.5, rel: 0.3, cutoff: 6000 });

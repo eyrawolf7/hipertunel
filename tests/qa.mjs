@@ -454,7 +454,8 @@ await run(12, async () => {
     const t1 = await toastsRead(page);
     const cnt1 = await page.evaluate(() => localStorage.getItem('hipertunel-partidas'));
     const want = vp.hasTouch ? /Toca a la izquierda|Inclina/ : /Gira con/;
-    rec(12, `${name}: 1.ª partida muestra el consejo de giro y el de las flechas`, t1.some((t) => want.test(t)) && t1.some((t) => /flechas azules/.test(t)) && cnt1 === '1', { toasts: t1, partidas: cnt1 });
+    // el consejo de las flechas sale cuando se acerca la primera placa (no a tiempo fijo)
+    rec(12, `${name}: 1.ª partida muestra el consejo de giro`, t1.some((t) => want.test(t)) && cnt1 === '1', { toasts: t1, partidas: cnt1 });
     // a partir de la 4.ª partida, sin consejos
     await page.evaluate(() => { localStorage.setItem('hipertunel-partidas', '3'); window.__qaToasts.length = 0; });
     await page.click('.hud-pause').catch(() => {}); await sleep(100);

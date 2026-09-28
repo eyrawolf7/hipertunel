@@ -644,9 +644,10 @@
 
 /* ---------- avisos ---------- */
 .htui .toasts {
-  position: absolute; left: 50%; top: calc(var(--st) + 4.2em);
-  transform: translateX(-50%);
-  display: flex; flex-direction: column; align-items: center; gap: .35em;
+  /* abajo a la izquierda: fuera del punto de fuga, que es donde miras */
+  position: absolute; left: calc(var(--sl, 0px) + 1.1em); bottom: calc(var(--sb, 0px) + 1.1em);
+  transform: none;
+  display: flex; flex-direction: column-reverse; align-items: flex-start; gap: .35em;
   pointer-events: none; z-index: 20;
 }
 .htui .toast {
