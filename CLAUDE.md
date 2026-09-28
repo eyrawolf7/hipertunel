@@ -61,7 +61,10 @@ npm run build                # genera index.html y hipertunel-movil.html (un sol
 
 Mira las capturas y compáralas con `referencias/video-original/` y `referencias/estilo-visual/`.
 Sé autocrítico. Para trabajos grandes, reparte en agentes según `docs/CONTRATO.md` (cada uno
-dueño de su carpeta) y usa un crítico con contexto limpio para lo visual.
+dueño de su carpeta). El equipo está en `.claude/agents/`: `director-arte` (crítico visual con
+contexto limpio), `qa-jugador`, `auditor-fidelidad` (contra el descompilado de Boost 2 en
+`referencias/boost2-decompilado/`), `sonido`, `interfaz` y `modelador-blender`. Tras cambios
+visuales, pasa el director de arte; tras cambios de reglas, el auditor; antes de publicar, el QA.
 
 ## Siguientes pasos
 
