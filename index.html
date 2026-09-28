@@ -251,10 +251,10 @@ const qnum = (k, d) => { const v = parseFloat(QS.get(k)); return isFinite(v) ? v
 const EXPO = qnum('expo', 0.72);
 const FOG_NEAR = qnum('fnear', 25), FOG_FAR = qnum('ffar', 170);
 // Antelación del aviso. Cuanto más larga, más carriles pintados a la vez y menos avisa el color.
-const WARN_S = qnum('warns', 1.5), WARN_MIN = qnum('warnmin', 55), WARN_MAX = qnum('warnmax', 130);
-const APPEAR = qnum('appear', 0.72);   // a qué parte de la antelación del aviso asoma ya el cubo
+const WARN_S = qnum('warns', 0.75), WARN_MIN = qnum('warnmin', 35), WARN_MAX = qnum('warnmax', 60);
+const APPEAR = qnum('appear', 0.62);   // a qué parte de la antelación del aviso asoma ya el cubo
 // Densidad de obstáculos y velocidad: se calibran juntas, una compensa a la otra.
-const LAM_MAX = qnum('lam', 0.2), PAR_2 = qnum('par2', 0.15), PAR_3 = qnum('par3', 0.05);
+const LAM_MIN = qnum('lammin', 0.18), LAM_MAX = qnum('lam', 0.7), PAR_2 = qnum('par2', 0.9), PAR_3 = qnum('par3', 0.7);
 const SPD_MAX = qnum('spdmax', 54), SPD_K = qnum('spdk', 0.007);
 const SHOWFPS = QS.has('fps');
 // Gestión de color: los colores se escriben en sRGB (como se ven) y se convierten a lineal para
@@ -980,7 +980,7 @@ function spawnNext(z){
   const safe = (l) => { for (let q = lo; q <= hi; q++) if (laneMod(l) === laneMod(q)) return true; return false; };
   // Menos bloques a la vez: con la densidad antigua casi todos los carriles acababan pintados de
   // aviso y el color dejaba de avisar. La dificultad se compensa con velocidad, no con muro.
-  const lam = lerp(0.24, LAM_MAX, clamp(D, 0, 1.2) / 1.2);
+  const lam = lerp(LAM_MIN, LAM_MAX, clamp(D, 0, 1.2) / 1.2);
   const n = Math.floor(lam) + (Math.random() < lam % 1 ? 1 : 0);
   for (let i = 0; i < n; i++) {
     const l = Math.random() < 0.7 ? pathL + ri(-6, 6) : ri(0, LANES - 1);
@@ -989,9 +989,20 @@ function spawnNext(z){
     const len = long ? rr(8, 16 + D * 10) : rr(3, 5);
     const zz = z + rr(0, STEP);
     if (!laneFree(l, zz - 4, zz + len + 4)) continue;
-    addBlock(zz, l, len, ri(0, PALETTE.length - 1));
+    // Toda la franja del mismo color: con colores distintos, un solo muro se lee como varios avisos
+    // sueltos y la pantalla parece un caos aunque los bloques estén pegados.
     const col0 = ri(0, PALETTE.length - 1);
-    if (Math.random() < PAR_2 + D * 0.2) { const dir = Math.random() < 0.5 ? 1 : -1; for (let q = 1; q <= (Math.random() < PAR_3 + D * 0.2 ? 2 : 1); q++) { const l2 = l + dir * q; if (safe(l2) || !laneFree(l2, zz - 4, zz + len + 4)) break; addBlock(zz, l2, len, col0); } }
+    addBlock(zz, l, len, col0);
+    // Franjas anchas en vez de bloques sueltos: cubren más contorno (hay que moverse de verdad) y a
+    // la vez se leen mejor, porque son un aviso grande en lugar de varios repartidos.
+    if (Math.random() < PAR_2 + D * 0.2) {
+      const dir = Math.random() < 0.5 ? 1 : -1;
+      let ancho = 1;
+      if (Math.random() < PAR_3 + D * 0.35) ancho++;
+      if (Math.random() < D * 0.55) ancho++;
+      if (Math.random() < D * 0.35) ancho++;
+      for (let q = 1; q <= ancho; q++) { const l2 = l + dir * q; if (safe(l2) || !laneFree(l2, zz - 4, zz + len + 4)) break; addBlock(zz, l2, len, col0); }
+    }
   }
   evCool -= STEP;
   const bk = biomeAt(z).key;

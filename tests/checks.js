@@ -112,34 +112,53 @@ for (const giro of [15, 25, 40]) {
   if (casos < 40) fail.push('No se pudieron medir los avisos: solo ' + casos + ' bloques');
   else if (malos > casos * 0.02) fail.push(malos + ' de ' + casos + ' cubos asoman antes que el aviso de su carril');
 }
-// 5) el color solo avisa si es raro: con medio túnel pintado deja de significar nada.
-// En el original nunca se ven más de 2-4 carriles de color a la vez. Pero tampoco debe quedar
-// vacío: la dificultad tiene que seguir creciendo con la distancia.
+// 5) legibilidad de los avisos. Lo que importa no es cuántos carriles se pintan, sino cuántas
+// FRANJAS distintas hay que leer: un muro ancho de un color se entiende de un vistazo, seis avisos
+// sueltos repartidos por el contorno no. Pero tampoco puede quedar vacío.
 G.setStep(() => 0);
 const pintados = (z) => {
-  const m = [];
+  const fr = [], ca = [];
   for (let rep = 0; rep < 4; rep++) {
     G.start(); G.warp(z);
     for (let i = 0; i < 60 * 10; i++) {
       G.update(1 / 60);
       if (G.state !== 'play') { G.start(); G.warp(z); continue; }
       if (i % 10) continue;
-      // el muro de la gominola pinta todos los carriles a propósito: no cuenta como saturación
-      if (G.dbg().biome === 'candy') continue;
-      const s = G.s; let c = 0;
-      for (let l = 0; l < L; l++) for (const o of G.byLane[l]) { if (o.type === 'block' && o.lit && o.z + o.len >= s && o.litFrom <= s + 110) { c++; break; } }
-      m.push(c);
+      if (G.dbg().biome === 'candy') continue;   // el muro de la gominola se pinta entero a propósito
+      const s = G.s; const on = [];
+      for (let l = 0; l < L; l++) { let v = false; for (const o of G.byLane[l]) { if (o.type === 'block' && o.lit && o.z + o.len >= s && o.litFrom <= s + 110) { v = true; break; } } on.push(v); }
+      let gr = 0; for (let l = 0; l < L; l++) if (on[l] && !on[lm(l - 1)]) gr++;
+      if (on.every(Boolean)) gr = 1;
+      fr.push(gr); ca.push(on.filter(Boolean).length);
     }
   }
-  m.sort((a, b) => a - b);
-  return { media: m.reduce((p, c) => p + c, 0) / m.length, p90: m[Math.floor(m.length * 0.9)] };
+  fr.sort((a, b) => a - b);
+  return { franjas: fr.reduce((p, c) => p + c, 0) / fr.length, fp90: fr[Math.floor(fr.length * 0.9)], carriles: ca.reduce((p, c) => p + c, 0) / ca.length };
 };
 const dens = [1200, 6000, 10000].map(pintados);
-const densMax = Math.max(...dens.map((d) => d.media));
-if (densMax > 5) fail.push('Demasiados carriles pintados de aviso a la vez: ' + densMax.toFixed(1) + ' de media (el color deja de avisar)');
-if (Math.max(...dens.map((d) => d.p90)) > 9) fail.push('Ráfagas de avisos demasiado grandes: p90 de ' + Math.max(...dens.map((d) => d.p90)) + ' carriles');
-// margen amplio: la pista es aleatoria y esto solo debe saltar ante una regresión de verdad
-if (dens[2].media < dens[0].media * 1.1) fail.push('La densidad de obstáculos no crece con la distancia: ' + dens.map((d) => d.media.toFixed(1)).join(' -> '));
-if (dens[1].media < 0.8) fail.push('Demasiado vacío: apenas hay obstáculos a 6.000 m');
-console.log(fail.length ? 'FALLOS:\n- ' + fail.join('\n- ') : 'Todo OK', JSON.stringify({ chordMin: +chord.toFixed(3), padGapMax: +gap.toFixed(3), diff: D.map((d) => +d.toFixed(2)), avisos: dens.map((d) => +d.media.toFixed(1)) }));
+const frMax = Math.max(...dens.map((d) => d.franjas));
+if (frMax > 2.5) fail.push('Demasiados avisos sueltos que leer a la vez: ' + frMax.toFixed(1) + ' franjas de media');
+if (Math.max(...dens.map((d) => d.fp90)) > 4) fail.push('Ráfagas de avisos difíciles de leer: p90 de ' + Math.max(...dens.map((d) => d.fp90)) + ' franjas');
+if (dens[2].carriles < dens[0].carriles * 1.1) fail.push('La densidad de obstáculos no crece con la distancia: ' + dens.map((d) => d.carriles.toFixed(1)).join(' -> '));
+if (dens[1].carriles < 1.5) fail.push('Demasiado vacío: apenas hay obstáculos a 6.000 m');
+
+// 6) quedarse quieto en un carril no puede llevarte lejos: el juego tiene que obligar a esquivar,
+// y cada vez más según avanzas.
+const quieto = (z) => {
+  const v = [];
+  for (let i = 0; i < 14; i++) {
+    G.start(); if (z) G.warp(z);
+    const z0 = G.s;
+    for (let f = 0; f < 60 * 80 && G.state === 'play'; f++) G.update(1 / 60);
+    v.push(G.s - z0);
+  }
+  v.sort((a, b) => a - b);
+  return { med: v[v.length >> 1], peor: v[v.length - 1] };
+};
+const q0 = quieto(0), q4 = quieto(4000), q8 = quieto(8000);
+if (q0.med > 800) fail.push('Sin moverse del carril se llega a ' + Math.round(q0.med) + ' m desde el principio: el juego no obliga a esquivar');
+if (q4.med > 400) fail.push('Sin moverse del carril se aguantan ' + Math.round(q4.med) + ' m a los 4.000 m');
+if (q8.med > 350) fail.push('Sin moverse del carril se aguantan ' + Math.round(q8.med) + ' m a los 8.000 m');
+if (q8.med > q0.med) fail.push('Quedarse quieto no es más letal según avanzas: ' + Math.round(q0.med) + ' -> ' + Math.round(q8.med) + ' m');
+console.log(fail.length ? 'FALLOS:\n- ' + fail.join('\n- ') : 'Todo OK', JSON.stringify({ chordMin: +chord.toFixed(3), padGapMax: +gap.toFixed(3), diff: D.map((d) => +d.toFixed(2)), franjas: dens.map((d) => +d.franjas.toFixed(1)), quieto: [q0.med, q4.med, q8.med].map(Math.round) }));
 process.exit(fail.length ? 1 : 0);

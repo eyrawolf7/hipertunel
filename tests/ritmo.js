@@ -27,7 +27,7 @@ G.setStep(() => {
 
 const dt = 1 / 60, pasos = Math.round(mins * 60 * 60);
 let muertes = 0, distTotal = 0, vidaIni = 0, mejorDist = 0, sumaVel = 0, n = 0;
-let sinAviso = 0, nivelSuma = 0, avisoSuma = 0, avisoN = 0; const avisoTodos = [], sinCandy = [], picos = {};
+let sinAviso = 0, nivelSuma = 0, avisoSuma = 0, avisoN = 0; const avisoTodos = [], sinCandy = [], picos = {}, franjas = [];
 const vidas = [], impulsos = [];
 let ultimoNivel = 0, ultimoImpulsoZ = 0;
 G.start();
@@ -42,8 +42,13 @@ for (let i = 0; i < pasos; i++) {
   if (G.level > ultimoNivel) { if (ultimoImpulsoZ) impulsos.push(s - ultimoImpulsoZ); ultimoImpulsoZ = s; }
   ultimoNivel = G.level;
   if (i % 6 === 0) {
-    let avisos = 0;
-    for (let l = 0; l < L; l++) for (const o of G.byLane[l]) { if (o.type === 'block' && o.lit && o.z + o.len >= s && o.litFrom <= s + 110) { avisos++; break; } }
+    let avisos = 0; const on = [];
+    for (let l = 0; l < L; l++) { let v = false; for (const o of G.byLane[l]) { if (o.type === 'block' && o.lit && o.z + o.len >= s && o.litFrom <= s + 110) { v = true; break; } } on.push(v); if (v) avisos++; }
+    // franjas: tramos contiguos de carril pintados. Una franja ancha se lee de un golpe; seis
+    // avisos sueltos repartidos por el contorno, no.
+    let gr = 0; for (let l = 0; l < L; l++) if (on[l] && !on[lm(l - 1)]) gr++;
+    if (avisos === L) gr = 1;
+    franjas.push(gr);
     if (avisos === 0) sinAviso++;
     avisoSuma += avisos; avisoN++; avisoTodos.push(avisos);
     const bk = G.dbg().biome; if (bk !== 'candy') { sinCandy.push(avisos); } if (avisos >= 12) picos[bk] = (picos[bk] || 0) + 1;
@@ -63,4 +68,6 @@ avisoTodos.sort((a, b) => a - b);
 console.log('  carriles pintados a la vez', (avisoSuma / avisoN).toFixed(1) + ' de media   p90 ' + avisoTodos[Math.floor(avisoN * 0.9)] + '   pico ' + avisoTodos[avisoN - 1]);
 sinCandy.sort((a, b) => a - b);
 console.log('  sin contar el caramelo    ', (sinCandy.reduce((p, c) => p + c, 0) / sinCandy.length).toFixed(1) + ' de media   p90 ' + sinCandy[Math.floor(sinCandy.length * 0.9)] + '   pico ' + sinCandy[sinCandy.length - 1]);
+franjas.sort((a, b) => a - b);
+console.log('  franjas de aviso a la vez ', (franjas.reduce((p, c) => p + c, 0) / franjas.length).toFixed(1) + ' de media   p90 ' + franjas[Math.floor(franjas.length * 0.9)]);
 console.log('  momentos con 12+ carriles ', JSON.stringify(picos));
