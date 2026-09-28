@@ -51,8 +51,8 @@ for (const fps of [60, 40, 30, 22]) {
   if (Math.max(...tray) > 1.08) fail.push('A ' + fps + ' fps el cambio de carril se dispara hasta ' + Math.max(...tray).toFixed(1) + ' carriles');
   else if (rebotes > 1) fail.push('A ' + fps + ' fps el cambio de carril rebota ' + rebotes + ' veces: se siente a saltitos');
   else if (t90 < 0) fail.push('A ' + fps + ' fps el cambio de carril no llega a completarse');
-  else if (t90 * dt < 0.06) fail.push('A ' + fps + ' fps el cambio de carril es un salto seco, no desliza');
-  else if (t90 * dt > 0.3) fail.push('A ' + fps + ' fps el cambio de carril va lento y flotante: ' + (t90 * dt).toFixed(2) + ' s');
+  else if (t90 * dt < 0.03) fail.push('A ' + fps + ' fps el cambio de carril es un salto seco, no desliza');
+  else if (t90 * dt > 0.12) fail.push('A ' + fps + ' fps el cambio de carril va más lento que en la v0.31 (0,105 s): ' + (t90 * dt).toFixed(2) + ' s');
   G.setStep(() => 0);
 }
 // tiene que responder en cuanto giras de verdad, sin retardo: cualquier recentrado del cero
