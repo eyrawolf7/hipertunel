@@ -74,7 +74,7 @@ export class Game {
     this.kFirst = 0;
 
     // ---- jugador
-    this.s = 0.5;                      // posición a lo largo del túnel, en filas
+    this.s = 0;                        // posición a lo largo del túnel, en filas (Player::init: frac 0)
     this.theta = 0;                    // ángulo alrededor del túnel (rad)
     this.omega = 0;
     this.v = V_START; this.vTarget = V_START;
@@ -84,7 +84,8 @@ export class Game {
     this.alive = true;
     this.crashes = 0;
     this.rowsPassed = 0;
-    this.maxBoostTime = 0; this.boostTime = 0;   // clásico: tiempo seguido a tope
+    this.maxBoostTime = 0; this.boostTime = 0;   // racha más larga a tope
+    this.boostTotal = 0;               // Player+0x128: tiempo total a tope (lo que enseña el clásico)
     this.timeLeft = 60;                // contrarreloj
     this.lastCollideRow = -99;
 
@@ -113,6 +114,9 @@ export class Game {
     this.coinStreak = 0; this.coinStreakT = 0;
 
     for (let i = 0; i < ROWS; i++) this.pushRow(true);
+    // BoxManager+0x70 empieza desfasado del contador del túnel: hay una pasada de cajas en el
+    // primer fotograma
+    this.pendingRow = true;
   }
 
   // ------------------------------------------------------------------ túnel
@@ -170,9 +174,10 @@ export class Game {
       this.world = Math.min(6, this.world + 1);
       this.event('world', { world: this.world });
     }
-    this.updateBoxes(row);
+    // Tunnel::addGrid solo decide placas; las cajas de esta fila las pone BoxManager::update en el
+    // fotograma siguiente, después del plegado (orden de Game::update del original)
     this.spawnBoosts(row);
-    this.spawnCoins(row);
+    this.pendingRow = true;
   }
 
   // Monedas: tiras de 5 a 10 por un carril libre, a veces en curva para obligar a girar. En el
@@ -323,8 +328,8 @@ export class Game {
       b = { lane, h, fixed, dir, color: this.pickColor(), group: 0, joined: false };
     } else {
       b = { lane: c.lane, h: c.h, fixed: c.fixed, dir: c.rollDir, color: c.color, group: c.id, joined: false };
-      c.count++;
       if (w.variant > 0 && c.count % w.variant === 0) { b.fixed = true; b.h = R_UNITS; }
+      c.count++;
       // las fijas seguidas de una colección recta se dibujan como una sola barra larga
       if (b.fixed && !c.spiral && c.count > 1) b.joined = true;
     }
@@ -360,7 +365,9 @@ export class Game {
     const closed = this.fold > 0;
     const lanes = closed ? [lane, (lane + 6) % LANES] : [lane, (lane + 3) % LANES, (lane + 6) % LANES, (lane + 9) % LANES];
     // la celda 'ocupada' del original solo la marcan las franjas iluminadas (cajas fijas)
-    const busy = (l) => this.boxes.some((b) => b.fixed && (b.lane === l || b.opp === l) && Math.abs(b.k - k) <= 6);
+    // filas del anillo padRow−6 … padRow+11 (con vuelta: también las 5 más antiguas)
+    const kl = this.kLast;
+    const busy = (l) => this.boxes.some((b) => b.fixed && !b.hit && (b.lane === l || b.opp === l) && ((b.k >= k - 6 && b.k <= k + 6) || (b.k >= kl - 29 && b.k <= kl - 25)));
     let ok;
     if (closed) {
       if (lanes.some(busy)) return;
@@ -390,7 +397,9 @@ export class Game {
     const rate = Math.min(Math.abs(this.fold) / 150 + 0.05, 0.1);
     const target = this.foldToIn ? FOLD_IN : FOLD_OUT;
     const dir = Math.sign(target - this.fold);
-    this.fold += dir * rate;
+    // primero se encoge hacia 0; al quedar por debajo del paso cambia de signo y luego crece
+    if (this.fold * target <= 0 && Math.abs(this.fold) < rate) this.fold = -this.fold;
+    else this.fold += dir * rate;
     if ((dir > 0 && this.fold >= target) || (dir < 0 && this.fold <= target)) {
       this.fold = target;
       this.folding = false;
@@ -480,16 +489,20 @@ export class Game {
       this.timeLeft += this.level >= 3 ? dtS : -dtS;
       if (this.timeLeft <= 0) { this.timeLeft = 0; this.die(null); return this.events; }
     }
-    if (this.level === 3) this.boostTime += dtS;
+    if (this.level === 3) { this.boostTime += dtS; this.boostTotal += dtS; }
 
+    // Orden de Game::update: Tunnel::update (plegado), BoxManager::update (cajas de la fila
+    // nueva, movimiento y choques), Player::update (avance, giro, placas, velocidad)
+    this.updateFold();
+    if (this.pendingRow) { this.pendingRow = false; const last = this.rows[this.rows.length - 1]; this.updateBoxes(last); this.spawnCoins(last); }
+    this.updateBoxMotion();
+    this.checkCollisions();
+    if (!this.alive) return this.events;
     this.advance();
     this.steer(input.steer || 0);
     this.checkBoost();
     this.updateSpeed();
-    this.updateBoxMotion();
-    this.checkCollisions();
     this.checkCoins();
-    this.updateFold();
     this.prune();
     return this.events;
   }
@@ -506,7 +519,7 @@ export class Game {
 
   updateSpeed() {                      // Player::updateSpeed
     if (this.mode === 'survival') {
-      this.v += 0.0005; this.vTarget = this.v;       // el objetivo sigue subiendo sin tope
+      this.v += 0.0005; this.vTarget = this.v;       // como el original: el objetivo es v + 0,0005
       if (this.v > V_MAX) this.v = V_MAX;
       return;
     }
@@ -523,9 +536,11 @@ export class Game {
       const hw = 0.314159;
       const lo = wrapAngle(a - hw), hi = wrapAngle(a + hw);
       if (!angleIn(wrapAngle(this.theta), lo, hi)) continue;
-      const row = this.rowAt(p.k);
-      if (row && row.taken) continue;
-      if (row) row.taken = true;
+      // checkForBoost exige que ni la fila actual ni la siguiente estén ya usadas, y marca las dos
+      const r0 = this.rowAt(cur), r1 = this.rowAt(cur + 1);
+      if ((r0 && r0.taken) || (r1 && r1.taken)) continue;
+      if (r0) r0.taken = true;
+      if (r1) r1.taken = true;
       for (const q of this.pads) if (q.k === p.k) q.taken = true;
       p.got = true;
       this.initBoost();
@@ -537,8 +552,9 @@ export class Game {
     for (const b of this.boxes) {
       if (b.grow < 1) b.grow = Math.min(1, b.grow + 0.027);
       if (b.fixed || b.hit) continue;
-      b.roll += b.rollSpeed;
-      if (Math.abs(b.roll) >= edge) {
+      // Box::update: o gira o llega (no las dos cosas en el mismo fotograma): 41 fotogramas por carril
+      if (Math.abs(b.roll) < edge) { b.roll += b.rollSpeed; continue; }
+      {
         b.roll = 0;
         let next = b.lane + Math.sign(b.rollSpeed);
         b.lane = mod(next, LANES);

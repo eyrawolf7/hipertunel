@@ -142,7 +142,7 @@ function finish() {
   list.push(me); list.sort((a, b) => b.score - a.score);
   const top = list.slice(0, 5); saveTop(mode, top);
   const isRecord = top[0] === me && list.length > 1;
-  ui.over({ mode, distM, coins, score, best: top[0].score, isRecord, time: game.time, maxBoostTime: game.maxBoostTime, top: top.map((e) => ({ ...e, me: e === me })) });
+  ui.over({ mode, distM, coins, score, best: top[0].score, isRecord, time: game.time, maxBoostTime: mode === 'classic' ? game.boostTotal : game.maxBoostTime, top: top.map((e) => ({ ...e, me: e === me })) });
   ui.show('over');
   if (isRecord) audio.play('record');
   pushRecords();
