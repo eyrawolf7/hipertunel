@@ -19,7 +19,7 @@ module.exports = function load(arg, file = path.join(__dirname, '..', 'index.htm
   Object.defineProperty(global, 'navigator', { value: { getGamepads: () => [] }, configurable: true });
   const store = {}; Object.defineProperty(global, 'localStorage', { value: { getItem: (k) => store[k] ?? null, setItem: (k, v) => { store[k] = String(v); } }, configurable: true });
   global.requestAnimationFrame = () => 1; global.isSecureContext = true;
-  class FakeRenderer { constructor(){ this.capabilities = { getMaxAnisotropy: () => 1 }; } setPixelRatio(){} setSize(){} setClearColor(){} render(){} }
+  class FakeRenderer { constructor(){ this.capabilities = { getMaxAnisotropy: () => 1, isWebGL2: false }; this.shadowMap = {}; this.extensions = { get: () => null }; } setPixelRatio(){} setSize(){} setClearColor(){} render(){} }
   THREE.WebGLRenderer = FakeRenderer; global.THREE = THREE;
   eval(code);
   return window.__game;

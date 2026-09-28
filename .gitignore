@@ -3,11 +3,7 @@ node_modules/
 referencias/
 tests/shots/
 tests/base-v031/
-# carpetas de capturas de trabajo (npm run compare)
-tests/despues-*/
-tests/cal-*/
-tests/prueba-*/
-tests/final-*/
-tests/partida*/
-tests/nuevo-*/
+# carpetas de capturas de trabajo (npm run compare / partida): solo se guardan los scripts
+tests/*/
+!tests/*.js
 dist/
