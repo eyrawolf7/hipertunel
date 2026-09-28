@@ -28,11 +28,11 @@ const mover = (deg, sec) => {
   }
   return null;
 };
-const uno = mover(14, 0.8);
+const uno = mover(9, 0.8);   // gesto pequeño: un carril y solo uno
 if (uno === null) fail.push('No se pudo medir la inclinación: el jugador muere siempre');
 else if (uno === 0) fail.push('La inclinación no cambia de carril');
 else if (uno !== 1) fail.push('Una inclinación normal salta ' + uno + ' carriles en vez de 1');
-const mantenido = mover(14, 2.5);   // mantener una inclinación normal NO debe encadenar carriles
+const mantenido = mover(9, 2.5);   // mantener un gesto pequeño NO debe encadenar carriles
 if (mantenido !== null && mantenido !== 1) fail.push('Mantener el móvil inclinado encadena carriles solo: ' + mantenido);
 // Mantener el móvil girado tiene que dar vueltas rápidas al túnel: es parte de la gracia y de la
 // pericia. Ojo al tocar los umbrales: es fácil matar esto sin querer buscando precisión.
@@ -47,7 +47,7 @@ for (let intento = 0; intento < 12 && respuesta === null; intento++) {
   if (G.state !== 'play') respuesta = null;
 }
 if (respuesta === null) fail.push('Una inclinación de 12 grados no llega a mover el carril en 1 s');
-else if (respuesta > 0.2) fail.push('El giroscopio responde tarde: ' + respuesta.toFixed(2) + ' s hasta cambiar de carril');
+else if (respuesta > 0.15) fail.push('El giroscopio responde tarde: ' + respuesta.toFixed(2) + ' s hasta cambiar de carril');
 // 5) el color solo avisa si es raro: con medio túnel pintado deja de significar nada.
 // En el original nunca se ven más de 2-4 carriles de color a la vez. Pero tampoco debe quedar
 // vacío: la dificultad tiene que seguir creciendo con la distancia.

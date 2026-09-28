@@ -2178,8 +2178,11 @@ const tilt = { on: false, has: false, phi: 0, phi0: null, t: 0, armed: true };
 // Grados: saltar un carril, volver a armar, y a partir de dónde se encadenan vueltas seguidas.
 // Un toque corto mueve un carril; mantener el móvil girado da vueltas rápidas al túnel, que es
 // parte de la gracia. TILT_REARM es solo antirrebote del sensor, no un freno.
-const TILT_STEP = qnum('tstep', 8), TILT_REARM = qnum('trearm', 4), TILT_HOLD = qnum('thold', 16);
-const TILT_RATE = qnum('trate', 15), TILT_DELAY = qnum('tdelay', 0.24), TILT_SMOOTH = qnum('tsmooth', 0.4), LANE_SOFT = qnum('lanesoft', 0.62);
+// ?sens=1.5 sube toda la sensibilidad de golpe (umbrales más bajos y vueltas más rápidas);
+// cada umbral se puede afinar aparte con ?tstep, ?thold, ?trate...
+const SENS = qnum('sens', 1);
+const TILT_STEP = qnum('tstep', 5 / SENS), TILT_REARM = qnum('trearm', 2.5 / SENS), TILT_HOLD = qnum('thold', 12 / SENS);
+const TILT_RATE = qnum('trate', 20 * SENS), TILT_DELAY = qnum('tdelay', 0.16), TILT_SMOOTH = qnum('tsmooth', 0.55), LANE_SOFT = qnum('lanesoft', 0.62);
 let tiltCheckT = 0, tiltWarned = false, motionN = 0, orientN = 0;
 function onOrient(e){
   orientN++; if (motionN > 5 || e.beta == null || e.gamma == null) return;
@@ -2246,7 +2249,7 @@ function pollInput(dt){
     else if (a > TILT_STEP && tilt.armed) { stepLane(dir, true); tilt.armed = false; tilt.t = 0; }
     // solo con el móvil bien girado se encadenan carriles seguidos, y más despacio que antes
     // girado de verdad y mantenido: vueltas seguidas, cada vez más rápidas cuanto más se gira
-    if (a > TILT_HOLD) { tilt.t += dt; if (tilt.t > TILT_DELAY) { gd = dir; rate = clamp((a - TILT_HOLD) / 14, 0.35, 1) * TILT_RATE; } } else if (a >= TILT_REARM) tilt.t = 0;
+    if (a > TILT_HOLD) { tilt.t += dt; if (tilt.t > TILT_DELAY) { gd = dir; rate = clamp((a - TILT_HOLD) / 12, 0.35, 1) * TILT_RATE; } } else if (a >= TILT_REARM) tilt.t = 0;
   }
   // mando
   let gps = null;
