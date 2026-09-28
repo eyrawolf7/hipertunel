@@ -57,7 +57,7 @@ export class Decor {
     for (const it of this.items) this.group.remove(it.obj);
     this.items = [];
     const kinds = KINDS[this.theme] || KINDS.sky;
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < 24; i++) {
       const name = kinds[i % kinds.length];
       const obj = this.build(name);
       const big = name === 'planet' ? 2.4 : name.startsWith('island') ? 1.6 : name === 'arch' ? 1.4 : 1;
@@ -77,7 +77,7 @@ export class Decor {
     const vertical = it.name === 'planet' ? 90 + Math.random() * 80
       : it.name === 'cloud' ? (low ? -55 + Math.random() * 30 : 45 + Math.random() * 40)
       : (low ? -70 + Math.random() * 45 : 40 + Math.random() * 35);
-    const ahead = 120 + Math.random() * 280;
+    const ahead = 120 + Math.random() * 520;
     it.obj.position.copy(r.P).addScaledVector(r.F, ahead).addScaledVector(r.X, lateral).addScaledVector(r.U, vertical);
     it.obj.rotation.y = Math.random() * Math.PI * 2;
     it.k = k + ahead / 4;

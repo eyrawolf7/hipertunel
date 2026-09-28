@@ -21,6 +21,7 @@ import { THEMES, BOX_COLORS } from './worlds.js';
 
 const DEG = Math.PI / 180;
 const INV_FOG = new THREE.Color(0x0b0822);
+const BOOST_BLUE = new THREE.Color(0x3fb6ff).multiplyScalar(2);
 const GradeShader = {
   uniforms: { tDiffuse: { value: null }, uBlur: { value: 0 }, uFlash: { value: new THREE.Vector4(1, 1, 1, 0) }, uVig: { value: 0.1 }, uCA: { value: 0.0 }, uVigCol: { value: new THREE.Color(0x2b2257) }, uTime: { value: 0 }, uSat: { value: 1.08 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
@@ -127,6 +128,7 @@ export class Renderer {
     this.sky.setTheme(A, B, t);
     this.decor.setTheme(t < 0.5 ? A : B);
     this.themeFog = u.uFog.value.clone();
+    this.themeGlow = u.uGlow.value.clone();
     this.fogColor = u.uFog.value;
   }
 
@@ -136,10 +138,11 @@ export class Renderer {
       if (e.type === 'boost') { this.cam.kick = 1; this.cam.rollAmp = (Math.random() * 2 - 1) * 0.127; this.cam.roll = 1; this.streakKick = 1; }
       if (e.type === 'crash') {
         const p = this.boxes.positions.get(e.id);
-        if (p) this.fx.explode(p, this.colors[(game.boxes.find((b) => b.id === e.id) || { color: 0 }).color], 46, this.look, 60);
-        this.cam.shake = 0.35; this.cam.shakeDecay = 0.9;
+        const bc = this.colors[(game.boxes.find((b) => b.id === e.id) || { color: 0 }).color];
+        if (p) this.fx.explode(p, bc, 80, this.look, 60, 1.5);
+        this.cam.shake = 0.5; this.cam.shakeDecay = 1.4;
         if (e.fatal) { this.flash(0xff3040, 0.55); this.deathFocus = p ? p.clone() : null; }
-        else this.flash(0xffffff, 0.6);
+        else this.flash(bc.getHex(), 0.3);
         this.cam.hit = 1;
       }
       if (e.type === 'coin') this.coins.collect(game, e, this.track);
@@ -169,7 +172,7 @@ export class Renderer {
     const tr = this.track;
     tr.sync(game);
     // tema
-    if (this.themeBlend < 1) { this.themeBlend = Math.min(1, this.themeBlend + dt / 0.5); this.applyTheme(this.themeFrom, this.themeIdx, this.themeBlend); }
+    if (this.themeBlend < 1) { this.themeBlend = Math.min(1, this.themeBlend + dt / 0.25); this.applyTheme(this.themeFrom, this.themeIdx, this.themeBlend); }
     // fase oscura: mientras dura el estado invertido y hasta aterrizar del salto entre mundos
     const gapAhead = game.gaps.find((g) => g.to + 1 > s);
     const landing = gapAhead ? gapAhead.to + 1 : -1;
@@ -179,7 +182,8 @@ export class Renderer {
     }
     this.wasFlying = game.jumpAt(s) > 0.2;
     const inv = game.inverted || (this.pendingTheme > 0) ? 1 : 0;
-    this.cam.invert += (inv - this.cam.invert) * Math.min(1, dt * 12);
+    // fundido lineal de 0,25 s: sin fotogramas grises a medio camino
+    this.cam.invert += Math.sign(inv - this.cam.invert) * Math.min(Math.abs(inv - this.cam.invert), dt * 4);
     this.hemi.intensity = 1.0 * (1 - this.cam.invert * 0.7);
     this.tunnel.uniforms.uInvert.value = this.cam.invert;
     // en el tránsito invertido la niebla también se apaga: si no, el túnel oscuro se ve gris
@@ -223,7 +227,8 @@ export class Renderer {
     cam.lookAt(target);
     // campo de visión: base del original, con un empujón al impulsar
     const sp01 = Math.min(1, Math.max(0, (game.speedMS - 36) / 64));
-    const fov = this.baseFov + sp01 * 6 + easeKick(c.kick) * (reduceFx ? 4 : 12);
+    const fov = this.baseFov + sp01 * 14 + easeKick(c.kick) * (reduceFx ? 4 : 12);
+    if (!reduceFx && sp01 > 0) cam.rotateZ((Math.random() * 2 - 1) * 0.003 * sp01 * sp01);
     c.kick = Math.max(0, c.kick - dt * 1.8);
     if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
 
@@ -255,16 +260,20 @@ export class Renderer {
     this.decor.update(game, tr, cam, outside, dt);
     this.renderer.setClearColor(this.fogColor, 1);
 
+    // impulso: 0,4 s de azul eléctrico en juntas y anillos (nunca en los carriles)
+    const bk = Math.max(0, c.kick - 0.28) / 0.72;
+    this.tunnel.uniforms.uGlow.value.copy(this.themeGlow || this.tunnel.uniforms.uGlow.value).lerp(BOOST_BLUE, bk);
+    this.tunnel.uniforms.uRing.value.set(0xfff1c9).lerp(BOOST_BLUE, bk);
     if (this.grade) {
       const g = this.grade.uniforms;
       g.uBlur.value = (0.01 + sp01 * 0.03 + c.kick * 0.06) * (reduceFx ? 0.3 : 1);
-      g.uCA.value = c.kick * 0.003;
+      g.uCA.value = c.kick * 0.004;
       g.uVigCol.value.copy(this.fogColor);
       g.uTime.value = this.time;
       g.uFlash.value.set(c.flashCol.r, c.flashCol.g, c.flashCol.b, c.flash * (reduceFx ? 0.4 : 1));
     }
     c.flash = Math.max(0, c.flash - dt * 2.5);
-    if (this.bloom) this.bloom.strength = 0.45 + Math.max(this.cam.invert * 0.3, this.tunnel.uniforms.uDark.value * 0.2) + (outside ? 0.1 : 0);
+    if (this.bloom) this.bloom.strength = 0.45 + Math.max(this.cam.invert * 0.3, this.tunnel.uniforms.uDark.value * 0.2) + (outside ? 0.1 : 0) + bk * 0.35;
   }
 
   render() { if (this.composer) this.composer.render(); else this.renderer.render(this.scene, this.camera); }

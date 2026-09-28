@@ -1,7 +1,7 @@
 // Temas visuales. La simulación avanza de mundo en cada plegado; aquí se decide el aspecto.
 // Regla 2: el túnel siempre casi neutro, el color vivo es solo para los avisos.
 export const THEMES = [
-  { name: 'Cielo', base: 0xfffaf2, base2: 0xe6e3f0, seam: 0x5d5896, fog: 0xffc98f, glow: 0xffd27a,
+  { name: 'Cielo', base: 0xfffaf2, base2: 0xd4d0e6, seam: 0x2a2350, fog: 0xffe2c0, glow: 0xffd27a,
     skyTop: 0x2f7fff, skyMid: 0x8fc8ff, skyBot: 0xfff3e0, sun: 0xfff2c8, stars: 0, decor: 'sky', exposure: 1.0 },
   { name: 'Atardecer', base: 0xfbe9e0, base2: 0xe9d3d6, seam: 0x6a4a78, fog: 0xff9c86, glow: 0xffb27a,
     skyTop: 0x5b3fb8, skyMid: 0xff8f8f, skyBot: 0xffd6a0, sun: 0xffb060, stars: 0.15, decor: 'sky', exposure: 1.0 },

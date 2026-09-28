@@ -16,7 +16,7 @@ export class Fx {
   reset() { this.p.length = 0; this.mesh.count = 0; }
   // forward: dirección de avance y velocidad del jugador. Los cascotes salen con nosotros y se
   // abren hacia los lados: así se ven estallar por delante y nunca tapan la vista.
-  explode(pos, color, n, forward, speed = 60) {
+  explode(pos, color, n, forward, speed = 60, big = 1) {
     for (let i = 0; i < n; i++) {
       if (this.p.length >= MAX) this.p.shift();
       const r = new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1);
@@ -26,7 +26,7 @@ export class Fx {
       if (forward) v.addScaledVector(forward, speed * (1.05 + Math.random() * 0.25));
       const start = pos.clone().add(r.clone().multiplyScalar(0.06));
       if (forward) start.addScaledVector(forward, 2.5);
-      this.p.push({ pos: start, v, drag: 1.2, life: 0.55 + Math.random() * 0.4, age: 0, size: 0.07 + Math.random() * 0.16, color: color.clone(), rot: new THREE.Vector3(Math.random() * 9, Math.random() * 9, Math.random() * 9) });
+      this.p.push({ pos: start, v, drag: 1.2, life: 0.55 + Math.random() * 0.4, age: 0, size: (0.07 + Math.random() * 0.16) * big, color: color.clone(), rot: new THREE.Vector3(Math.random() * 9, Math.random() * 9, Math.random() * 9) });
     }
   }
   update(dt) {

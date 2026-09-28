@@ -60,7 +60,7 @@ void main(){
   col += uSkyFill * 0.14 * max(N.y, 0.0) * uOutside;
   col *= mix(0.86, 1.0, ao);
   // junta: un tono del propio panel (no tinta morada), con un toque del color de junta del mundo
-  vec3 seamC = mix(base * 0.6, uSeam, 0.35);
+  vec3 seamC = mix(base * 0.45, uSeam, 0.6);
   col = mix(col, seamC, seam);
   col = mix(col, seamC, subL * (1.0 - clamp(wa * 2.0, 0.0, 1.0) * 0.5));
   // brillo de plástico: un reflejo especular suave que se mueve con la cámara
@@ -73,7 +73,8 @@ void main(){
   // en los mundos claros es una banda ancha y suave (no un aro fino en el centro de la vista)
   float ringBand = (mod(vCell.y, 8.0) < 0.5) ? (1.0 - smoothstep(0.0, 1.4, vUv.y * size.y)) : 0.0;
   float ring = ringLine;
-  col = mix(col, uRing * 1.3, ringBand * 0.3 * (1.0 - uInvert));
+  float ringB2 = (mod(vCell.y, 8.0) < 0.5) ? (1.0 - smoothstep(0.0, 0.6, vUv.y * size.y)) : 0.0;
+  col = mix(col, uRing * 1.3, ringB2 * 0.55 * (1.0 - uInvert));
   // estado invertido (transición entre mundos): túnel oscuro con juntas de neón
   // mundos oscuros y estado invertido: baldosa azul noche con juntas de luz (como las texturas
   // invertidas del original). El aviso sigue siendo apagado/encendido.
@@ -89,6 +90,8 @@ void main(){
   float dist = length(uCam - vW);
   float fog = smoothstep(uFogNear, uFogFar, dist);
   col = mix(col, uFog, fog);
+  // foco de luz al fondo del tubo (solo lejos, más allá de 80 m): tira del ojo hacia delante
+  col += uGlow * fog * (1.0 - fog) * 0.6 * smoothstep(80.0, 110.0, dist) * (1.0 - uOutside);
   col = mix(col, vec3(1.0, 0.25, 0.3), uHit * 0.35);
   gl_FragColor = vec4(col, 1.0);
 }`;
