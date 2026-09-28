@@ -96,9 +96,18 @@ function newGame(m, seed) {
   acc = 0;
 }
 
+// Demo del título: el piloto automático no se estrella y arranca ya cerca del primer plegado,
+// para que lo primero que se vea sea lo más vistoso.
+function attractGame(seed) {
+  newGame('classic', seed);
+  game.crash = (b) => { b.hit = true; };
+  while (game.s < 300) game.step({ steer: botSteer(game) });
+  renderer.reset(); renderer.track.sync(game);
+  prev = { s: game.s, theta: game.theta };
+}
 function attract() {
   state = 'attract';
-  newGame('classic', 7);
+  attractGame(7);
   ui.show('title');
   audio.setWorld(0);
 }
@@ -159,7 +168,7 @@ function stepSim() {
     else if (e.type === 'foldEnd') audio.play('foldEnd');
     else if (e.type === 'world') { audio.setWorld(game.world); if (!game.inverted) { audio.play('world'); } }
   }
-  if (state === 'attract' && !game.alive) newGame('classic', (Math.random() * 1e9) | 0);
+  if (state === 'attract' && (!game.alive || game.s > 4000)) attractGame((Math.random() * 1e9) | 0);
 }
 
 function frame(now) {

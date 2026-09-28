@@ -238,7 +238,7 @@ export class Renderer {
     const fogFar = (outside ? 190 : 120) * (1 + 0.3 * (this.landT > 0 ? this.landT / 1.5 : 0));
     if (this.landT > 0) this.landT -= dt;
     this.tunnel.uniforms.uFogFar.value += (fogFar - this.tunnel.uniforms.uFogFar.value) * Math.min(1, dt * 2);
-    this.tunnel.uniforms.uFogNear.value = this.tunnel.uniforms.uFogFar.value * 0.38;
+    this.tunnel.uniforms.uFogNear.value = this.tunnel.uniforms.uFogFar.value * 0.3;
     c.hit = Math.max(0, c.hit - dt * 3);
     this.tunnel.uniforms.uHit.value = c.hit;
     this.tunnel.update(game, tr, this.colors, dt);
