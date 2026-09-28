@@ -121,6 +121,7 @@ export class Renderer {
     const c = (k, target) => target.set(A[k]).lerp(new THREE.Color(B[k]), t);
     const u = this.tunnel.uniforms;
     c('base', u.uBase.value); c('base2', u.uBase2.value); c('seam', u.uSeam.value); c('fog', u.uFog.value); c('glow', u.uGlow.value);
+    u.uDark.value = (A.dark || 0) + ((B.dark || 0) - (A.dark || 0)) * t;
     this.sky.setTheme(A, B, t);
     this.decor.setTheme(t < 0.5 ? A : B);
     this.themeFog = u.uFog.value.clone();
@@ -237,7 +238,7 @@ export class Renderer {
     this.pads.update(game, tr, dt);
     this.coins.update(game, tr, dt, cam.position);
     this.fx.update(dt);
-    this.sky.update(cam, this.upS, outside ? 1 : 0, dt, this.cam.invert);
+    this.sky.update(cam, this.fr.U, outside ? 1 : 0, dt, this.cam.invert);
     this.decor.update(game, tr, cam, outside, dt);
     this.renderer.setClearColor(this.fogColor, 1);
 
@@ -250,7 +251,7 @@ export class Renderer {
       g.uFlash.value.set(c.flashCol.r, c.flashCol.g, c.flashCol.b, c.flash * (reduceFx ? 0.4 : 1));
     }
     c.flash = Math.max(0, c.flash - dt * 2.5);
-    if (this.bloom) this.bloom.strength = 0.45 + this.cam.invert * 0.5 + (outside ? 0.1 : 0);
+    if (this.bloom) this.bloom.strength = 0.45 + this.cam.invert * 0.15 + (outside ? 0.1 : 0);
   }
 
   render() { if (this.composer) this.composer.render(); else this.renderer.render(this.scene, this.camera); }

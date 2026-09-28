@@ -23,7 +23,7 @@ void main(){
 const frag = /* glsl */`
 uniform vec3 uBase; uniform vec3 uBase2; uniform vec3 uSeam; uniform vec3 uFog; uniform vec3 uGlow;
 uniform vec3 uCam; uniform vec3 uKey; uniform float uFogNear; uniform float uFogFar; uniform float uTime;
-uniform float uInvert; uniform vec2 uCellSize; uniform float uHit; uniform vec3 uRing; uniform float uOutside; uniform vec3 uSkyFill;
+uniform float uInvert; uniform vec2 uCellSize; uniform float uHit; uniform vec3 uRing; uniform float uOutside; uniform vec3 uSkyFill; uniform float uDark;
 varying vec2 vUv; varying vec4 vWarn; varying vec3 vN; varying vec3 vW; varying vec2 vCell;
 float edgeDist(vec2 uv, vec2 size){ vec2 p = uv * size; vec2 q = min(p, size - p); return min(q.x, q.y); }
 void main(){
@@ -68,9 +68,15 @@ void main(){
   float ring = (mod(vCell.y, 8.0) < 0.5) ? (1.0 - smoothstep(0.02, 0.16 + px * 2.0, vUv.y * size.y)) : 0.0;
   col = mix(col, uRing * 1.9, ring * 0.85 * (1.0 - uInvert));
   // estado invertido (transición entre mundos): túnel oscuro con juntas de neón
-  vec3 neon = mix(uGlow, vec3(1.0), 0.35);
-  vec3 inv = mix(vec3(0.035, 0.03, 0.07), warn * 0.8, clamp(wa * 1.4, 0.0, 1.0)) + neon * (seam * 1.8 + subL * 1.2 + ring * 1.2);
-  col = mix(col, inv, uInvert);
+  // mundos oscuros y estado invertido: baldosa azul noche con juntas de luz (como las texturas
+  // invertidas del original). El aviso sigue siendo apagado/encendido.
+  vec3 neon = mix(uGlow, vec3(1.0), 0.35 + 0.4 * uInvert);
+  vec3 inv = vec3(0.075, 0.068, 0.15) * (0.7 + 0.3 * lam) * mix(0.8, 1.0, bevel);
+  inv = mix(inv, vec3(0.03, 0.028, 0.06), uInvert);
+  if (wa > 0.0) inv = mix(warn * 0.4, warn * 1.1, on) + warn * on * 0.3;
+  inv += neon * (seam * 1.25 + subL * 0.45 + ring * 1.0) * (1.0 - clamp(wa * 2.0, 0.0, 1.0) * 0.5);
+  inv += vec3(1.0) * pow(max(dot(N, H), 0.0), 64.0) * 0.06;
+  col = mix(col, inv, max(uInvert, uDark));
   float dist = length(uCam - vW);
   float fog = smoothstep(uFogNear, uFogFar, dist);
   col = mix(col, uFog, fog);
@@ -103,7 +109,7 @@ export class Tunnel {
       uKey: { value: new THREE.Vector3(0.3, 0.8, 0.5).normalize() },
       uFogNear: { value: 40 }, uFogFar: { value: 118 }, uTime: { value: 0 }, uInvert: { value: 0 },
       uCellSize: { value: new THREE.Vector2(CELL_W, ROW_M) }, uHit: { value: 0 },
-      uRing: { value: new THREE.Color(0xfff1c9) }, uOutside: { value: 0 }, uSkyFill: { value: new THREE.Color(0x8fc8ff) },
+      uRing: { value: new THREE.Color(0xfff1c9) }, uDark: { value: 0 }, uOutside: { value: 0 }, uSkyFill: { value: new THREE.Color(0x8fc8ff) },
     };
     this.mat = new THREE.ShaderMaterial({ vertexShader: vert, fragmentShader: frag, uniforms: this.uniforms, side: THREE.DoubleSide });
     this.mesh = new THREE.Mesh(g, this.mat);

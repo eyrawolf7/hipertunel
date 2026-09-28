@@ -26,12 +26,13 @@ await page.goto(url + (url.includes('?') ? '&' : '?') + 'fps', { waitUntil: 'net
 await page.waitForFunction(() => window.__hip && window.__hip.game, { timeout: 15000 });
 const report = [];
 if (opt.title) { await new Promise((r) => setTimeout(r, 1500)); await page.screenshot({ path: out + 'titulo.png' }); }
-await page.evaluate((m, seed) => { window.__hip.start(m, seed); window.__freeze = true; }, opt.mode || 'classic', +(opt.seed || 3));
+await page.evaluate((m, seed, th) => { window.__hip.start(m, seed); window.__freeze = true; if (th !== null) window.__theme = th; }, opt.mode || 'classic', +(opt.seed || 3), opt.theme !== undefined ? +opt.theme : null);
 for (const r of rows) {
   const st = await page.evaluate(async (r) => {
     const h = window.__hip;
     h.skipTo(r);
     h.step(20);
+    if (window.__theme !== undefined) { h.renderer.themeIdx = window.__theme; h.renderer.pendingTheme = 0; h.renderer.applyTheme(window.__theme, window.__theme, 1); }
     await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
     const g = h.game;
     return { s: +g.s.toFixed(1), wave: g.waveIdx, fold: +g.fold.toFixed(1), world: g.world, level: g.level, alive: g.alive, boxes: g.boxes.length, pads: g.pads.length, v: +g.v.toFixed(2) };

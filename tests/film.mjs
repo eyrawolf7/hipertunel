@@ -19,12 +19,14 @@ const ev = opt.event || 'crash';
 
 // 1) localizar el suceso
 const g = new Game({ mode, seed });
+if (opt.invul) { const c = g.crash.bind(g); g.crash = (b) => { g.invul = 1; b.hit = true; }; }
 let at = -1;
 while (g.alive && g.frame < 60 * 60 * 6) {
   const out = g.step({ steer: botSteer(g, 14 * skill) });
   const hit = ev.startsWith('row:') ? g.s >= +ev.slice(4)
     : ev === 'tall' ? g.boxes.some((b) => b.tall && b.k - g.s < 6 && b.k - g.s > 3)
     : ev === 'roller' ? g.boxes.some((b) => !b.fixed && b.roll !== 0 && b.k - g.s < 8 && b.k - g.s > 2)
+    : ev === 'foldIn' ? out.some((e) => e.type === 'foldEnd' && e.toIn)
     : out.some((e) => e.type === ev);
   if (hit) { at = g.frame; break; }
 }
@@ -42,13 +44,14 @@ const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
 await page.goto(opt.url || 'http://localhost:5173/', { waitUntil: 'networkidle0' });
 await page.waitForFunction(() => window.__hip && window.__hip.game);
-await page.evaluate((m, seed, skill, start) => {
+await page.evaluate((m, seed, skill, start, invul) => {
   const h = window.__hip; h.start(m, seed);
   window.__freeze = true;
   const g = h.game;
+  if (invul) g.crash = (b) => { g.invul = 1; b.hit = true; };
   while (g.frame < start - 1) { g.step({ steer: h.bot(g, 14 * skill) }); }
   h.renderer.track.sync(g);
-}, mode, seed, skill, start);
+}, mode, seed, skill, start, !!opt.invul);
 for (let i = 0; i < N; i++) {
   await page.evaluate((every, skill) => { const h = window.__hip; for (let j = 0; j < every; j++) h.step(1, h.bot(h.game, 14 * skill)); }, every, skill);
   await new Promise((r) => setTimeout(r, 60));
