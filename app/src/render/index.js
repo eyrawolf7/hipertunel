@@ -166,12 +166,23 @@ export class Renderer {
     for (const o of hidden) o.visible = false;
   }
 
+  // posición en pantalla (px) de una moneda recogida
+  coinScreen(e) {
+    const fr = makeFrame(); if (!this.track.rings.has(e.k - 1)) return null;
+    this.track.frameAt(e.k - 0.5, fr); const sp = {}; const f = this.lastFoldVal ?? 30; surf(section(f), e.lane, f === 30 || f === -30, sp);
+    const v = new THREE.Vector3().copy(fr.P).addScaledVector(fr.X, sp.x + sp.nx * 0.85).addScaledVector(fr.U, sp.y + sp.ny * 0.85);
+    v.project(this.camera);
+    if (v.z > 1) return null;
+    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+    return { x: (v.x * 0.5 + 0.5) * w, y: (-v.y * 0.5 + 0.5) * h };
+  }
+
   consumeLanding() { const l = !!this.landed; this.landed = false; return l; }
 
   flash(hex, a) { this.cam.flashCol.set(hex); this.cam.flash = Math.max(this.cam.flash, a); }
 
   // s y theta vienen interpolados entre los dos últimos pasos de la simulación
-  update(game, s, theta, dt, { reduceFx = false } = {}) {
+  update(game, s, theta, dt, { reduceFx = false, intro = 0 } = {}) {
     this.time += dt;
     const tr = this.track;
     tr.sync(game);
@@ -196,6 +207,7 @@ export class Renderer {
     // ---- cámara: superficie del jugador + normal, mirando la dirección de la fila +10
     const closed = game.fold === 30 || game.fold === -30;
     const sec = section(game.fold);
+    this.lastFoldVal = game.fold;
     const camS = s - 0.12;
     tr.frameAt(camS, this.fr);
     const u = theta / (CELL_DEG * DEG);
@@ -213,6 +225,9 @@ export class Renderer {
     const c = this.cam;
     const cam = this.camera;
     cam.position.copy(pos);
+    // travelling de entrada en la cuenta atrás: empieza 1,5 m atrás y abierto, y se acerca
+    const iq = intro * intro * (3 - 2 * intro);
+    if (iq > 0) cam.position.addScaledVector(this.look, -1.5 * iq).addScaledVector(this.upS, 0.4 * iq);
     if (c.shake > 0) {
       const a = c.shake * (reduceFx ? 0.3 : 1);
       cam.position.x += (Math.random() * 2 - 1) * a; cam.position.y += (Math.random() * 2 - 1) * a; cam.position.z += (Math.random() * 2 - 1) * a;
@@ -231,7 +246,7 @@ export class Renderer {
     cam.lookAt(target);
     // campo de visión: base del original, con un empujón al impulsar
     const sp01 = Math.min(1, Math.max(0, (game.speedMS - 36) / 64));
-    const fov = this.baseFov + sp01 * 14 + easeKick(c.kick) * (reduceFx ? 4 : 12) * (c.kickAmp || 1) + (c.foldFov > 0 ? Math.sin(Math.min(1, (1.2 - c.foldFov) / 1.2) * Math.PI) * 8 : 0);
+    const fov = this.baseFov + iq * 18 + sp01 * 14 + easeKick(c.kick) * (reduceFx ? 4 : 12) * (c.kickAmp || 1) + (c.foldFov > 0 ? Math.sin(Math.min(1, (1.2 - c.foldFov) / 1.2) * Math.PI) * 8 : 0);
     if (c.foldFov > 0) c.foldFov -= dt;
     if (!reduceFx && sp01 > 0) cam.rotateZ((Math.random() * 2 - 1) * 0.003 * sp01 * sp01);
     c.kick = Math.max(0, c.kick - dt * 1.8);

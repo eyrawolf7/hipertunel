@@ -150,7 +150,19 @@ function finish() {
 
 // vibración (móvil): se apaga con "Reducir efectos"
 const buzz = (p) => { if (settings.reduceFx || state === 'attract') return; try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
-let nearT = 0, pendingChime = false, padHint = false;
+let nearT = 0, pendingChime = false, padHint = false, hitstop = 0;
+
+// moneda que vuela desde donde la coges hasta el contador (por el borde, nunca por el centro)
+function coinFly(e) {
+  const chip = document.querySelector('.hud-coins'); if (!chip || settings.reduceFx) return;
+  const p = renderer.coinScreen(e); if (!p) return;
+  const r = chip.getBoundingClientRect();
+  const d = document.createElement('div'); d.className = 'coin-fly';
+  d.style.left = p.x + 'px'; d.style.top = p.y + 'px';
+  document.body.appendChild(d);
+  requestAnimationFrame(() => { d.style.transform = `translate(${r.left + 18 - p.x}px, ${r.top + r.height / 2 - p.y}px) scale(.6)`; d.style.opacity = '0.2'; });
+  setTimeout(() => d.remove(), 420);
+}
 
 // ---------------------------------------------------------------- bucle
 let last = performance.now();
@@ -168,8 +180,8 @@ function stepSim() {
   for (const e of ev) {
     if (state === 'attract') continue;
     if (e.type === 'boost') { audio.play('boost', { level: e.level }); buzz(e.level === 3 ? [15, 40, 30] : [14 + e.level * 4]); if (e.level === 3) ui.toast('¡Velocidad máxima!', 'boost'); }
-    else if (e.type === 'crash') { audio.play(e.fatal ? 'death' : 'crash'); buzz(e.fatal ? [120, 60, 200] : [40, 30, 60]); if (!e.fatal) ui.toast('¡Impulsos perdidos!', 'info'); }
-    else if (e.type === 'coin') { coins = game.coinsGot; audio.play('coin', { combo: e.combo }); if (e.combo >= 3) buzz(8); }
+    else if (e.type === 'crash') { audio.play(e.fatal ? 'death' : 'crash'); buzz(e.fatal ? [120, 60, 200] : [40, 30, 60]); if (!e.fatal) { ui.toast('¡Impulsos perdidos!', 'info'); hitstop = settings.reduceFx ? 0 : 0.07; } }
+    else if (e.type === 'coin') { coins = game.coinsGot; audio.play('coin', { combo: e.combo }); if (e.combo >= 3) buzz(8); coinFly(e); }
     else if (e.type === 'foldStart') audio.play('foldStart');
     else if (e.type === 'foldEnd') { audio.play('foldEnd'); buzz(25); }
     else if (e.type === 'world') {
@@ -206,6 +218,7 @@ function frame(now) {
     if (countdown <= 0) { state = 'play'; audio.play('go'); }
   }
   if (window.__freeze) { acc = 0; }
+  else if (hitstop > 0) { hitstop -= dt; }          // micro-pausa del impacto: la simulación solo se retrasa
   else if (state === 'play' || state === 'attract' || state === 'dying') {
     acc += dt;
     let n = 0;
@@ -221,7 +234,7 @@ function frame(now) {
   let dth = game.theta - prev.theta;
   if (dth > Math.PI) dth -= Math.PI * 2; else if (dth < -Math.PI) dth += Math.PI * 2;
   const theta = prev.theta + dth * a;
-  renderer.update(game, s, theta, dt, { reduceFx: settings.reduceFx });
+  renderer.update(game, s, theta, dt, { reduceFx: settings.reduceFx, intro: state === 'countdown' && countdown > 0.6 ? Math.min(1, (countdown - 0.6) / 2.4) : 0 });
   renderer.render();
   audio.setSpeed(game.speedMS, game.level);
   if (state === 'play' || state === 'countdown' || state === 'dying') {
