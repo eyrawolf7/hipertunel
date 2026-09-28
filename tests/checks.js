@@ -21,7 +21,7 @@ const dl = (a, b) => ((a - b + 8 + 16) % 16) - 8;   // diferencia de carriles te
 // vuelta y se pierde la cuenta (16 carriles recorridos parecerían 0).
 const mover = (deg, sec) => {
   for (let intento = 0; intento < 12; intento++) {
-    G.start(); feed(0, 0.5);
+    G.start(); feed(0, 1.1);   // se espera a que termine la calibración inicial del cero
     let prev = G.lane, acc = 0;
     for (let i = 0; i < sec * 60; i++) { feed(deg, 1 / 60); acc += Math.abs(dl(G.lane, prev)); prev = G.lane; }
     if (G.state === 'play') return acc;
@@ -41,13 +41,28 @@ if (girado !== null && girado < 8) fail.push('Con el móvil girado no se dan vue
 // y tiene que responder al momento, no sentirse pesado
 let respuesta = null;
 for (let intento = 0; intento < 12 && respuesta === null; intento++) {
-  G.start(); feed(0, 0.4);
+  G.start(); feed(0, 1.1);
   const l0 = G.lane; let t = 0;
   for (let i = 0; i < 60 && respuesta === null; i++) { feed(12, 1 / 60); t += 1 / 60; if (G.lane !== l0) respuesta = t; }
   if (G.state !== 'play') respuesta = null;
 }
 if (respuesta === null) fail.push('Una inclinación de 12 grados no llega a mover el carril en 1 s');
 else if (respuesta > 0.15) fail.push('El giroscopio responde tarde: ' + respuesta.toFixed(2) + ' s hasta cambiar de carril');
+// 4b) el cero del giroscopio. Al pulsar Jugar estás tocando la pantalla y recolocando el móvil, así
+// que la referencia se toma en mitad de ese movimiento. Si se coge mal, la partida arranca girando
+// sola. Aquí se recoloca el móvil durante el primer cuarto de segundo y luego se sujeta quieto.
+for (const giro of [15, 25, 40]) {
+  let mov = null;
+  for (let intento = 0; intento < 12 && mov === null; intento++) {
+    G.start();
+    for (let i = 0; i < 15; i++) feed(giro * (i / 15), 1 / 60);   // recolocando el móvil
+    feed(giro, 0.6);                                              // ya quieto, sujetándolo así
+    let prev = G.lane, acc = 0;
+    for (let i = 0; i < 60 * 3; i++) { feed(giro, 1 / 60); acc += Math.abs(dl(G.lane, prev)); prev = G.lane; }
+    if (G.state === 'play') mov = acc;
+  }
+  if (mov !== null && mov > 1) fail.push('Recolocando el móvil ' + giro + ' grados al empezar, la partida arranca girando sola: ' + mov + ' carriles en 3 s');
+}
 // 5) el color solo avisa si es raro: con medio túnel pintado deja de significar nada.
 // En el original nunca se ven más de 2-4 carriles de color a la vez. Pero tampoco debe quedar
 // vacío: la dificultad tiene que seguir creciendo con la distancia.
