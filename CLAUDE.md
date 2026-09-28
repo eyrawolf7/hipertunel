@@ -53,7 +53,12 @@ node tests/shots.mjs <carpeta> 20 150 400 800 [--seed=3 --mode=classic --title]
 node tests/film.mjs <nombre> --event=crash|foldStart|world|boost|tall|roller|row:N
 node tests/qa.mjs            # comprobaciones funcionales con Chrome sin cabeza
 npm run build                # genera index.html y hipertunel-movil.html (un solo archivo)
+npm run android              # genera hipertunel.apk (Capacitor; SDK en /opt/homebrew/share/android-commandlinetools)
+node tests/sonido.mjs        # render sin conexión del audio + espectrograma
 ```
+
+La app de Android se descarga desde https://eyrawolf7.github.io/hipertunel/hipertunel.apk (en la
+web, desde un Android, sale el botón "App para Android"). Emulador para probarla: AVD `hip`.
 
 `?fps` muestra fps en pantalla, `?q=baja` fuerza la calidad. El gancho de pruebas es
 `window.__hip` (`start(modo, semilla)`, `skipTo(filas)`, `step(n)`, `game`, `renderer`…) y
@@ -69,5 +74,6 @@ visuales, pasa el director de arte; tras cambios de reglas, el auditor; antes de
 ## Siguientes pasos
 
 1. Que Víctor lo pruebe en el móvil (inclinación: comprobar el sentido y la calibración).
-2. Android con Capacitor; mando y giroscopio de los Joy-Con para Switch.
+2. Switch: la simulación en C está en `ports/switch/` (misma partida que JS con la misma semilla);
+   falta el render SDL2+GL y la entrada de los Joy-Con.
 3. Multijugador: fantasmas (la simulación es determinista: basta guardar semilla + entradas).

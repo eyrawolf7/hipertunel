@@ -1,8 +1,8 @@
 # Llevar Hipertúnel a Android y a Switch
 
-## Android (Capacitor): la vía corta
+## Android (Capacitor): HECHO
 
-El juego ya es una web de un solo archivo, así que basta con envolverlo:
+`npm run android` genera `hipertunel.apk`. Lo que se hizo (por si hay que repetirlo desde cero):
 
 ```
 brew install --cask android-commandlinetools   # o Android Studio
