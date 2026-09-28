@@ -1,23 +1,23 @@
 {
   "name": "hipertunel",
   "private": true,
-  "version": "0.32.0",
-  "description": "Runner de túnel en primera persona inspirado en Boost 3D (demo interna).",
+  "version": "0.40.0",
+  "description": "Hipertúnel: runner de túnel en primera persona con la jugabilidad de Boost 2.",
   "scripts": {
-    "serve": "npx --yes http-server . -p 5173 -c-1",
-    "sim": "node tests/sim.js",
-    "check": "node tests/checks.js",
-    "shots": "node tests/shots.js",
-    "build": "node tools/build-movil.js",
-    "compare": "node tests/compare.js",
-    "densidad": "node tests/densidad.js",
-    "ritmo": "node tests/ritmo.js",
-    "partida": "node tests/partida.js",
-    "orientacion": "node tests/orientacion.js",
-    "controles": "node tests/controles.js"
+    "dev": "vite --config app/vite.config.js --host",
+    "build": "vite build --config app/vite.config.js && node tools/publicar.mjs",
+    "preview": "vite preview --config app/vite.config.js --host",
+    "bot": "node tests/sim-bot.mjs",
+    "test": "node tests/sim-checks.mjs",
+    "shots": "node tests/shots.mjs"
   },
   "devDependencies": {
     "puppeteer": "^23.0.0",
-    "three": "0.147.0"
-  }
+    "vite": "^8.3.1",
+    "vite-plugin-singlefile": "^2.3.3"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
+  },
+  "type": "module"
 }

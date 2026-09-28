@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#2b2257">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Hipertúnel</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%232b2257'/%3E%3Cpath d='M14 40l18-18 18 18' fill='none' stroke='%2319a8ff' stroke-width='7' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M14 52l18-18 18 18' fill='none' stroke='%23fff' stroke-width='5' stroke-linecap='round' stroke-linejoin='round' opacity='.85'/%3E%3C/svg%3E">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #2b2257; touch-action: none; overscroll-behavior: none; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #ui { position: fixed; inset: 0; pointer-events: none; }
+  #fatal { position: fixed; inset: 0; display: grid; place-items: center; color: #fff; font: 600 20px system-ui; text-align: center; padding: 24px; background: #2b2257; }
+  #fatal[hidden] { display: none; }
+  .fps { position: fixed; left: 8px; bottom: 8px; z-index: 99; font: 600 12px monospace; color: #fff; background: rgba(0,0,0,.5); padding: 3px 6px; border-radius: 6px; pointer-events: none; }
+</style>
+</head>
+<body>
+<canvas id="view" aria-label="Hipertúnel"></canvas>
+<div id="ui"></div>
+<div id="fatal" hidden>Tu navegador no puede mostrar gráficos 3D (WebGL). Prueba con Chrome o Safari actualizados.</div>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

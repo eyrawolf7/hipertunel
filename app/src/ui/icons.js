@@ -1,0 +1,30 @@
+// Iconos SVG en línea para la interfaz de Hipertúnel. Todos usan currentColor salvo los que
+// llevan color propio (moneda, trofeo), para poder teñirlos desde el CSS.
+
+const s = (body, vb = '0 0 24 24', cls = '') =>
+  `<svg class="ico ${cls}" viewBox="${vb}" aria-hidden="true" focusable="false">${body}</svg>`;
+
+export const ICON = {
+  play: s('<path d="M8 5.5v13a1.2 1.2 0 0 0 1.8 1l10.4-6.5a1.2 1.2 0 0 0 0-2L9.8 4.5A1.2 1.2 0 0 0 8 5.5z" fill="currentColor"/>'),
+  grid: s('<rect x="3.5" y="3.5" width="7" height="7" rx="2.2" fill="currentColor"/><rect x="13.5" y="3.5" width="7" height="7" rx="2.2" fill="currentColor"/><rect x="3.5" y="13.5" width="7" height="7" rx="2.2" fill="currentColor"/><rect x="13.5" y="13.5" width="7" height="7" rx="2.2" fill="currentColor"/>'),
+  gear: s('<path d="M12 2.8l1.6 2.3 2.7-.7.6 2.7 2.6 1-.9 2.6 1.9 2-2 2 .9 2.6-2.6 1-.6 2.7-2.7-.7L12 21.2l-1.6-2.3-2.7.7-.6-2.7-2.6-1 .9-2.6-1.9-2 1.9-2-.9-2.6 2.6-1 .6-2.7 2.7.7z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="12" r="3.3" fill="var(--hole, #fffaf2)"/>'),
+  back: s('<path d="M14.5 5.5L8 12l6.5 6.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>'),
+  pause: s('<rect x="6" y="4.5" width="4.2" height="15" rx="1.6" fill="currentColor"/><rect x="13.8" y="4.5" width="4.2" height="15" rx="1.6" fill="currentColor"/>'),
+  retry: s('<path d="M19 12a7 7 0 1 1-2.2-5.1" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><path d="M19.6 3.6v4.8h-4.8" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>'),
+  home: s('<path d="M4 11.2L12 4.5l8 6.7V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.2H9v5.2H5.5A1.5 1.5 0 0 1 4 19z" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>'),
+  target: s('<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2.6"/><circle cx="12" cy="12" r="3" fill="currentColor"/><path d="M12 1.8v3.4M12 18.8v3.4M1.8 12h3.4M18.8 12h3.4" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>'),
+  trophy: s('<path d="M7 3.5h10v5.2a5 5 0 0 1-10 0z" fill="#ffd23f" stroke="#2b2257" stroke-width="1.8" stroke-linejoin="round"/><path d="M7 5.5H4.2a3 3 0 0 0 3.3 4.2M17 5.5h2.8a3 3 0 0 1-3.3 4.2" fill="none" stroke="#2b2257" stroke-width="1.8" stroke-linecap="round"/><path d="M12 13.7v3.3M8.5 20.5h7l-.8-3.5H9.3z" fill="#ffd23f" stroke="#2b2257" stroke-width="1.8" stroke-linejoin="round"/><path d="M9.3 5.6v2.6" stroke="#fff" stroke-width="1.5" stroke-linecap="round" opacity=".8"/>', '0 0 24 24', 'ico-trophy'),
+  coin: s('<circle cx="12" cy="12" r="9.6" fill="#e3a008" stroke="#2b2257" stroke-width="1.9"/><circle cx="12" cy="11.2" r="7.6" fill="#ffd23f"/><circle cx="12" cy="11.2" r="5.4" fill="none" stroke="#f0b418" stroke-width="1.5"/><path d="M12 7.6l1.1 2.3 2.5.3-1.8 1.7.5 2.5-2.3-1.2-2.3 1.2.5-2.5-1.8-1.7 2.5-.3z" fill="#fff6c9"/><path d="M6.6 8.4a6.4 6.4 0 0 1 3-2.6" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round" opacity=".85"/>', '0 0 24 24', 'ico-coin'),
+  // Modos
+  classic: s('<circle cx="32" cy="32" r="26" fill="currentColor"/><circle cx="32" cy="32" r="17" fill="none" stroke="var(--detail, #fff)" stroke-width="2.5" opacity=".35"/><circle cx="32" cy="32" r="9" fill="none" stroke="var(--detail, #fff)" stroke-width="2" opacity=".25"/><path d="M21 21l10 11-10 11M34 21l10 11-10 11" fill="none" stroke="var(--detail, #fff)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>', '0 0 64 64'),
+  survival: s('<path d="M33 5c2 9 13 14 13 29a14 14 0 0 1-28 0c0-7 3-11 6-14 0 5 2 8 5 9-1-10 2-18 4-24z" fill="currentColor" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/><path d="M32 57a7.5 7.5 0 0 1-7.5-7.5c0-5 4-7.5 5-12 3 3 10 6.5 10 12A7.5 7.5 0 0 1 32 57z" fill="var(--detail, #fff)"/>', '0 0 64 64'),
+  timetrial: s('<circle cx="32" cy="36" r="22" fill="currentColor"/><path d="M26 6.5h12M32 6.5v8M49 17l3.5-3.5" stroke="currentColor" stroke-width="5.5" stroke-linecap="round"/><path d="M32 36V24" stroke="var(--detail, #fff)" stroke-width="5" stroke-linecap="round"/><path d="M32 36l8 5" stroke="var(--detail, #fff)" stroke-width="5" stroke-linecap="round"/><circle cx="32" cy="36" r="3.6" fill="var(--detail, #fff)"/>', '0 0 64 64'),
+  chevron: s('<path d="M7 5h11.5L33 22 18.5 39H7l14.5-17z" stroke-linejoin="round"/>', '0 0 40 44', 'chev-ico'),
+  music: s('<path d="M9 17.5V5.8l10-2.3v11.7" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/><ellipse cx="6.6" cy="17.6" rx="3" ry="2.5" fill="currentColor"/><ellipse cx="16.6" cy="15.3" rx="3" ry="2.5" fill="currentColor"/>'),
+  sound: s('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"/>'),
+  phone: s('<rect x="3" y="7" width="18" height="10" rx="2.6" fill="none" stroke="currentColor" stroke-width="2.4" transform="rotate(-14 12 12)"/><circle cx="17.2" cy="10.6" r="1.1" fill="currentColor"/>'),
+  swap: s('<path d="M4 8.5h14l-3.5-3.5M20 15.5H6l3.5 3.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>'),
+  speed: s('<path d="M4 16.5a8 8 0 1 1 16 0" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M12 16.5l4.5-5" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1.8" fill="currentColor"/>'),
+  sparkle: s('<path d="M12 2.5l2.3 6.4 6.7 2.1-6.7 2.2L12 20l-2.3-6.8L3 11l6.7-2.1z" fill="currentColor"/>'),
+  eye: s('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linejoin="round"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/>'),
+};

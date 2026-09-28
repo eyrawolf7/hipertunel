@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hipertúnel · banco de sonido</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #1d2440; color: #fff; margin: 0; padding: 16px; }
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  h2 { font-size: 14px; margin: 16px 0 6px; opacity: .8; text-transform: uppercase; }
+  button { font: inherit; font-weight: 700; border: 0; border-radius: 12px; padding: 10px 14px; margin: 3px;
+           background: #ffd23f; color: #1d2440; box-shadow: 0 4px 0 #b88a00; cursor: pointer; }
+  button:active { transform: translateY(3px); box-shadow: 0 1px 0 #b88a00; }
+  button.on { background: #3fd2ff; box-shadow: 0 4px 0 #0f8ab8; }
+  label { display: block; margin: 6px 0; }
+  input[type=range] { width: 260px; vertical-align: middle; }
+</style>
+</head>
+<body>
+<h1>Hipertúnel · banco de sonido</h1>
+<div id="ctl">
+  <button id="unlock">Desbloquear audio</button>
+  <button id="music" class="on">Música</button>
+  <button id="mute">Silencio</button>
+  <button id="pause">Pausa</button>
+</div>
+<h2>Mundo</h2>
+<div id="worlds"></div>
+<h2>Velocidad e impulso</h2>
+<label>Velocidad <input id="speed" type="range" min="0" max="100" value="18"> <span id="speedv">18</span> m/s</label>
+<label>Impulso <input id="level" type="range" min="0" max="3" value="0"> <span id="levelv">0</span></label>
+<button id="ramp">Rampa 18→100 m/s</button>
+<h2>Efectos</h2>
+<div id="sfx"></div>
+<script type="module" src="./demo.js"></script>
+</body>
+</html>

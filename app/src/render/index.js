@@ -1,0 +1,230 @@
+// Capa de dibujo: une túnel, cajas, placas, cielo, decorado y posproceso, y coloca la cámara en
+// primera persona como el original (pegada a la superficie, mirando a donde va la fila +10).
+import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
+import { CELL_DEG, LANES } from '../sim/game.js';
+import { Track, makeFrame, section, surf } from './track.js';
+import { Tunnel } from './tunnel.js';
+import { Boxes } from './boxes.js';
+import { Pads } from './pads.js';
+import { Sky } from './sky.js';
+import { Decor } from './decor.js';
+import { Fx } from './fx.js';
+import { THEMES, BOX_COLORS } from './worlds.js';
+
+const DEG = Math.PI / 180;
+const GradeShader = {
+  uniforms: { tDiffuse: { value: null }, uBlur: { value: 0 }, uFlash: { value: new THREE.Vector4(1, 1, 1, 0) }, uVig: { value: 0.22 }, uCA: { value: 0.002 }, uTime: { value: 0 }, uSat: { value: 1.08 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: /* glsl */`
+    uniform sampler2D tDiffuse; uniform float uBlur; uniform vec4 uFlash; uniform float uVig; uniform float uCA; uniform float uTime; uniform float uSat;
+    varying vec2 vUv;
+    void main(){
+      vec2 c = vec2(0.5, 0.52); vec2 d = vUv - c; float r = length(d);
+      // desenfoque radial solo en los bordes: el centro, donde miras, queda nítido
+      float amt = uBlur * smoothstep(0.18, 0.75, r);
+      vec3 acc = vec3(0.0); float tot = 0.0;
+      for (int i = 0; i < 8; i++) { float t = float(i) / 7.0; float w = 1.0 - t * 0.6;
+        vec2 uv = vUv - d * amt * t;
+        acc += vec3(texture2D(tDiffuse, uv + d * uCA).r, texture2D(tDiffuse, uv).g, texture2D(tDiffuse, uv - d * uCA).b) * w; tot += w; }
+      vec3 col = acc / tot;
+      float l = dot(col, vec3(0.2126, 0.7152, 0.0722)); col = mix(vec3(l), col, uSat);
+      col *= 1.0 - uVig * smoothstep(0.35, 0.95, r * 1.25);
+      col = mix(col, uFlash.rgb, uFlash.a);
+      gl_FragColor = vec4(col, 1.0);
+    }`,
+};
+
+export class Renderer {
+  constructor(canvas, { quality = 'alta' } = {}) {
+    this.canvas = canvas;
+    this.quality = quality;
+    const low = quality === 'baja';
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !low, powerPreference: 'high-performance', stencil: false });
+    this.renderer.setClearColor(0xffffff, 1);
+    this.renderer.toneMapping = THREE.NeutralToneMapping;
+    this.renderer.toneMappingExposure = 1.0;
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(80, 16 / 9, 0.05, 900);
+    this.scene.add(this.camera);
+
+    const pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.hemi = new THREE.HemisphereLight(0xffffff, 0xb8c4e8, 1.1); this.scene.add(this.hemi);
+    this.key = new THREE.DirectionalLight(0xffffff, 1.6); this.camera.add(this.key); this.key.position.set(-0.4, 1, 0.6); this.key.target.position.set(0, 0, -1); this.camera.add(this.key.target);
+
+    this.track = new Track();
+    this.sky = new Sky(this.scene);
+    this.decor = new Decor(this.scene);
+    this.tunnel = new Tunnel(this.scene);
+    this.boxes = new Boxes(this.scene);
+    this.pads = new Pads(this.scene);
+    this.fx = new Fx(this.scene);
+    this.colors = BOX_COLORS.map((h) => new THREE.Color(h));
+
+    this.composer = null;
+    this.setQuality(quality);
+
+    this.fr = makeFrame(); this.fr2 = makeFrame(); this.sp = {};
+    this.look = new THREE.Vector3(0, 0, -1);
+    this.upS = new THREE.Vector3(0, 1, 0);
+    this.cam = { shake: 0, shakeDecay: 0, kick: 0, roll: 0, rollAmp: 0, flash: 0, flashCol: new THREE.Color(1, 1, 1), invert: 0, hit: 0 };
+    this.themeIdx = 0; this.themeBlend = 1; this.themeFrom = 0;
+    this.applyTheme(0, 0, 1);
+    this.time = 0;
+    this.deathFocus = null;
+  }
+
+  setQuality(q) {
+    this.quality = q;
+    const dpr = Math.min(window.devicePixelRatio || 1, q === 'alta' ? 2 : q === 'media' ? 1.5 : 1);
+    this.renderer.setPixelRatio(dpr);
+    if (this.composer) { this.composer.dispose?.(); }
+    if (q === 'baja') { this.composer = null; this.bloom = null; this.grade = null; this.resize(); return; }
+    const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: q === 'alta' ? 4 : 0 });
+    const comp = new EffectComposer(this.renderer, rt);
+    comp.addPass(new RenderPass(this.scene, this.camera));
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.55, 0.5, 0.92);
+    comp.addPass(this.bloom);
+    this.grade = new ShaderPass(GradeShader);
+    comp.addPass(this.grade);
+    comp.addPass(new OutputPass());
+    this.composer = comp;
+    this.resize();
+  }
+
+  resize() {
+    const w = this.canvas.clientWidth || innerWidth, h = this.canvas.clientHeight || innerHeight;
+    this.renderer.setSize(w, h, false);
+    if (this.composer) { this.composer.setSize(w, h); this.bloom?.setSize(w / 2, h / 2); }
+    this.camera.aspect = w / h;
+    this.baseFov = fovFor(this.camera.aspect);
+    this.camera.fov = this.baseFov;
+    this.camera.updateProjectionMatrix();
+  }
+
+  reset() { this.track.reset(); this.fx.reset(); this.cam.shake = 0; this.cam.kick = 0; this.cam.roll = 0; this.cam.rollAmp = 0; this.deathFocus = null; this.themeIdx = 0; this.applyTheme(0, 0, 1); this.look.set(0, 0, -1); this.upS.set(0, 1, 0); this.firstFrame = true; }
+
+  applyTheme(from, to, t) {
+    const A = THEMES[from % THEMES.length], B = THEMES[to % THEMES.length];
+    const c = (k, target) => target.set(A[k]).lerp(new THREE.Color(B[k]), t);
+    const u = this.tunnel.uniforms;
+    c('base', u.uBase.value); c('base2', u.uBase2.value); c('seam', u.uSeam.value); c('fog', u.uFog.value); c('glow', u.uGlow.value);
+    this.sky.setTheme(A, B, t);
+    this.decor.setTheme(t < 0.5 ? A : B);
+    this.fogColor = u.uFog.value;
+  }
+
+  // Sucesos de la simulación: efectos de cámara y partículas.
+  onEvents(events, game) {
+    for (const e of events) {
+      if (e.type === 'boost') { this.cam.kick = 1; this.cam.rollAmp = (Math.random() * 2 - 1) * 0.127; this.cam.roll = 1; this.flash(0x7fd6ff, 0.35); }
+      if (e.type === 'crash') {
+        const p = this.boxes.positions.get(e.id);
+        if (p) this.fx.explode(p, this.colors[(game.boxes.find((b) => b.id === e.id) || { color: 0 }).color], 40);
+        this.cam.shake = 0.35; this.cam.shakeDecay = 0.9;
+        if (e.fatal) { this.flash(0xff3040, 0.55); this.deathFocus = p ? p.clone() : null; }
+        else this.flash(0xffffff, 0.6);
+        this.cam.hit = 1;
+      }
+      if (e.type === 'foldStart') { this.cam.shake = Math.max(this.cam.shake, 0.12); this.cam.shakeDecay = 0.15; }
+      if (e.type === 'foldEnd') { this.flash(0xffffff, 0.8); }
+      if (e.type === 'world') {
+        if (!game.inverted) { this.themeFrom = this.themeIdx; this.themeIdx++; this.themeBlend = 0; }
+      }
+    }
+  }
+
+  flash(hex, a) { this.cam.flashCol.set(hex); this.cam.flash = Math.max(this.cam.flash, a); }
+
+  // s y theta vienen interpolados entre los dos últimos pasos de la simulación
+  update(game, s, theta, dt, { reduceFx = false } = {}) {
+    this.time += dt;
+    const tr = this.track;
+    tr.sync(game);
+    // tema
+    if (this.themeBlend < 1) { this.themeBlend = Math.min(1, this.themeBlend + dt / 1.2); this.applyTheme(this.themeFrom, this.themeIdx, this.themeBlend); }
+    const inv = game.inverted ? 1 : 0;
+    this.cam.invert += (inv - this.cam.invert) * Math.min(1, dt * 6);
+    this.tunnel.uniforms.uInvert.value = this.cam.invert;
+
+    // ---- cámara: superficie del jugador + normal, mirando la dirección de la fila +10
+    const closed = game.fold === 30 || game.fold === -30;
+    const sec = section(game.fold);
+    const camS = s - 0.35;
+    tr.frameAt(camS, this.fr);
+    const u = theta / (CELL_DEG * DEG);
+    surf(sec, u, closed, this.sp);
+    const sp = this.sp, fr = this.fr;
+    const N = new THREE.Vector3().copy(fr.X).multiplyScalar(sp.nx).addScaledVector(fr.U, sp.ny);
+    const pos = new THREE.Vector3().copy(fr.P).addScaledVector(fr.X, sp.x).addScaledVector(fr.U, sp.y).addScaledVector(N, 0.62);
+    tr.frameAt(Math.min(s + 10, game.kLast), this.fr2);
+    const kLook = this.firstFrame ? 1 : Math.min(1, dt * 60 * 0.06);
+    this.look.lerp(this.fr2.F, kLook).normalize();
+    this.upS.lerp(N, this.firstFrame ? 1 : Math.min(1, dt * 18)).normalize();
+    this.firstFrame = false;
+
+    const c = this.cam;
+    const cam = this.camera;
+    cam.position.copy(pos);
+    if (c.shake > 0) {
+      const a = c.shake * (reduceFx ? 0.3 : 1);
+      cam.position.x += (Math.random() * 2 - 1) * a; cam.position.y += (Math.random() * 2 - 1) * a; cam.position.z += (Math.random() * 2 - 1) * a;
+      c.shake = Math.max(0, c.shake - c.shakeDecay * dt);
+    }
+    // muerte: la cámara se gira hacia la caja que te ha dado
+    const target = new THREE.Vector3().copy(pos).add(this.look);
+    if (!game.alive && this.deathFocus) { this.deathT = (this.deathT || 0) + dt; target.lerp(this.deathFocus, Math.min(1, this.deathT * 2) * 0.6); } else this.deathT = 0;
+    cam.up.copy(this.upS);
+    // giro del impulso (Camera::boostEffect): ±0,127 rad que se apaga
+    if (c.roll > 0) { cam.up.applyAxisAngle(this.look, c.rollAmp * c.roll * (reduceFx ? 0.3 : 1)); c.roll = Math.max(0, c.roll - dt * 1.4); }
+    cam.lookAt(target);
+    // campo de visión: base del original, con un empujón al impulsar
+    const sp01 = Math.min(1, Math.max(0, (game.speedMS - 36) / 64));
+    const fov = this.baseFov + sp01 * 6 + easeKick(c.kick) * (reduceFx ? 4 : 12);
+    c.kick = Math.max(0, c.kick - dt * 1.8);
+    if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
+
+    // ---- mundo
+    this.tunnel.uniforms.uCam.value.copy(cam.position);
+    const outside = game.fold < 29;
+    const fogFar = outside ? 190 : 120;
+    this.tunnel.uniforms.uFogFar.value += (fogFar - this.tunnel.uniforms.uFogFar.value) * Math.min(1, dt * 2);
+    this.tunnel.uniforms.uFogNear.value = this.tunnel.uniforms.uFogFar.value * 0.38;
+    c.hit = Math.max(0, c.hit - dt * 3);
+    this.tunnel.uniforms.uHit.value = c.hit;
+    this.tunnel.update(game, tr, this.colors, dt);
+    this.boxes.update(game, tr, this.colors, dt, !game.alive && this.deathT > 0 && Math.floor(this.deathT * 10) % 2 ? game.killer : 0);
+    this.pads.update(game, tr, dt);
+    this.fx.update(dt);
+    this.sky.update(cam, this.upS, outside ? 1 : 0, dt, this.cam.invert);
+    this.decor.update(game, tr, cam, outside, dt);
+    this.renderer.setClearColor(this.fogColor, 1);
+
+    if (this.grade) {
+      const g = this.grade.uniforms;
+      g.uBlur.value = (0.02 + sp01 * 0.06 + c.kick * 0.1) * (reduceFx ? 0.3 : 1);
+      g.uCA.value = 0.0015 + sp01 * 0.002 + c.kick * 0.004;
+      g.uTime.value = this.time;
+      g.uFlash.value.set(c.flashCol.r, c.flashCol.g, c.flashCol.b, c.flash * (reduceFx ? 0.4 : 1));
+    }
+    c.flash = Math.max(0, c.flash - dt * 2.5);
+    if (this.bloom) this.bloom.strength = 0.45 + this.cam.invert * 0.5 + (outside ? 0.1 : 0);
+  }
+
+  render() { if (this.composer) this.composer.render(); else this.renderer.render(this.scene, this.camera); }
+}
+
+function fovFor(aspect) {
+  // El original usa 90° en vertical sobre una pantalla 3:2 apaisada (≈113° en horizontal).
+  // Se conserva ese horizontal en cualquier pantalla, sin pasar de 90° en vertical.
+  const h = 112 * DEG;
+  const v = 2 * Math.atan(Math.tan(h / 2) / aspect) / DEG;
+  return Math.min(90, Math.max(60, v));
+}
+const easeKick = (k) => (k <= 0 ? 0 : Math.sin(Math.min(1, k) * Math.PI * 0.5));
