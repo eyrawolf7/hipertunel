@@ -1,0 +1,6 @@
+{
+  "appId": "es.eyrawolf.hipertunel",
+  "appName": "Hipertúnel",
+  "webDir": "dist",
+  "android": { "backgroundColor": "#2b2257" }
+}
