@@ -30,7 +30,8 @@ personal de Víctor, **no** la del trabajo). GitHub Pages sirve el `index.html` 
 1. **La jugabilidad es la de Boost 2, al detalle.** 12 carriles, velocidad 2 → 3,65 → 4,76 → 5,5
    (u/fotograma) con salto instantáneo al impulsar, choque con impulso = pierdes TODOS y
    atraviesas, choque sin impulso = fin, el guion de oleadas del clásico, placas en parejas o de
-   cuatro, curvas y plegados. Cualquier cambio de mecánica se discute antes con Víctor. Lo único
+   cuatro, curvas y plegados. Cualquier cambio de mecánica se discute antes con Víctor, y si se toca `app/src/sim/` hay que
+   portarlo también a `ports/switch/sim/` y pasar `npm run paridad`. Lo único
    añadido son las monedas (van con su propio generador para no alterar el original).
 2. Primera persona y sensación de velocidad por encima de todo.
 3. **El color de un carril solo significa "viene una caja".** Apagado (pastel) si no estás en ese
@@ -55,6 +56,7 @@ node tests/qa.mjs            # comprobaciones funcionales con Chrome sin cabeza
 npm run build                # genera index.html y hipertunel-movil.html (un solo archivo)
 npm run android              # genera hipertunel.apk (Capacitor; SDK en /opt/homebrew/share/android-commandlinetools)
 node tests/sonido.mjs        # render sin conexión del audio + espectrograma
+npm run paridad              # la simulación en C (ports/switch) debe dar lo mismo que la JS
 ```
 
 La app de Android se descarga desde https://eyrawolf7.github.io/hipertunel/hipertunel.apk (en la

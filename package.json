@@ -10,7 +10,8 @@
     "bot": "node tests/sim-bot.mjs",
     "test": "node tests/sim-checks.mjs",
     "shots": "node tests/shots.mjs",
-    "android": "node tools/android.mjs"
+    "android": "node tools/android.mjs",
+    "paridad": "sh ports/switch/tools/parity.sh"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.6.9",
