@@ -1282,6 +1282,8 @@ const QS = new URLSearchParams(typeof location !== 'undefined' ? location.search
 const qnum = (k, d) => { const v = parseFloat(QS.get(k)); return isFinite(v) ? v : d; };
 const EXPO = qnum('expo', 0.72);
 const FOG_NEAR = qnum('fnear', 25), FOG_FAR = qnum('ffar', 170);
+// Antelación del aviso. Cuanto más larga, más carriles pintados a la vez y menos avisa el color.
+const WARN_S = qnum('warns', 1.25), WARN_MIN = qnum('warnmin', 30), WARN_MAX = qnum('warnmax', 100);
 const SHOWFPS = QS.has('fps');
 // Gestión de color: los colores se escriben en sRGB (como se ven) y se convierten a lineal para
 // iluminar. Sin esto, el sombreado se aplasta al mostrarlo y todo parece plano.
@@ -2567,7 +2569,7 @@ function update(dt){
     invul -= dt;
     if (COARSE && tiltCheckT > 0) { tiltCheckT -= dt; if (tiltCheckT <= 0 && !tilt.has && !tiltWarned) { tiltWarned = true; popText('Giroscopio no disponible aquí'); } }
     checkAch(dt);
-    const wnNow = clamp(speed * 1.25, 30, 100);
+    const wnNow = clamp(speed * WARN_S, WARN_MIN, WARN_MAX);
     for (const o of objs) if (o.type === 'block' && !o.lit && o.z - s < wnNow) { o.lit = true; o.litFrom = Math.max(s + 1, o.z - wnNow); }
     collide();
     spawnAhead();

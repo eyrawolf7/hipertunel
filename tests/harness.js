@@ -1,6 +1,12 @@
 // Arnés para ejecutar la lógica del juego en Node (sin GPU): stubs mínimos de DOM y WebGL.
 const fs = require('fs'); const path = require('path'); const THREE = require('three');
-module.exports = function load(file = path.join(__dirname, '..', 'index.html')) {
+// load()                      -> index.html con los valores por defecto
+// load({ warns: 0.9 })        -> los mismos parámetros que se pasarían por la URL, para probar variantes
+module.exports = function load(arg, file = path.join(__dirname, '..', 'index.html')) {
+  if (typeof arg === 'string') { file = arg; arg = null; }
+  const qs = new URLSearchParams();
+  for (const [k, v] of Object.entries(arg || {})) if (v !== undefined && v !== null && v !== '') qs.set(k, v);
+  global.location = { search: qs.toString() ? '?' + qs.toString() : '' };
   const html = fs.readFileSync(file, 'utf8');
   const code = html.match(/<script id="game">([\s\S]*?)<\/script>/)[1];
   const grad = { addColorStop(){} };
