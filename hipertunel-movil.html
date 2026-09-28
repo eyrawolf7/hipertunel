@@ -1464,7 +1464,9 @@ const tileTex = (() => {
 // El túnel se dibuja con más segmentos que carriles jugables: con 6 caras planas parecía estar
 // dentro de un pentágono deforme. Los carriles siguen siendo 6 para el juego; solo la geometría
 // se subdivide para que el tubo se vea redondo.
-const TSUB = Math.max(1, Math.round(qnum('tsub', LANES <= 8 ? 4 : 2)));
+// Celdas visuales por carril. El original enseña unas 16 divisiones alrededor del túnel, y son
+// ellas las que dan la sensación de tubo; los carriles de juego son otra cosa.
+const TSUB = Math.max(1, Math.round(qnum('tsub', Math.max(1, Math.round(16 / LANES)))));
 const NSEG = LANES * TSUB;
 const VPT = 6, NV = NR * NSEG * VPT;
 const tPos = new Float32Array(NV * 3), tCol = new Float32Array(NV * 4), tUV = new Float32Array(NV * 2);
@@ -2769,12 +2771,12 @@ function buildTube(){
         const sh = VSHADE[q] ? sh1 : sh0;
         tCol[oc + q * 4] = tmpA.r * sh; tCol[oc + q * 4 + 1] = tmpA.g * sh; tCol[oc + q * 4 + 2] = tmpA.b * sh; tCol[oc + q * 4 + 3] = alpha;
       }
-      // la textura de baldosa se reparte entre los segmentos, para que el dibujo siga siendo uno por
-      // carril y no se repita en cada trozo
+      // Cada segmento lleva la baldosa entera, así que se ve una junta por segmento y no por carril.
+      // El túnel del original tiene unas 16 divisiones finas: son ellas las que lo hacen parecer un
+      // tubo. Con solo una junta por carril, 8 juntas gordas lo dejan con pinta de polígono.
       const ux = tileLight(k, l) && sideM(za) < 0.5 ? 0.5 : 0, uo = v * 2;
-      const x0 = ux + 0.01 + 0.48 * (sub / TSUB), x1 = ux + 0.01 + 0.48 * ((sub + 1) / TSUB);
-      tUV[uo] = x0; tUV[uo+1] = 0; tUV[uo+2] = x1; tUV[uo+3] = 0; tUV[uo+4] = x1; tUV[uo+5] = 1;
-      tUV[uo+6] = x0; tUV[uo+7] = 0; tUV[uo+8] = x1; tUV[uo+9] = 1; tUV[uo+10] = x0; tUV[uo+11] = 1;
+      tUV[uo] = ux + 0.01; tUV[uo+1] = 0; tUV[uo+2] = ux + 0.49; tUV[uo+3] = 0; tUV[uo+4] = ux + 0.49; tUV[uo+5] = 1;
+      tUV[uo+6] = ux + 0.01; tUV[uo+7] = 0; tUV[uo+8] = ux + 0.49; tUV[uo+9] = 1; tUV[uo+10] = ux + 0.01; tUV[uo+11] = 1;
       v += 6;
     }
   }
