@@ -442,8 +442,8 @@ def stone_top_formas(seed=11):
     nm2 = pnoise(shape, dx, dz, 0.35, seed + 6)
     F = 0.9 * nm + 0.35 * nm2 - 0.2
     # bordes nítidos (forma gráfica, no mancha borrosa)
-    moss = sstep(0.8, 0.84, F) * sstep(0.2, 0.17, e)
-    moss = np.maximum(moss, sstep(1.25, 1.3, nm) * sstep(0.42, 0.39, e))   # alguna lengua más larga
+    # solo en la junta (8 cm) y a rodales: nada de manchas sobre la cara por la que se conduce
+    moss = sstep(0.55, 0.6, F) * sstep(0.08, 0.05, e)
     H = lerp(H, np.maximum(H, GR + 0.02), moss).astype(np.float32)
 
     # albedo: arenisca clara, cada losa con su tono y un degradado suave; canto más claro
@@ -454,18 +454,18 @@ def stone_top_formas(seed=11):
     A = base * grad[..., None]
     edge = sstep(0.0, 0.03, e) * sstep(bw + 0.02, 0.02, e)
     A = A * (1 + 0.10 * edge)[..., None]
-    grout = srgb('#6b5a41')
+    grout = srgb('#8c7858')                        # junta: sombra suave, no negra
     A = lerp(A, grout, sstep(0.004, -0.004, e)[..., None])
-    moss_c = lerp(srgb('#6f8a3a'), srgb('#8fa650'), np.clip(0.5 + 0.35 * nm2, 0, 1)[..., None])
-    moss_c = lerp(moss_c, srgb('#55702c'), sstep(0.02, -0.01, e)[..., None] * 0.6)
+    moss_c = lerp(srgb('#7a8c48'), srgb('#93a35e'), np.clip(0.5 + 0.35 * nm2, 0, 1)[..., None])
+    moss_c = lerp(moss_c, srgb('#65773a'), sstep(0.02, -0.01, e)[..., None] * 0.6)
     A = lerp(A, moss_c, moss[..., None])
     R = np.where(e < 0, 0.95, 0.78).astype(np.float32)
     R = lerp(R, 0.92, moss)
 
     N = normals_from_height(H, dx, dz)
     AO = horizon_ao(H, dx, dz, radius=0.14)
-    AO = np.clip(AO * (0.75 + 0.25 * sstep(-0.01, 0.06, e)), 0, 1)       # junta honda y oscura
-    A = A * (0.7 + 0.3 * AO)[..., None]
+    AO = np.clip(AO * (0.85 + 0.15 * sstep(-0.01, 0.06, e)), 0.55, 1)    # junta con oclusión suave
+    A = A * (0.82 + 0.18 * AO)[..., None]
     return A.astype(np.float32), N, AO, R
 
 

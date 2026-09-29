@@ -26,12 +26,16 @@ export function stylize(mat, { rim = 0.35, key = 'st' } = {}) {
   vec3 Nv = normalize(normal); vec3 Vv = normalize(vViewPosition);
   float ndl = dot(Nv, normalize(uSunDirV));
   // en un túnel el techo recibe mucha luz rebotada: la sombra no llega nunca al tono puro
-  float sh = smoothstep(0.35, -0.35, ndl) * 0.85;
+  // la sombra conserva al menos ~75 % del valor de la cara al sol (ilustración clara, no sucia)
+  float sh = smoothstep(0.35, -0.35, ndl) * 0.7;
   vec3 base = diffuseColor.rgb;
   // cara al sol: cálida y algo más brillante cuanto más de frente (da volumen a biseles y losas)
   // sombra con color propio (no solo más oscura): el tono frío del mundo tiñe también la luz
   // ambiente, como en la ilustración estilizada
-  vec3 shade = base * uShadowCol * 1.02 + uShadowCol * 0.09;
+  // (la piedra cálida por un tono frío daba caqui: la sombra toma buena parte de su tono del color
+  // frío del mundo, conservando la luminosidad de la piedra)
+  float lb = dot(base, vec3(0.3333));
+  vec3 shade = mix(base * uShadowCol, vec3(lb) * uShadowCol * 1.2, 0.6) + uShadowCol * 0.05;
   vec3 st = mix(base * uSunCol * (0.9 + 0.3 * max(ndl, 0.0)), shade, sh);
   #ifdef USE_AOMAP
   st *= mix(1.0, ambientOcclusion, 0.85);

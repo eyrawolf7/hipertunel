@@ -78,7 +78,7 @@ export class TunnelKit {
     const stoneMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: alb, normalMap: nrm, aoMap: orm, roughnessMap: orm, roughness: 1, metalness: 0 });
     const crystalMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: ca, normalMap: cn, roughness: 0.15, metalness: 0.0, envMapIntensity: 1.5, vertexColors: true });
     patch(stoneMat, false); patch(crystalMat, true);
-    stylize(stoneMat, { rim: 0.22, key: 'kit-stone' }); stylize(crystalMat, { rim: 0.6, key: 'kit-crystal' });
+    stylize(stoneMat, { rim: 0.06, key: 'kit-stone' }); stylize(crystalMat, { rim: 0.6, key: 'kit-crystal' });
     this.stoneMat = stoneMat; this.crystalMat = crystalMat;
     kit.updateMatrixWorld(true);
     for (const name of ['tile_stone', 'tile_arch', 'tile_crystal', 'tile_crystal_arch']) {
