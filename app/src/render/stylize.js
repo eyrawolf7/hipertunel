@@ -7,7 +7,7 @@ import * as THREE from 'three';
 
 export const styleUniforms = {
   uSunDirV: { value: new THREE.Vector3(0, 1, 0) },     // dirección de la luz en espacio de vista
-  uSunCol: { value: new THREE.Color(1.08, 1.0, 0.9) },
+  uSunCol: { value: new THREE.Color(1.15, 1.0, 0.8) },    // sol dorado (concepto C·3)
   uShadowCol: { value: new THREE.Color(0x6d5fc4) },
   uRimCol: { value: new THREE.Color(0xbfe8ff) },
   uStyl: { value: 0.8 },

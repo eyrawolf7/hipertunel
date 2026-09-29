@@ -391,17 +391,14 @@ def stone_top(seed=11):
     R = np.full(shape, 0.84, np.float32) + 0.03 * n1
     R = np.where(e < 0, 0.93, R)
 
-    moss_c = lerp(srgb('#5b7f2e'), srgb('#8fae48'), np.clip(0.5 + 0.5 * nmb, 0, 1)[..., None])
+    moss_c = lerp(srgb('#66763a'), srgb('#8c9a55'), np.clip(0.5 + 0.5 * nmb, 0, 1)[..., None])
     moss_c = lerp(moss_c, srgb('#44652a'), sstep(0.004, -0.01, e)[..., None] * 0.5)
     A = lerp(A, moss_c, moss[..., None])
     R = lerp(R, 0.9, moss)
 
     P = Paint(H, A.astype(np.float32), R.astype(np.float32))
-    # --- hiedra: dos ramitas pegadas a las llagas cerca de las costuras (nada en el centro del carril)
-    ivy_rng = np.random.default_rng(seed + 50)
-    draw_ivy(P, XX, ZZ, [(HW + 0.02, 1.10), (HW - 0.05, 1.28), (0.93, 1.33), (0.80, 1.36), (0.72, 1.47)], ivy_rng)
-    draw_ivy(P, XX, ZZ, [(-HW - 0.03, 3.05), (-0.98, 3.2), (-0.96, 3.33), (-0.86, 3.36), (-0.74, 3.30)], ivy_rng,
-             size=(0.045, 0.065))
+    # (sin hiedra en la cara del carril: de cerca parecía un objeto en la pista y su verde competía
+    # con el aviso de caja verde; las enredaderas van por fuera del tubo)
     H, A, R = P.H, P.A, P.R
 
     # --- horneado: normal (espacio tangente T=+u, B=+v) y AO
@@ -454,7 +451,7 @@ def stone_strip(seed=23):
     A = lerp(A, srgb('#e5d8b8'), np.clip(chip / 0.01, 0, 1)[..., None] * 0.5)
     A = A * (1 + 0.10 * np.clip(1 - np.abs(PP - 0.012) / 0.012, 0, 1))[..., None]   # arista clara
     A = lerp(A, srgb('#8f7a58'), sstep(0.003, -0.003, e)[..., None])
-    moss_c = lerp(srgb('#5b7f2e'), srgb('#8fae48'), np.clip(0.5 + 0.4 * nmf, 0, 1)[..., None])
+    moss_c = lerp(srgb('#66763a'), srgb('#8c9a55'), np.clip(0.5 + 0.4 * nmf, 0, 1)[..., None])
     A = lerp(A, moss_c, moss[..., None])
     R = np.where(e < 0, 0.93, 0.85 + 0.03 * n1)
     R = lerp(R, 0.9, moss)

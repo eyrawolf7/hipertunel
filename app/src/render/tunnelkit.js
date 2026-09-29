@@ -46,7 +46,7 @@ vWarn = aWarn; vFacet = fract(sin(dot(position.xz, vec2(12.9898, 78.233))) * 437
 float on = clamp((vWarn.a - 0.42) / 0.58, 0.0, 1.0);
 diffuseColor.rgb *= mix(mix(vWarn.rgb, vec3(1.0), 0.35), vWarn.rgb * mix(vec3(1.0), vWarn.rgb, 0.6), on);` : '#include <color_fragment>')
       .replace('#include <emissivemap_fragment>', crystal ? `#include <emissivemap_fragment>
-totalEmissiveRadiance += vWarn.rgb * (0.1 + 0.55 * on) * uGlowK;` : '#include <emissivemap_fragment>');
+totalEmissiveRadiance += vWarn.rgb * (0.08 + 0.35 * on) * uGlowK;` : '#include <emissivemap_fragment>');
     sh.uniforms.uGlowK = mat.userData.uGlowK;
   };
   mat.userData.uGlowK = { value: 1 };
@@ -115,7 +115,9 @@ export class TunnelKit {
     for (let k = kNear; k <= game.kLast; k++) {
       const ra = track.rings.get(k), rb = track.rings.get(k + 1);
       if (!ra || !rb || game.inGap(k)) continue;
-      const archRow = (k & 1) === 0;
+      // un arco cada 4 filas: cada 2 formaban en el punto de fuga una doble fila de teclas de
+      // piano blancas que tapaba el centro de la vista
+      const archRow = (k & 3) === 0;
       for (let c = 0; c < LANES; c++) {
         let wr = 0, wg = 0, wb = 0, wa = 0;
         const strips = lit.get(c);

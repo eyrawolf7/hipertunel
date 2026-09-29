@@ -79,7 +79,7 @@ export class Boxes {
     if (!kit) return;
     const tex = async (n, srgb) => { const t = await loadTexture('kit/' + n); if (t) { t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.flipY = false; t.needsUpdate = true; } return t; };
     const [alb, nrm, orm, cn] = await Promise.all([tex('stone_albedo.jpg', true), tex('stone_normal.png'), tex('stone_orm.jpg'), tex('crystal_normal.png')]);
-    const stone = stylize(new THREE.MeshStandardMaterial({ map: alb, normalMap: nrm, aoMap: orm, roughnessMap: orm, roughness: 1 }), { rim: 0.45, key: 'box-stone' });
+    const stone = stylize(new THREE.MeshStandardMaterial({ map: alb, normalMap: nrm, aoMap: orm, roughnessMap: orm, roughness: 1 }), { rim: 0.55, key: 'box-stone' });
     const rune = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const crystal = stylize(new THREE.MeshStandardMaterial({ normalMap: cn, roughness: 0.12, envMapIntensity: 1.6, vertexColors: true, emissive: 0x000000 }), { rim: 0.7, key: 'box-crystal' });
     const make = (name) => {
@@ -187,7 +187,7 @@ export class Boxes {
           for (const im of list) {
             im.setMatrixAt(j, cm);
             // la runa brilla con el color de la caja (más cuanto más cerca estás de su carril)
-            if (im.userData.isRune) im.setColorAt(j, this._rc.copy(tc).multiplyScalar(1.6 + this.glow[i] * 1.4));
+            if (im.userData.isRune) im.setColorAt(j, this._rc.copy(tc).multiplyScalar(1.9 + this.glow[i] * 1.6));
             else im.setColorAt(j, tc);
           }
         }

@@ -21,5 +21,5 @@ export const THEMES = [
 // Colores de caja: 10, como el original, pero sin azul (el azul es solo del impulso).
 // 6 tonos bien separados (los 10 colores del original se reparten entre ellos). Nada de amarillo
 // ni naranja claro: sobre la arenisca del túnel se confundían con la piedra.
-const HUES = [0xff3d57, 0xa8e61a, 0xff5fb4, 0xff6a0a, 0xa05cff, 0x22d08a];
+const HUES = [0xff3d57, 0x7cc41a, 0xff5fb4, 0xff6a0a, 0xa05cff, 0x22d08a];
 export const BOX_COLORS = Array.from({ length: 10 }, (_, i) => HUES[i % HUES.length]);

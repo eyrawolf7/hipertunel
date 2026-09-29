@@ -13,7 +13,7 @@ import { Tunnel } from './tunnel.js';
 import { Boxes } from './boxes.js';
 import { Pads } from './pads.js';
 import { Sky, setPanoRenderer } from './sky.js';
-import { Decor } from './decor.js';
+import { Decor, aerialU } from './decor.js';
 import { Fx } from './fx.js';
 import { Coins } from './coins.js';
 import { Streaks } from './streaks.js';
@@ -138,6 +138,7 @@ export class Renderer {
     u.uInvBase.value.set(A.inv || 0x13112a).lerp(new THREE.Color(B.inv || 0x13112a), t);
     this.sky.setTheme(A, B, t);
     this.decor.setTheme(t < 0.5 ? A : B);
+    aerialU.uAirCol.value.set(A.fog).lerp(new THREE.Color(B.fog), t);
     this.themeFog = u.uFog.value.clone();
     this.themeGlow = u.uGlow.value.clone();
     this.fogColor = u.uFog.value;

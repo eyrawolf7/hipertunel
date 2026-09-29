@@ -11,6 +11,21 @@ const KINDS = {
   space: ['volcano', 'island_c', 'crystal', 'ruin_arch', 'island_a'],
 };
 
+// perspectiva aérea: el decorado se mezcla con el color del horizonte según la distancia a la
+// cámara (12 % a 150 m, 35 % a 600 m), así se funde con el panorama en vez de parecer una pegatina
+export const aerialU = { uAirCol: { value: new THREE.Color(0xcfe6ff) } };
+function aerial(mat) {
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uAirCol = aerialU.uAirCol;
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform vec3 uAirCol;')
+      .replace('#include <opaque_fragment>', `float airD = length(vViewPosition);
+outgoingLight = mix(outgoingLight, uAirCol, mix(0.12, 0.35, smoothstep(150.0, 600.0, airD)) * smoothstep(60.0, 150.0, airD));
+#include <opaque_fragment>`);
+  };
+  mat.customProgramCacheKey = () => 'decor-air';
+}
+
 export class Decor {
   constructor(scene) {
     this.group = new THREE.Group(); scene.add(this.group);
@@ -47,7 +62,7 @@ export class Decor {
     if (m) {
       const o = m.clone(true);
       // el decorado queda por debajo del umbral del bloom: solo brillan bombillas y cristales
-      o.traverse((c) => { if (c.isMesh && c.material) { c.material = c.material.clone(); c.material.envMapIntensity = 0.3; c.material.fog = false; if (c.material.color) c.material.color.multiplyScalar(0.82); } });
+      o.traverse((c) => { if (c.isMesh && c.material) { c.material = c.material.clone(); c.material.envMapIntensity = 0.3; c.material.fog = false; if (c.material.color) c.material.color.multiplyScalar(0.9); if (c.material.color) aerial(c.material); } });
       return o;
     }
     return this.make[name]();
@@ -76,7 +91,7 @@ export class Decor {
     // lejos de la pista y nunca a su altura cerca de ella. La altura va con la vertical de la
     // cámara (que gira con el carril en el que vas): las islas quedan casi siempre por debajo de
     // lo que ves y se ve su césped, como en el concepto; vistas desde abajo parecen conchas.
-    const lateral = side * (75 + Math.random() * 130);
+    const lateral = side * (120 + Math.random() * 110);
     const low = Math.random() < (it.name.startsWith('island') || it.name === 'volcano' ? 0.92 : 0.7);
     const vertical = it.name === 'planet' ? 90 + Math.random() * 80
       : it.name === 'cloud' ? (low ? -55 + Math.random() * 30 : 45 + Math.random() * 40)
@@ -103,7 +118,7 @@ export class Decor {
       // la pista curva: si algo se ha quedado cerca de ella, se lleva a otro sitio
       if (!it.checkT || (it.checkT -= dt) <= 0) {
         it.checkT = 0.25;
-        for (let k = Math.floor(game.s); k <= game.kLast; k += 3) { const r = track.rings.get(k); if (r && r.P.distanceTo(it.obj.position) < 65) { this.place(it, game, track, true); break; } }
+        for (let k = Math.floor(game.s); k <= game.kLast; k += 3) { const r = track.rings.get(k); if (r && r.P.distanceTo(it.obj.position) < 90) { this.place(it, game, track, true); break; } }
       }
     }
   }
