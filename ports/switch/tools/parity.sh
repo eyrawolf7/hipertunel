@@ -17,7 +17,7 @@ cc -O2 -std=c99 -Wall -Wextra -pedantic -ffp-contract=off \
 
 total=0; bad=0; lines=0; difflines=0
 for variant in normal god; do
-  for mode in classic survival timetrial; do
+  for mode in classic survival timetrial arcade; do
     for seed in $SEEDS; do
       arg=""; [ "$variant" = god ] && arg=god
       c="$OUT/traces/$mode-$seed-$variant.c.txt"

@@ -34,6 +34,9 @@ static int imod(int a, int n) { return ((a % n) + n) % n; }
 /* Math.sign: devuelve el propio 0 (o -0) si x es cero */
 static double js_sign(double x) { return x > 0 ? 1 : x < 0 ? -1 : x; }
 /* Math.round: el .5 va hacia +infinito (el round de C lo aleja del cero) */
+#define ARC_COMPRESS 0.4
+#define ARC_GAP_ROWS 6
+#define ARC_CAMP_ROWS 22
 static double js_round(double x) { double r = floor(x); return (x - r >= 0.5) ? r + 1 : r; }
 
 double strip_half_width(double fold) {
@@ -254,6 +257,7 @@ static void check_coins(Game *g) {
 /* ------------------------------------------------------------------ oleadas y cajas */
 static void begin_fold(Game *g);
 
+static void arcade_increment(Game *g);
 static void increment_wave(Game *g) {
   Event *e;
   if (g->waveIdx + 1 >= g->nWaves) return;
@@ -266,6 +270,7 @@ static void increment_wave(Game *g) {
   if (g->wave->world >= 0) { g->world = g->wave->world; event(g, EV_WORLD, &e); e->world = g->world; }
   if (g->wave->fold) begin_fold(g);
   event(g, EV_WAVE, &e); e->wave = g->waveIdx;
+  if (g->arcade) arcade_increment(g);
 }
 
 static void spawn_new_boxes(Game *g, int k);
@@ -330,6 +335,15 @@ static int pick_location(Game *g) {           /* BoxManager::pickRandomLocation 
   int l = rng_int(rng, 0, 100000) % LANES;
   if (l == g->lastLoc) { l = (int)trunc(l + rng_float(rng, 2, 6)); if (l > LANES - 1) l -= LANES; }
   g->lastLoc = l;
+  if (g->arcade && g->campRows >= ARC_CAMP_ROWS) {
+    /* llevas un rato en el mismo carril: esta caja va a por ti */
+    Event *e;
+    int me = game_lane(g);
+    g->campRows = 0; g->camps++;
+    g->lastLoc = me;
+    event(g, EV_CAMP, &e); e->lane = me;
+    return me;
+  }
   return l;
 }
 
@@ -653,7 +667,19 @@ static void prune(Game *g) {
   }
 }
 
+static int game_step_core(Game *g, double steer_in);
 int game_step(Game *g, double steer_in) {
+  double before = g->s;
+  int n = game_step_core(g, steer_in);
+  if (g->arcade && g->alive) {
+    int lane = game_lane(g);
+    if (lane == g->campLane) g->campRows += g->s - before;
+    else { g->campLane = lane; g->campRows = 0; }
+  }
+  return n;
+}
+
+static int game_step_core(Game *g, double steer_in) {
   const double dtS = 1.0 / 60;
   g->nEvents = 0;
   g->frame++;
@@ -704,8 +730,32 @@ double game_speed_ms(const Game *g) { return g->v * 60 * M_PER_UNIT; }
 
 const char *event_name(EventType t) {
   static const char *n[] = { "world", "wave", "spawn", "coin", "foldOrder", "foldStart", "foldEnd",
-                             "boost", "crash", "death" };
+                             "boost", "crash", "death", "camp" };
   return n[t];
+}
+
+/* ------------------------------------------------------------------ Arcade (arcade.js) */
+static void arcade_increment(Game *g) {
+  Wave *w = &g->waves[g->waveIdx];
+  double t;
+  if (g->gap > ARC_GAP_ROWS) g->gap = ARC_GAP_ROWS;
+  /* cuanto más dura la partida, más cajas por fila (hasta el doble a los 4 min) */
+  t = g->time / 240; if (t > 1) t = 1;
+  if (w->interval < 0) { double a = g->waveA0[g->waveIdx] * (1 + t); w->a = a < 1 ? a : 1; }
+}
+
+void game_init_arcade(Game *g, uint32_t seed) {
+  int i;
+  game_init(g, MODE_CLASSIC, seed);
+  g->arcade = 1;
+  for (i = 0; i < g->nWaves; i++) {
+    Wave *w = &g->waves[i];
+    g->waveA0[i] = w->a;
+    if (w->n > 0 && w->n < 1000) { int n = (int)js_round(w->n * ARC_COMPRESS); w->n = n > 6 ? n : 6; }
+  }
+  g->waveLeft = g->wave->n;
+  g->campRows = 0; g->campLane = -1; g->camps = 0;
+  init_boost(g);
 }
 
 GameMode mode_from_name(const char *name) {

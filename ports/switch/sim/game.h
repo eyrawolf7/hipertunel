@@ -37,7 +37,8 @@
 
 typedef enum {
   EV_WORLD, EV_WAVE, EV_SPAWN, EV_COIN, EV_FOLD_ORDER, EV_FOLD_START, EV_FOLD_END,
-  EV_BOOST, EV_CRASH, EV_DEATH
+  EV_BOOST, EV_CRASH, EV_DEATH,
+  EV_CAMP                       /* Arcade: una caja va a por ti por quedarte en un carril */
 } EventType;
 
 typedef struct {
@@ -116,10 +117,17 @@ typedef struct {
 
   /* solo para pruebas: choque sin consecuencias (marca la caja y avisa, no frena ni mata) */
   int god;
+
+  /* modo Arcade (app/src/sim/arcade.js): capa encima del clásico */
+  int arcade;
+  double waveA0[MAX_WAVES];
+  double campRows; int campLane, camps;
 } Game;
 
 void   game_init(Game *g, GameMode mode, uint32_t seed);
 void   game_reset(Game *g);
+/* Arcade: reglas del clásico con el guion comprimido, un impulso de salida y sin acampar */
+void   game_init_arcade(Game *g, uint32_t seed);
 /* Avanza un fotograma de 60 Hz. Los sucesos quedan en g->events[0..g->nEvents). */
 int    game_step(Game *g, double steer);
 

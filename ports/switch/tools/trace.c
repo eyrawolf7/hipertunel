@@ -48,13 +48,13 @@ int main(int argc, char **argv) {
   static Game g;
   GameMode mode; uint32_t seed; int frames, god, deadAt = -1, i;
   if (argc < 4) { fprintf(stderr, "uso: trace <modo> <semilla> <fotogramas> [god]\n"); return 2; }
-  mode = mode_from_name(argv[1]);
+  mode = !strcmp(argv[1], "arcade") ? MODE_CLASSIC : mode_from_name(argv[1]);
   if ((int)mode < 0) { fprintf(stderr, "modo desconocido: %s\n", argv[1]); return 2; }
   seed = (uint32_t)strtoul(argv[2], NULL, 10);
   frames = atoi(argv[3]);
   god = argc > 4 && !strcmp(argv[4], "god");
 
-  game_init(&g, mode, seed);
+  if (!strcmp(argv[1], "arcade")) game_init_arcade(&g, seed); else game_init(&g, mode, seed);
   g.god = god;
   printf("start mode=%s seed=%u waves=%d rng=%u crng=%u lastLoc=%d\n", argv[1], seed, g.nWaves, g.rng.a, g.coinRng.a, g.lastLoc);
   while (g.frame < frames) {
@@ -79,6 +79,7 @@ int main(int argc, char **argv) {
           case EV_BOOST: printf(" level=%d", e->level); break;
           case EV_CRASH: printf(" id=%d lane=%d k=%d fatal=%d", e->id, e->lane, e->k, e->fatal); break;
           case EV_DEATH: printf(" id=%d", e->id); break;
+          case EV_CAMP: printf(" lane=%d", e->lane); break;
           default: break;
         }
         printf(" frame=%d\n", e->frame);

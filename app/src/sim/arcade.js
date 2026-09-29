@@ -6,13 +6,11 @@
 // - Se empieza con un impulso: arranque rápido y el primer error no acaba la partida.
 // - Nada de acampar: si te quedas en el mismo carril, la siguiente caja sale en tu carril.
 // - La densidad sube poco a poco con el tiempo de partida.
-import { Game, LANES } from './game.js';
+import { Game } from './game.js';
 
 const COMPRESS = 0.4;           // cajas por oleada respecto al guion original
 const GAP_ROWS = 6;             // filas vacías entre oleadas (20 en el original)
 export const CAMP_ROWS = 22;    // filas en un carril antes de que te echen una caja encima
-
-const mod = (a, n) => ((a % n) + n) % n;
 
 export class Arcade extends Game {
   constructor({ seed = 1 } = {}) {
@@ -27,7 +25,7 @@ export class Arcade extends Game {
     this.initBoost();
   }
 
-  laneOf() { return mod(Math.round(this.theta / (Math.PI / 6)), LANES); }
+  laneOf() { return this.lane; }   // mismo cálculo que el carril del jugador (paridad con C)
 
   incrementWave() {
     super.incrementWave();

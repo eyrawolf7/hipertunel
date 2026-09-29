@@ -9,6 +9,7 @@ enum { NX_A = 1, NX_B = 2, NX_X = 4, NX_Y = 8, NX_PLUS = 16, NX_MINUS = 32, NX_L
 typedef struct {
   unsigned down, held;     /* botones recién pulsados / mantenidos (NX_*) */
   double stickX;           /* palanca izquierda, −1..1 */
+  double stickY;           /* palanca izquierda, −1..1 (arriba +) */
   int hasAccel;            /* hay lectura del acelerómetro */
   double ax, ay, az;       /* acelerómetro, en g */
 } NxPad;
@@ -16,6 +17,8 @@ typedef struct {
 void nx_init(void);        /* sockets + nxlink (printf por red) */
 void nx_input_init(void);
 void nx_poll(NxPad *p);
+/* vibración HD del mando que se esté usando: amplitud grave (160 Hz) y aguda (320 Hz), 0..1 */
+void nx_rumble(float low, float high, float fLow, float fHigh);
 int  nx_mainloop(void);
 void nx_exit(void);
 

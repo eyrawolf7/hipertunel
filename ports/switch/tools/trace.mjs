@@ -3,6 +3,7 @@
 // Debe dar exactamente la misma salida que trace.c.
 import { Game } from '../../../app/src/sim/game.js';
 import { botSteer } from '../../../app/src/sim/bot.js';
+import { Arcade } from '../../../app/src/sim/arcade.js';
 
 const [mode, seedS, framesS, godS] = process.argv.slice(2);
 const seed = Number(seedS) >>> 0, frames = Number(framesS), god = godS === 'god';
@@ -50,7 +51,7 @@ function hashBits(g) {
   return H;
 }
 
-const g = new Game({ mode, seed });
+const g = mode === 'arcade' ? new Arcade({ seed }) : new Game({ mode, seed });
 if (god) {
   // choque sin consecuencias en los choques mortales; igual que g->god en game.c
   g.crash = function (box) {
@@ -89,6 +90,7 @@ while (g.frame < frames) {
         case 'boost': s += ` level=${e.level}`; break;
         case 'crash': s += ` id=${e.id} lane=${e.lane} k=${e.k} fatal=${b01(e.fatal)}`; break;
         case 'death': s += ` id=${e.id}`; break;
+        case 'camp': s += ` lane=${e.lane}`; break;
       }
       P(s + ` frame=${e.frame}`);
     }

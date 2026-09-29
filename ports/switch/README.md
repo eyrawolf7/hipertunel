@@ -88,12 +88,20 @@ Hace falta una Switch con CFW/homebrew y el Homebrew Menu (hbmenu).
 |---|---|
 | Inclinar la consola / el mando (como un volante) | girar (giroscopio: la magnitud "a" = 0,981·sen(inclinación) de la web) |
 | Palanca izquierda, cruceta ← → | girar (la cruceta con la misma asistencia de carril que la web) |
+| Cruceta o palanca ← → en el título | elegir modo: **Arcade** (el de «Jugar» en la web) o **Clásico** (Boost 2 tal cual) |
 | **A** | empezar / otra vez |
 | **+** | pausa y seguir; en el título, salir al Homebrew Menu |
 | **B** | en pausa o al morir, volver al título |
 | **R**, **ZR** o clic de la palanca derecha | centrar el giroscopio (también se centra solo al empezar cada partida) |
 | **−** | giroscopio sí/no |
 | **X** | invertir el giro del giroscopio |
+| **Y** | vibración sí/no |
+
+Vibración HD (`nx_rumble` en `src/nx.c`): un zumbido grave muy suave que sube con la velocidad y
+pulsos en monedas, impulsos, roces, choques y plegados.
+
+En el título hay una barra con un punto verde que se mueve al inclinar: sirve para comprobar el
+sentido del giroscopio antes de jugar.
 
 Funciona en portátil, con los Joy-Con en el soporte y con el mando Pro (se lee el sensor del
 mando que se esté usando). **Sin probar en consola**: el signo del eje del acelerómetro está
@@ -126,16 +134,15 @@ así no se pierde precisión a decenas de kilómetros del origen.
 
 ## Qué falta frente a la web
 
-- **Sonido**: no hay (ni música ni efectos). Ver abajo.
+- **Sonido**: un sintetizador propio (`src/audio.c`) con música, turbina y efectos, más sencillo que el de la web.
 - **Posproceso**: sin bloom, sin el desenfoque radial de los bordes ni la viñeta suave (sí están
   el tono, la saturación, los destellos y la viñeta azul del nivel 3).
 - **Decorado**: sin las islas flotantes ni los modelos GLB (`decor.js`, `assets.js`); las cajas
   son cubos redondeados generados en código y las monedas discos con bisel.
 - **Líneas de velocidad y cascotes** (`streaks.js`, `fx.js`).
-- **Menús**: solo modo clásico (sin supervivencia ni contrarreloj en el menú, aunque la simulación
-  los tiene), sin ajustes, sin top 5 (se guarda solo el mejor: `sdmc:/switch/hipertunel-record.txt`
+- **Modos**: Arcade y Clásico (sin Aventura, supervivencia ni contrarreloj en el menú, aunque la
+  simulación tiene los dos últimos), sin ajustes, sin top 5 (se guarda solo el mejor: `sdmc:/switch/hipertunel-record.txt`
   en la Switch), sin logros ni avisos de "¡Por los pelos!".
-- **Vibración** de los Joy-Con.
 - Tipografía: una fuente de píxeles propia en lugar de Fredoka/Baloo.
 
 ## Paridad de la simulación

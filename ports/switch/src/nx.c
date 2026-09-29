@@ -6,6 +6,8 @@
 
 static PadState pad;
 static HidSixAxisSensorHandle hHand, hFull, hDual[2];
+static HidVibrationDeviceHandle vHand[2], vFull[2], vDual[2];
+static u32 curStyle;
 static int sock;
 
 void nx_init(void) { sock = R_SUCCEEDED(socketInitializeDefault()); if (sock) nxlinkStdio(); }
@@ -20,6 +22,23 @@ void nx_input_init(void) {
   hidGetSixAxisSensorHandles(hDual, 2, HidNpadIdType_No1, HidNpadStyleTag_NpadJoyDual);
   hidStartSixAxisSensor(hHand); hidStartSixAxisSensor(hFull);
   hidStartSixAxisSensor(hDual[0]); hidStartSixAxisSensor(hDual[1]);
+  hidInitializeVibrationDevices(vHand, 2, HidNpadIdType_Handheld, HidNpadStyleTag_NpadHandheld);
+  hidInitializeVibrationDevices(vFull, 2, HidNpadIdType_No1, HidNpadStyleTag_NpadFullKey);
+  hidInitializeVibrationDevices(vDual, 2, HidNpadIdType_No1, HidNpadStyleTag_NpadJoyDual);
+}
+
+void nx_rumble(float low, float high, float fLow, float fHigh) {
+  HidVibrationValue v[2];
+  HidVibrationDeviceHandle *h = NULL;
+  int i;
+  if (curStyle & HidNpadStyleTag_NpadHandheld) h = vHand;
+  else if (curStyle & HidNpadStyleTag_NpadFullKey) h = vFull;
+  else if (curStyle & HidNpadStyleTag_NpadJoyDual) h = vDual;
+  if (!h) return;
+  low = low < 0 ? 0 : low > 1 ? 1 : low;
+  high = high < 0 ? 0 : high > 1 ? 1 : high;
+  for (i = 0; i < 2; i++) { v[i].amp_low = low; v[i].freq_low = fLow; v[i].amp_high = high; v[i].freq_high = fHigh; }
+  hidSendVibrationValues(h, v, 2);
 }
 
 static unsigned map(u64 b) {
@@ -48,8 +67,10 @@ void nx_poll(NxPad *p) {
   ls = padGetStickPos(&pad, 0);
   x = ls.x / 32767.0;
   p->stickX = x > 0.12 || x < -0.12 ? (x > 1 ? 1 : x < -1 ? -1 : x) : 0;
+  p->stickY = ls.y / 32767.0;
   /* el sensor del mando que se esté usando: portátil, mando Pro o los dos Joy-Con */
   style = padGetStyleSet(&pad);
+  curStyle = style;
   memset(&st, 0, sizeof st);
   if (style & HidNpadStyleTag_NpadHandheld) got = hidGetSixAxisSensorStates(hHand, &st, 1);
   else if (style & HidNpadStyleTag_NpadFullKey) got = hidGetSixAxisSensorStates(hFull, &st, 1);

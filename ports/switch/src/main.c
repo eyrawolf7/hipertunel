@@ -18,6 +18,7 @@
 #include "render.h"
 #include "input.h"
 #include "png.h"
+#include "audio.h"
 #include "../sim/game.h"
 #include "../sim/bot.h"
 
@@ -26,7 +27,7 @@
 #endif
 
 #define STEP (1.0 / 60)
-#define VERSION "0.40"
+#define VERSION "0.50"
 
 typedef enum { ST_ATTRACT, ST_COUNTDOWN, ST_PLAY, ST_DYING, ST_OVER, ST_PAUSED } State;
 
@@ -34,7 +35,15 @@ static Game game;
 static State state = ST_ATTRACT;
 static Input input;
 static double acc, prevS, prevTheta, countdown, overT, titleT;
-static int coins, best, lastScore, isRecord, lastDist, W = 1280, H = 720;
+static int coins, lastScore, isRecord, lastDist, W = 1280, H = 720;
+/* modos del menú: 0 = Arcade (el de la web por defecto), 1 = Clásico (Boost 2 tal cual) */
+static int modeSel, playMode, best2[2];
+#define best best2[playMode]
+static const char *MODE_NAME[2] = { "ARCADE", "CLÁSICO" };
+/* Arcade: racha ×1…×5 (sube al pasar rozando y cada 500 m sin chocar) y puntos = metros × racha */
+static int mult = 1, maxMult = 1; static double multDist, points, prevDistM, nearT;
+/* vibración: pulsos que se apagan solos, encima del zumbido del motor */
+static double rbLo, rbHi, rbT;
 #ifdef __SWITCH__
 static int gyroSign = -1;
 #endif          /* signo del eje x del acelerómetro de la Switch (ver README) */
@@ -54,14 +63,16 @@ static const char *record_path(void) {
   return p;
 #endif
 }
-static void load_record(void) { FILE *f = fopen(record_path(), "r"); if (f) { if (fscanf(f, "%d", &best) != 1) best = 0; fclose(f); } }
-static void save_record(void) { FILE *f = fopen(record_path(), "w"); if (f) { fprintf(f, "%d\n", best); fclose(f); } }
+static void load_record(void) { FILE *f = fopen(record_path(), "r"); if (f) { if (fscanf(f, "%d %d", &best2[1], &best2[0]) < 1) best2[1] = 0; fclose(f); } }
+/* formato: récord del Clásico (metros+monedas) y del Arcade (puntos) */
+static void save_record(void) { FILE *f = fopen(record_path(), "w"); if (f) { fprintf(f, "%d %d\n", best2[1], best2[0]); fclose(f); } }
+static void pulse(double lo, double hi) { if (lo > rbLo) rbLo = lo; if (hi > rbHi) rbHi = hi; }
 
 static void toast(const char *t, unsigned col) { snprintf(toastText, sizeof toastText, "%s", t); toastT = 1.6; toastCol = col; }
 
 /* ---------------------------------------------------------------- estados */
 static void new_game(GameMode m, uint32_t seed) {
-  game_init(&game, m, seed);
+  if (m == MODE_CLASSIC && playMode == 0 && state != ST_ATTRACT) game_init_arcade(&game, seed); else game_init(&game, m, seed);
   rn_reset();
   track_sync(rn_track(), &game);
   prevS = game.s; prevTheta = game.theta; acc = 0;
@@ -76,8 +87,11 @@ static void attract_game(uint32_t seed) {
 }
 static void attract(void) { state = ST_ATTRACT; titleT = 0; attract_game(7); }
 static void start_game(int quick) {
+  playMode = modeSel;
+  state = ST_COUNTDOWN;
   new_game(MODE_CLASSIC, (uint32_t)rand() ^ (uint32_t)time(NULL));
-  coins = 0;
+  coins = 0; mult = 1; maxMult = 1; multDist = 0; points = 0; prevDistM = 0;
+  au_play(AU_COUNT, 0);
   state = ST_COUNTDOWN; countdown = quick ? 0.6 : 3;
   input_calibrate(&input);       /* el cero de la inclinación es como tengas el mando al empezar */
   input.hasTarget = 0;
@@ -89,12 +103,20 @@ static void start_game(int quick) {
 }
 static void finish(void) {
   lastDist = (int)game_distance_m(&game);
-  lastScore = (int)floor(game_distance_m(&game) + coins * 10 + 0.5);
+  lastScore = playMode == 0 ? (int)floor(points + coins * 10 + 0.5) : (int)floor(game_distance_m(&game) + coins * 10 + 0.5);
   isRecord = lastScore > best && best > 0;
   if (lastScore > best) { best = lastScore; if (!noSave) save_record(); }
   state = ST_OVER; overT = 0;
+  if (isRecord) au_play(AU_RECORD, 0);
 }
 static void pause_game(void) { if (state == ST_PLAY) state = ST_PAUSED; }
+static void bump_mult(const char *why) {
+  char b[64];
+  if (mult >= 5) return;
+  mult++; if (mult > maxMult) maxMult = mult;
+  snprintf(b, sizeof b, "×%d · %s", mult, why); toast(b, 0xffd24a);
+  au_play(AU_MULT, mult); pulse(0.15, 0.45);
+}
 static void resume_game(void) { if (state == ST_PAUSED) { state = ST_COUNTDOWN; countdown = 1.0; } }
 
 static void step_sim(void) {
@@ -110,9 +132,39 @@ static void step_sim(void) {
   rn_events(&game);
   if (state != ST_ATTRACT) for (i = 0; i < game.nEvents; i++) {
     const Event *e = &game.events[i];
-    if (e->type == EV_BOOST && e->level == 3) toast("¡Velocidad máxima!", 0x6fd8ff);
-    else if (e->type == EV_CRASH && !e->fatal) toast("¡Impulsos perdidos!", 0xffd0d0);
-    else if (e->type == EV_COIN) coins = game.coinsGot;
+    if (e->type == EV_BOOST) { if (e->level == 3) toast("¡Velocidad máxima!", 0x6fd8ff); au_play(AU_BOOST, e->level); pulse(0.55 + 0.1 * e->level, 0.35); }
+    else if (e->type == EV_CRASH) {
+      if (!e->fatal) { toast(mult > 1 && playMode == 0 ? "¡Impulsos perdidos! Racha a ×1" : "¡Impulsos perdidos!", 0xffd0d0); au_play(AU_CRASH, 0); pulse(0.85, 0.6); }
+      else { au_play(AU_DEATH, 0); pulse(1, 0.8); }
+      mult = 1; multDist = 0;
+    }
+    else if (e->type == EV_COIN) { coins = game.coinsGot; au_play(AU_COIN, e->combo); pulse(0.05, 0.28); }
+    else if (e->type == EV_FOLD_START) { au_play(AU_FOLD, 0); pulse(0.4, 0.1); }
+    else if (e->type == EV_WORLD && !game_inverted(&game)) au_play(AU_WORLD, 0);
+    else if (e->type == EV_CAMP) toast("¡No te quedes quieto!", 0xffd0d0);
+  }
+  /* Arcade: puntos y racha */
+  if (state == ST_PLAY && playMode == 0 && game.alive) {
+    double d = game_distance_m(&game) - prevDistM;
+    points += d * mult; multDist += d;
+    if (multDist >= 500 && mult < 5) { multDist = 0; bump_mult("500 M SIN CHOCAR"); }
+  }
+  prevDistM = game_distance_m(&game);
+  /* ¡Por los pelos!: una caja pasa rozando por el carril de al lado a más de 60 m/s */
+  if (state == ST_PLAY && game.alive && game_speed_ms(&game) > 60 && (nearT -= STEP) <= 0) {
+    const double hw = M_PI / 6;
+    int j;
+    for (j = 0; j < game.nBoxes; j++) {
+      const Box *b = &game.boxes[j];
+      double d;
+      if (b->hit || b->k + 0.5 <= prevS || b->k + 0.5 > game.s) continue;
+      d = game.theta - b->lane * hw; d = atan2(sin(d), cos(d));
+      if (fabs(d) > hw * 0.8 && fabs(d) < hw * 1.6) {
+        au_play(AU_NEAR, 0); pulse(0.1, 0.35); nearT = 0.4;
+        if (playMode == 0) bump_mult("¡POR LOS PELOS!"); else toast("¡Por los pelos!", 0xffd24a);
+        break;
+      }
+    }
   }
   rn_consume_landing();
   if (state == ST_ATTRACT && (!game.alive || game.s > 4000)) attract_game((uint32_t)rand());
@@ -160,12 +212,33 @@ static void draw_hud(void) {
       (void)blink;
     }
 #ifdef __SWITCH__
-    text_center(cx, 610 * S, 2.6f * S, "INCLINA EL MANDO, PALANCA O CRUCETA PARA GIRAR", 0xffffff);
-    text_center(cx, 645 * S, 2.6f * S, "R: CENTRAR GIROSCOPIO   -: GIROSCOPIO SÍ/NO   X: INVERTIR   +: SALIR", 0xffffff);
+    text_center(cx, 615 * S, 2.6f * S, "INCLINA EL MANDO, PALANCA O CRUCETA PARA GIRAR", 0xffffff);
+    text_center(cx, 648 * S, 2.4f * S, "R: CENTRAR   -: GIROSCOPIO SÍ/NO   X: INVERTIR GIRO   Y: VIBRACIÓN   +: SALIR", 0xffffff);
 #else
-    text_center(cx, 630 * S, 2.6f * S, "FLECHAS O A/D PARA GIRAR   P/ESC: PAUSA   Q: SALIR", 0xffffff);
+    text_center(cx, 630 * S, 2.6f * S, "FLECHAS O A/D PARA GIRAR   P/ESC: PAUSA   V: VIBRACIÓN   Q: SALIR", 0xffffff);
 #endif
-    if (best > 0) { snprintf(buf, sizeof buf, "RÉCORD %d", best); text_center(cx, 510 * S, 3.2f * S, buf, 0xffd24a); }
+    /* modo: ◀ ARCADE ▶ (cruceta o palanca para cambiar) */
+    {
+      int m;
+      for (m = 0; m < 2; m++) {
+        float bx = cx + (m == 0 ? -170 : 170) * S, on = m == modeSel;
+        float tw = hud_text_w(3.4f * S, MODE_NAME[m]), bw = tw + 50 * S;
+        hud_rect(bx - bw / 2, 482 * S, bw, 50 * S, 25 * S, on ? 0xffd24a : 0x3b2a6b, on ? 1 : 0.7f);
+        hud_text(bx - tw / 2, 495 * S, 3.4f * S, MODE_NAME[m], on ? INK : 0xffffff, 1);
+      }
+      text_center(cx, 497 * S, 3.4f * S, "< >", 0xffffff);
+      if (best2[modeSel] > 0) { snprintf(buf, sizeof buf, modeSel == 0 ? "RÉCORD %d PUNTOS" : "RÉCORD %d", best2[modeSel]); text_center(cx, 548 * S, 2.8f * S, buf, 0xffd24a); }
+      else text_center(cx, 548 * S, 2.6f * S, modeSel == 0 ? "MÁS RÁPIDO, SIN ACAMPAR Y RACHA X5" : "BOOST 2 TAL CUAL", 0xfff1c9);
+    }
+    /* inclinación: barra con el punto donde está ahora (para ver el sentido del giroscopio) */
+    if (input.hasTilt && input.tiltOn) {
+      double v = (input.tiltRaw - input.cal) * (input.invert ? -1 : 1) * 2.5;
+      float bw = 300 * S, bx = cx - bw / 2, y = 585 * S;
+      v = v > 1 ? 1 : v < -1 ? -1 : v;
+      hud_rect(bx, y, bw, 10 * S, 5 * S, 0x3b2a6b, 0.8f);
+      hud_rect(cx - 2 * S, y - 4 * S, 4 * S, 18 * S, 0, 0xffffff, 0.8f);
+      hud_rect(cx + (float)v * bw / 2 - 9 * S, y - 4 * S, 18 * S, 18 * S, 9 * S, 0x22d08a, 1);
+    }
   } else {
     /* monedas (arriba a la izquierda) */
     snprintf(buf, sizeof buf, "%d", coins);
@@ -185,6 +258,13 @@ static void draw_hud(void) {
       float tw = hud_text_w(2.6f * S, buf);
       hud_rect(W - 22 * S - tw - 20 * S, 69 * S, tw + 20 * S, 26 * S, 13 * S, 0x3b2a6b, 0.78f);
       hud_text(W - 22 * S - tw - 10 * S, 73 * S, 2.6f * S, buf, 0xffffff, 1);
+    }
+    if (playMode == 0) {
+      static const unsigned mc[6] = { 0, 0x3b2a6b, 0xe0600f, 0xd6307f, 0x8a3fe0, 0xff3d57 };
+      snprintf(buf, sizeof buf, "X%d", mult);
+      { float tw = hud_text_w(4.6f * S, buf); hud_rect(W - 22 * S - tw - 24 * S, 104 * S, tw + 24 * S, 46 * S, 14 * S, mc[mult], 0.92f); hud_text(W - 22 * S - tw - 12 * S, 113 * S, 4.6f * S, buf, 0xffffff, 1); }
+      snprintf(buf, sizeof buf, "%d PTS", (int)(points + coins * 10));
+      text_right(W - 22 * S, 158 * S, 2.6f * S, buf, 0xffffff);
     }
     /* impulsos: 3 chevrones (abajo a la derecha) */
     {
@@ -219,10 +299,11 @@ static void draw_hud(void) {
       hud_text(cx - hud_text_w(7 * S, "¡CATAPUM!") / 2, py + 34 * S, 7 * S, "¡CATAPUM!", 0xff3d57, 1);
       snprintf(buf, sizeof buf, "%d M", lastDist);
       hud_text(cx - hud_text_w(8 * S, buf) / 2, py + 110 * S, 8 * S, buf, INK, 1);
-      snprintf(buf, sizeof buf, "MONEDAS %d   PUNTOS %d", coins, lastScore);
+      if (playMode == 0) snprintf(buf, sizeof buf, "ARCADE   PUNTOS %d   RACHA MÁX X%d", lastScore, maxMult);
+      else snprintf(buf, sizeof buf, "CLÁSICO   MONEDAS %d   PUNTOS %d", coins, lastScore);
       hud_text(cx - hud_text_w(3.2f * S, buf) / 2, py + 196 * S, 3.2f * S, buf, 0x6a4a78, 1);
       if (isRecord) snprintf(buf, sizeof buf, "¡NUEVO RÉCORD!");
-      else snprintf(buf, sizeof buf, "RÉCORD %d", best);
+      else snprintf(buf, sizeof buf, playMode == 0 ? "RÉCORD %d PUNTOS" : "RÉCORD %d", best);
       hud_text(cx - hud_text_w(3.6f * S, buf) / 2, py + 240 * S, 3.6f * S, buf, isRecord ? 0xff8a1a : 0x6a4a78, 1);
 #ifdef __SWITCH__
       snprintf(buf, sizeof buf, "A: OTRA VEZ    B: MENÚ");
@@ -245,12 +326,25 @@ static void draw_hud(void) {
   hud_end();
 }
 
+/* ---------------------------------------------------------------- vibración */
+static int vibeOn = 1;
+static void platform_rumble(float lo, float hi, float fl, float fh);
+/* motor: un zumbido grave muy suave que sube con la velocidad (sp = 0..1; −1 = parado) + pulsos */
+static void rumble_frame(double dt, double sp) {
+  float lo = 0, hi = 0;
+  rbLo *= exp(-dt * 7); rbHi *= exp(-dt * 12);
+  if (!vibeOn) { platform_rumble(0, 0, 160, 320); return; }
+  if (sp >= 0) { rbT += dt; lo = (float)(0.05 + 0.1 * sp + 0.02 * sin(rbT * (18 + 30 * sp))); hi = (float)(0.02 + 0.05 * sp); }
+  lo += (float)rbLo; hi += (float)rbHi;
+  platform_rumble(lo, hi, (float)(90 + 80 * (sp > 0 ? sp : 0)), 320);
+}
+
 /* ---------------------------------------------------------------- fotograma */
 static void frame(double dt, RenderOpts ro) {
   double a, s, dth, theta;
   titleT += dt;
   if (toastT > 0) toastT -= dt;
-  if (state == ST_COUNTDOWN) { countdown -= dt; if (countdown <= 0) state = ST_PLAY; }
+  if (state == ST_COUNTDOWN) { int b0 = (int)ceil(countdown); countdown -= dt; if ((int)ceil(countdown) != b0 && countdown > 0) au_play(AU_COUNT, 0); if (countdown <= 0) { state = ST_PLAY; au_play(AU_GO, 0); } }
   if (state == ST_PLAY || state == ST_ATTRACT || state == ST_DYING) {
     int n = 0;
     acc += dt;
@@ -271,14 +365,23 @@ static void frame(double dt, RenderOpts ro) {
   rn_update(&game, s, theta, dt, ro);
   rn_render();
   draw_hud();
+  {
+    double sp = (game.v - 1) / 4.5;
+    int playing = state == ST_PLAY || state == ST_COUNTDOWN || state == ST_DYING;
+    au_set(sp, playing && game.alive, state != ST_PAUSED);
+    rumble_frame(dt, state == ST_PLAY && game.alive ? (sp < 0 ? 0 : sp > 1 ? 1 : sp) : -1);
+  }
 }
 
-typedef enum { B_OK, B_BACK, B_PAUSE, B_QUIT, B_CALIB, B_TILT, B_INVERT } Button;
+typedef enum { B_OK, B_BACK, B_PAUSE, B_QUIT, B_CALIB, B_TILT, B_INVERT, B_LEFT, B_RIGHT, B_VIBE } Button;
 static int quitReq;
 static void on_button(Button b) {
   if (b == B_QUIT) { if (state == ST_PLAY || state == ST_COUNTDOWN) pause_game(); else if (state == ST_PAUSED) attract(); else quitReq = 1; return; }
   if (b == B_CALIB) { input_calibrate(&input); toast("Giroscopio centrado", 0xffffff); return; }
   if (b == B_TILT) { input.tiltOn = !input.tiltOn; toast(input.tiltOn ? "Giroscopio: sí" : "Giroscopio: no", 0xffffff); return; }
+  if (b == B_VIBE) { vibeOn = !vibeOn; toast(vibeOn ? "Vibración: sí" : "Vibración: no", 0xffffff); if (vibeOn) pulse(0.6, 0.4); return; }
+  if ((b == B_LEFT || b == B_RIGHT) && state == ST_ATTRACT) { modeSel = !modeSel; au_play(AU_MENU, 0); pulse(0.1, 0.2); return; }
+  if (b == B_LEFT || b == B_RIGHT) return;
   if (b == B_INVERT) { input.invert = !input.invert; toast(input.invert ? "Giro invertido" : "Giro normal", 0xffffff); return; }
   switch (state) {
     case ST_ATTRACT: if (b == B_OK) start_game(0); else if (b == B_PAUSE || b == B_BACK) quitReq = b == B_PAUSE ? 1 : quitReq; break;
@@ -374,6 +477,15 @@ static void platform_input(void) {
   if (p.down & NX_CALIB) on_button(B_CALIB);
   if (p.down & NX_MINUS) on_button(B_TILT);
   if (p.down & NX_X) on_button(B_INVERT);
+  if (p.down & NX_Y) on_button(B_VIBE);
+  if (p.down & NX_LEFT) on_button(B_LEFT);
+  if (p.down & NX_RIGHT) on_button(B_RIGHT);
+  {  /* palanca: un golpe a un lado cambia de modo en el título */
+    static int flick;
+    int f = p.stickX > 0.6 ? 1 : p.stickX < -0.6 ? -1 : 0;
+    if (f && !flick) on_button(f < 0 ? B_LEFT : B_RIGHT);
+    flick = f;
+  }
   input.dl = (p.held & NX_LEFT) != 0;
   input.dr = (p.held & NX_RIGHT) != 0;
   input.stickX = p.stickX;
@@ -383,8 +495,17 @@ static void platform_input(void) {
     if (g > 0.3) { input.tiltRaw = gyroSign * 0.981 * p.ax / g; input.hasTilt = 1; }
   }
 }
+static void platform_rumble(float lo, float hi, float fl, float fh) { nx_rumble(lo, hi, fl, fh); }
 #else
 static SDL_GameController *ctl;
+static void platform_rumble(float lo, float hi, float fl, float fh) {
+  (void)fl; (void)fh;
+#if SDL_VERSION_ATLEAST(2, 0, 9)
+  if (ctl) SDL_GameControllerRumble(ctl, (Uint16)(lo > 1 ? 65535 : lo * 65535), (Uint16)(hi > 1 ? 65535 : hi * 65535), 60);
+#else
+  (void)lo; (void)hi;
+#endif
+}
 static void platform_input_init(void) {
   int i;
   for (i = 0; i < SDL_NumJoysticks(); i++) if (SDL_IsGameController(i)) { ctl = SDL_GameControllerOpen(i); break; }
@@ -474,6 +595,7 @@ int main(int argc, char **argv) {
   if (gl_load((void *(*)(const char *))SDL_GL_GetProcAddress)) { fprintf(stderr, "Faltan funciones de OpenGL\n"); return 1; }
   printf("OpenGL %s · %s · %s\n", (const char *)glGetString(GL_VERSION), (const char *)glGetString(GL_RENDERER), es ? "ES" : "core");
   SDL_GL_SetSwapInterval(getenv("HIP_NOVSYNC") ? 0 : 1);
+  au_init();
   if (rn_init(es)) { fprintf(stderr, "Fallo al compilar los sombreadores\n"); return 1; }
   input_init(&input);
   platform_input_init();
@@ -504,6 +626,8 @@ int main(int argc, char **argv) {
         else if (kc == SDLK_q) on_button(B_QUIT);
         else if (kc == SDLK_c) on_button(B_CALIB);
         else if (kc == SDLK_g) on_button(B_TILT);
+        else if (kc == SDLK_v) on_button(B_VIBE);
+        else if (kc == SDLK_LEFT || kc == SDLK_RIGHT) on_button(kc == SDLK_LEFT ? B_LEFT : B_RIGHT);
       } else if (ev.type == SDL_CONTROLLERDEVICEADDED && !ctl) platform_input_init();
       else if (ev.type == SDL_CONTROLLERBUTTONDOWN) {
         int b = ev.cbutton.button;
@@ -512,6 +636,8 @@ int main(int argc, char **argv) {
         else if (b == SDL_CONTROLLER_BUTTON_START) on_button(B_PAUSE);
         else if (b == SDL_CONTROLLER_BUTTON_RIGHTSHOULDER || b == SDL_CONTROLLER_BUTTON_RIGHTSTICK) on_button(B_CALIB);
         else if (b == SDL_CONTROLLER_BUTTON_BACK) on_button(B_TILT);
+        else if (b == SDL_CONTROLLER_BUTTON_Y) on_button(B_VIBE);
+        else if (b == SDL_CONTROLLER_BUTTON_DPAD_LEFT || b == SDL_CONTROLLER_BUTTON_DPAD_RIGHT) on_button(b == SDL_CONTROLLER_BUTTON_DPAD_LEFT ? B_LEFT : B_RIGHT);
       }
 #endif
     }
@@ -538,6 +664,8 @@ int main(int argc, char **argv) {
       break;
     }
   }
+  platform_rumble(0, 0, 160, 320);
+  au_quit();
   SDL_GL_DeleteContext(ctx);
   SDL_DestroyWindow(win);
   SDL_Quit();
