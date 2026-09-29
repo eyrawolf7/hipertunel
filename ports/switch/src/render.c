@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "assets.h"
+#include "model.h"
+#include "kitshaders.h"
 #define STB_IMAGE_IMPLEMENTATION
 #define STBI_ONLY_JPEG
 #define STBI_ONLY_PNG
@@ -30,15 +32,15 @@ typedef struct {
   const char *name;
   unsigned base, base2, seam, fog, glow, skyTop, skyMid, skyBot, sun;
   float stars; int dark; unsigned inv;
-  unsigned shadow; float sunK[3]; unsigned inlay, seamGlow; int pano;
+  unsigned shadow; float sunK[3]; unsigned inlay, seamGlow; int pano; unsigned rim; unsigned air; int decor;
 } Theme;
 /* los mismos 5 mundos que la web (islas, selva, noche, templo, volcán) */
 static const Theme THEMES[] = {
-  { "Islas del cielo", 0xe8d5ad, 0xbfa57a, 0x6b5a3e, 0xbfe0ff, 0x5ff5e0, 0x3f8fff, 0xbfe0ff, 0xf4f8ff, 0xfff2c8, 0, 0, 0, 0xa6c6f2, { 1.26f, 1.03f, 0.72f }, 0xffc861, 0, 0 },
-  { "Selva perdida", 0xe2d8b8, 0xb9ad86, 0x4d5a36, 0xbfe6d0, 0x9dffb0, 0x4aa3d8, 0xbfe6d0, 0xe8f6e4, 0xfff6d0, 0, 0, 0, 0x9ec6ea, { 1.18f, 1.08f, 0.76f }, 0xffd970, 0, 1 },
-  { "Noche de luciérnagas", 0xd8d4e8, 0xa9a4c4, 0x2a2a50, 0x1c2a5e, 0x3ff5e0, 0x060a26, 0x1c2a5e, 0x2f5a7a, 0xbff8ff, 1, 1, 0x151b36, 0x5868a8, { 0.8f, 0.95f, 1.15f }, 0x8dffd0, 0x1f8f7a, 2 },
-  { "Templo del ocaso", 0xf6dcb0, 0xd6a978, 0x7a4a2e, 0xff9f7a, 0xffd27a, 0x6a4bc4, 0xff9f7a, 0xffd8a0, 0xffb060, 0.1f, 0, 0, 0xa8b4d8, { 1.3f, 0.96f, 0.7f }, 0xffb45a, 0, 3 },
-  { "Islas de fuego", 0xe8d0c0, 0xb89080, 0x4a2020, 0x8a3040, 0xff8a3d, 0x2a1030, 0x8a3040, 0xff8a50, 0xffb070, 0.3f, 1, 0x2a1418, 0x7a4868, { 1.25f, 0.86f, 0.72f }, 0xff8a3d, 0x8a2a0a, 4 },
+  { "Islas del cielo", 0xe8d5ad, 0xbfa57a, 0x6b5a3e, 0xbfe0ff, 0x5ff5e0, 0x3f8fff, 0xbfe0ff, 0xf4f8ff, 0xfff2c8, 0, 0, 0, 0xa6c6f2, { 1.26f, 1.03f, 0.72f }, 0xffc861, 0, 0, 0xcfeeff, 0xf2d6c0, 0 },
+  { "Selva perdida", 0xe2d8b8, 0xb9ad86, 0x4d5a36, 0xbfe6d0, 0x9dffb0, 0x4aa3d8, 0xbfe6d0, 0xe8f6e4, 0xfff6d0, 0, 0, 0, 0x9ec6ea, { 1.18f, 1.08f, 0.76f }, 0xffd970, 0, 1, 0xd8ffe0, 0xb8e0c0, 0 },
+  { "Noche de luciérnagas", 0xd8d4e8, 0xa9a4c4, 0x2a2a50, 0x1c2a5e, 0x3ff5e0, 0x060a26, 0x1c2a5e, 0x2f5a7a, 0xbff8ff, 1, 1, 0x151b36, 0x5868a8, { 0.8f, 0.95f, 1.15f }, 0x8dffd0, 0x1f8f7a, 2, 0x5ff5e0, 0x3a5a8a, 1 },
+  { "Templo del ocaso", 0xf6dcb0, 0xd6a978, 0x7a4a2e, 0xff9f7a, 0xffd27a, 0x6a4bc4, 0xff9f7a, 0xffd8a0, 0xffb060, 0.1f, 0, 0, 0xa8b4d8, { 1.3f, 0.96f, 0.7f }, 0xffb45a, 0, 3, 0xffd8a0, 0xe8a890, 0 },
+  { "Islas de fuego", 0xe8d0c0, 0xb89080, 0x4a2020, 0x8a3040, 0xff8a3d, 0x2a1030, 0x8a3040, 0xff8a50, 0xffb070, 0.3f, 1, 0x2a1418, 0x7a4868, { 1.25f, 0.86f, 0.72f }, 0xff8a3d, 0x8a2a0a, 4, 0xff9a60, 0x9a4858, 2 },
 };
 #define NTHEMES 5
 /* colores de caja: sin azul (solo del impulso) ni amarillo (se confundía con la arenisca) */
@@ -194,6 +196,12 @@ static Mesh make_fullscreen(void) {
   return mesh_upload(v, 3, idx, 3);
 }
 
+/* ---------------------------------------------------------------- túnel del kit (tunnelkit.js) */
+#define KI 22                        /* floats por instancia: C0 C1 C2 C3 N0 N1 (vec3) + warn (vec4) */
+#define KMAX ((ROWS + 4) * (LANES + 2))
+static float kitI[4][KMAX * KI];
+enum { T_STONE, T_ARCH, T_CRYSTAL, T_CRYSTAL_ARCH };
+
 /* ---------------------------------------------------------------- túnel: VBO dinámico */
 #define NQ ((ROWS + 4) * LANES)
 #define TV 14   /* floats por vértice: pos3 n3 uv2 warn4 cell2 */
@@ -229,6 +237,15 @@ typedef struct { V3 p, v; double t; } Flying;
 static struct {
   int w, h; double aspect, baseFov, fov;
   GLuint tAlb, tNrm, tOrm, tCAlb, tCNrm, tPano[5];
+  GLuint pCell, pModel; int kitOk;
+  Model tile[4], boxBlock, boxCrystal;
+  /* adornos del túnel (tunnelprops.js) y decorado lejano (decor.js) */
+  Model mRib, mCry, mVine, mHang, mDecor[9];
+  struct { int m; M4 x; } props[400]; int nProps;
+  struct { int kind, placed; V3 pos, up; double yaw, spin, scale, k, checkT; } dec[24]; int nDec, decTheme;
+  V3 camUp, decUp; C3 airCol;
+  GLuint tileVbo[4]; int tileN[4];
+  C3 rimCol;
   C3 shadowCol, sunCol, inlay, seamGlow, tint; int panoA, panoB; float panoT; V3 sunDir, fwd; double keyFollow, inside;
   GLuint pTun, pBox, pCoin, pPad, pSky, pFlash, pHud;
   Mesh box, coin, plane, full;
@@ -284,6 +301,9 @@ static void apply_theme(int from, int to, double t) {
   R.seaFog = R.skyMid;
   R.themeFog = R.uFog; R.themeGlow = R.uGlow;
   R.shadowCol = clerp(hexc(A->shadow), hexc(B->shadow), tf);
+  R.rimCol = clerp(hexc(A->rim), hexc(B->rim), tf);
+  R.airCol = clerp(hexc(A->air), hexc(B->air), tf);
+  R.decTheme = tf < 0.5f ? A->decor : B->decor;
   R.sunCol.r = A->sunK[0] + (B->sunK[0] - A->sunK[0]) * tf; R.sunCol.g = A->sunK[1] + (B->sunK[1] - A->sunK[1]) * tf; R.sunCol.b = A->sunK[2] + (B->sunK[2] - A->sunK[2]) * tf;
   R.inlay = clerp(hexc(A->inlay), hexc(B->inlay), tf);
   R.seamGlow = clerp(A->seamGlow ? hexc(A->seamGlow) : hexc(0), B->seamGlow ? hexc(B->seamGlow) : hexc(0), tf);
@@ -333,6 +353,30 @@ int rn_init(int es) {
     R.tAlb = tex_load("stone_albedo", 1, 1); R.tNrm = tex_load("stone_normal", 0, 1); R.tOrm = tex_load("stone_orm", 0, 1);
     R.tCAlb = tex_load("crystal_albedo", 1, 1); R.tCNrm = tex_load("crystal_normal", 0, 1);
     for (i = 0; i < 5; i++) R.tPano[i] = tex_load(P[i], 1, 0);
+  }
+  {
+    static const char *const aKit[] = { "aPos", "aNrm", "aUv", "aTan", "aCol", "aC0", "aC1", "aC2", "aC3", "aN0", "aN1", "aWarn", NULL };
+    static const char *TN[4] = { "tile_stone", "tile_arch", "tile_crystal", "tile_crystal_arch" };
+    static const int sizes[7] = { 3, 3, 3, 3, 3, 3, 4 };
+    int ok = 1;
+    R.pCell = program(VS_CELL, FS_KIT, aKit);
+    R.pModel = program(VS_MODEL, FS_KIT, aKit);
+    for (i = 0; i < 4; i++) {
+      ok &= !model_load(&R.tile[i], "glb_tunnel_kit", TN[i]);
+      glGenBuffers(1, &R.tileVbo[i]); glBindBuffer(GL_ARRAY_BUFFER, R.tileVbo[i]);
+      glBufferData(GL_ARRAY_BUFFER, sizeof kitI[0], NULL, GL_DYNAMIC_DRAW);
+      model_bind_instances(&R.tile[i], R.tileVbo[i], 5, 7, sizes);
+    }
+    model_load(&R.mRib, "glb_rib_stone", NULL); model_load(&R.mCry, "glb_crystal_cluster", NULL);
+    model_load(&R.mVine, "glb_vine_edge", NULL); model_load(&R.mHang, "glb_vine_hang", NULL);
+    {
+      static const char *DN[9] = { "glb_island_a", "glb_island_b", "glb_island_c", "glb_island_castle", "glb_cloud", "glb_crystal", "glb_ruin_arch", "glb_volcano", "glb_coin" };
+      for (i = 0; i < 9; i++) model_load(&R.mDecor[i], DN[i], NULL);
+    }
+    ok &= !model_load(&R.boxBlock, "glb_boxes_kit", "box_block");
+    ok &= !model_load(&R.boxCrystal, "glb_boxes_kit", "box_crystal");
+    R.kitOk = ok && R.pCell && R.pModel;
+    if (!R.kitOk) fprintf(stderr, "kit de Blender no disponible: túnel plano\n");
   }
   R.box = make_rounded_box(); R.coin = make_coin(); R.plane = make_plane(); R.full = make_fullscreen();
   tunnel_gl_init();
@@ -392,6 +436,16 @@ void rn_events(const Game *g) {
 }
 
 /* ---------------------------------------------------------------- túnel */
+static void kit_put(int var, V3 c0, V3 c1, V3 c2, V3 c3, V3 n0, V3 n1, float w0, float w1, float w2, float w3) {
+  float *o;
+  if (R.tileN[var] >= KMAX) return;
+  o = &kitI[var][R.tileN[var]++ * KI];
+#define PUT(v) do { V3 q_ = (v); *o++ = (float)q_.x; *o++ = (float)q_.y; *o++ = (float)q_.z; } while (0)
+  PUT(vsub(c0, R.origin)); PUT(vsub(c1, R.origin)); PUT(vsub(c2, R.origin)); PUT(vsub(c3, R.origin)); PUT(n0); PUT(n1);
+#undef PUT
+  *o++ = w0; *o++ = w1; *o++ = w2; *o++ = w3;
+}
+
 static void tunnel_update(const Game *g, double dt) {
   Section sec;
   int on[2], nOn = 0, l, k, c, q = 0;
@@ -403,10 +457,25 @@ static void tunnel_update(const Game *g, double dt) {
     double kk = target > R.laneGlow[l] ? 14 : 7;
     R.laneGlow[l] += (target - R.laneGlow[l]) * (kk * dt < 1 ? kk * dt : 1);
   }
+  R.tileN[0] = R.tileN[1] = R.tileN[2] = R.tileN[3] = 0;
   for (k = kNear; k <= kLast && q < NQ; k++) {
     const Frame *ra = track_ring(&R.tr, k), *rb = track_ring(&R.tr, k + 1);
     if (!ra || !rb) continue;
     if (game_in_gap(g, k)) continue;
+    /* lámina abierta: faldón de sillería de 1,5 m bajo cada borde (tunnelkit.js) */
+    if (R.kitOk && !(g->fold == 30 || g->fold == -30)) {
+      int side;
+      for (side = 0; side < 2; side++) {
+        int c0 = side ? LANES - 1 : 0;
+        double vx = sec.b[side ? LANES * 2 : 0], vy = sec.b[side ? LANES * 2 + 1 : 1];
+        double tx = sec.d[c0 * 2], ty = sec.d[c0 * 2 + 1], nx = -ty, ny = tx;
+        double lx = vx - nx * 1.5, ly = vy - ny * 1.5;
+        double ax = side ? vx : lx, ay = side ? vy : ly, bx = side ? lx : vx, by = side ? ly : vy;
+        double ox = side ? tx : -tx, oy = side ? ty : -ty;
+        V3 n0 = vadd(vscale(ra->X, ox), vscale(ra->U, oy)), n1 = vadd(vscale(rb->X, ox), vscale(rb->U, oy));
+        kit_put(T_STONE, track_to_world(ra, ax, ay), track_to_world(ra, bx, by), track_to_world(rb, bx, by), track_to_world(rb, ax, ay), n0, n1, 0, 0, 0, 0);
+      }
+    }
     for (c = 0; c < LANES && q < NQ; c++, q++) {
       const double *b = sec.b, *d = sec.d;
       double nx = -d[c * 2 + 1], ny = d[c * 2];
@@ -427,6 +496,12 @@ static void tunnel_update(const Game *g, double dt) {
         if (k >= near && k <= bx->k && bx->id > bestId) { bestId = bx->id; bestCol = bx->color; }
       }
       if (bestId >= 0) { C3 col = COLORS[bestCol]; wr = col.r; wg = col.g; wb = col.b; wa = (float)(0.42 + 0.58 * R.laneGlow[c]); }
+      if (R.kitOk) {
+        int arch = (k & 3) == 0, lit = wa > 0;
+        int var = lit ? (arch ? T_CRYSTAL_ARCH : T_CRYSTAL) : (arch ? T_ARCH : T_STONE);
+        if (lit) kit_put(var, P[0], P[1], P[2], P[3], Nr[0], Nr[2], wr, wg, wb, wa);
+        else kit_put(var, P[0], P[1], P[2], P[3], Nr[0], Nr[2], (k & 7) == 0 ? 1.f : 0.f, 0, 0, 0);
+      }
       for (j = 0; j < 4; j++) {
         float *o = &tunV[(q * 4 + j) * TV];
         V3 p = vsub(P[j], R.origin);
@@ -440,6 +515,107 @@ static void tunnel_update(const Game *g, double dt) {
   }
   tunQuads = q;
   R.tunTime += dt;
+}
+
+/* ---------------------------------------------------------------- adornos del túnel (tunnelprops.js) */
+static double minf(double a, double b) { return a < b ? a : b; }
+static double hh(double a, double b) { double x = sin(a * 127.1 + b * 311.7) * 43758.5453; return x - floor(x); }
+static void prop_add(int m, V3 X, V3 Y, V3 Z, V3 p) {
+  if (R.nProps >= 400) return;
+  R.props[R.nProps].m = m; R.props[R.nProps].x = m4_basis(X, Y, Z, vsub(p, R.origin)); R.nProps++;
+}
+static void props_update(const Game *g) {
+  Section sec;
+  int k, c, closed = g->fold == 30 || g->fold == -30, kNear = (int)floor(g->s) - 2;
+  R.nProps = 0;
+  if (!R.kitOk) return;
+  track_section(g->fold, &sec);
+  for (k = kNear; k <= game_klast(g); k++) {
+    const Frame *r = track_ring(&R.tr, k), *r2 = track_ring(&R.tr, k + 1);
+    int rib = k % 8 == 0, side;
+    if (!r || game_in_gap(g, k)) continue;
+    for (c = 0; c < LANES; c++) {
+      const double *b = sec.b, *d = sec.d;
+      double tx = d[c * 2], ty = d[c * 2 + 1];
+      V3 T = vadd(vscale(r->X, tx), vscale(r->U, ty));
+      V3 N = vadd(vscale(r->X, -ty), vscale(r->U, tx)), O = vscale(N, -1);
+      V3 p = track_to_world(r, (b[c * 2] + b[c * 2 + 2]) / 2, (b[c * 2 + 1] + b[c * 2 + 3]) / 2);
+      if (rib && R.mRib.n) prop_add(0, T, O, r->F, vmad(p, O, 0.3));
+      if (rib && R.mCry.n && (c & 1) == 0) prop_add(1, vscale(T, 1.6), vscale(O, 1.6), vscale(r->F, 1.6), vmad(track_to_world(r, b[c * 2], b[c * 2 + 1]), O, 0.6));
+      if (R.mVine.n && r2 && hh(k, c) < 0.22) {
+        V3 q = vlerp(track_to_world(r, b[c * 2], b[c * 2 + 1]), track_to_world(r2, b[c * 2], b[c * 2 + 1]), 0.5);
+        prop_add(2, T, O, r->F, vmad(q, O, 0.36));
+      }
+    }
+    /* lámina abierta: enredaderas que cuelgan por el faldón y cristales en el canto */
+    if (!closed) for (side = 0; side < 2; side++) {
+      int c0 = side ? LANES - 1 : 0;
+      double tx = sec.d[c0 * 2], ty = sec.d[c0 * 2 + 1], sg = side ? 1 : -1;
+      V3 N = vadd(vscale(r->X, -ty), vscale(r->U, tx));
+      V3 T = vadd(vscale(r->X, tx * sg), vscale(r->U, ty * sg));
+      V3 p = track_to_world(r, sec.b[side ? LANES * 2 : 0], sec.b[side ? LANES * 2 + 1 : 1]);
+      if (R.mHang.n && hh(k, 20 + side) < 0.6) {
+        V3 O = vnorm(vcross(r->F, N));
+        double sy = 1.0 + 0.9 * hh(k, 30 + side);
+        prop_add(3, vscale(r->F, 2.2), vscale(N, sy), vscale(O, 2.2), vmad(vmad(p, T, 0.06), N, 0.02));
+      }
+      if (R.mCry.n && k % 6 == side * 3) {
+        V3 O = vnorm(vcross(T, r->F));
+        prop_add(1, vscale(O, 1.8), vscale(T, 1.8), vscale(r->F, 1.8), vmad(vmad(p, N, -0.5), T, 0.1));
+      }
+    }
+  }
+}
+
+/* ---------------------------------------------------------------- decorado lejano (decor.js) */
+enum { D_ISLA_A, D_ISLA_B, D_ISLA_C, D_CASTILLO, D_NUBE, D_CRISTAL, D_ARCO, D_VOLCAN };
+static const int KINDS[3][7] = {
+  { D_CASTILLO, D_ISLA_A, D_ISLA_B, D_NUBE, D_ISLA_C, D_ARCO, D_NUBE },
+  { D_ISLA_B, D_CRISTAL, D_CASTILLO, D_NUBE, D_CRISTAL, D_ARCO, -1 },
+  { D_VOLCAN, D_ISLA_C, D_CRISTAL, D_ARCO, D_ISLA_A, -1, -1 },
+};
+static void dec_place(int i, const Game *g, int far) {
+  int kk = game_klast(g) - (far ? 0 : (int)(frand() * 20)), kind = R.dec[i].kind;
+  const Frame *r = track_ring(&R.tr, kk);
+  double side = frand() < 0.5 ? -1 : 1, lateral, vertical, ahead;
+  int isl = kind <= D_CASTILLO || kind == D_VOLCAN, low;
+  V3 up = R.camUp, s3;
+  if (!r) return;
+  lateral = side * (kind == D_VOLCAN ? 260 + frand() * 120 : 120 + frand() * 110);
+  low = frand() < (isl ? 0.92 : 0.7);
+  vertical = kind == D_NUBE ? (low ? -55 + frand() * 30 : 45 + frand() * 40) : (low ? -75 + frand() * 45 : 45 + frand() * 30);
+  ahead = 120 + frand() * 520;
+  s3 = vcross(r->F, up); if (vlen(s3) < 1e-2) s3 = r->X; s3 = vnorm(s3);
+  R.dec[i].pos = vadd(vadd(vadd(r->P, vscale(r->F, ahead)), vscale(s3, lateral)), vscale(up, vertical));
+  R.dec[i].up = up; R.dec[i].yaw = frand() * 6.283;
+  R.dec[i].k = kk + ahead / 4; R.dec[i].placed = 1;
+}
+static void decor_update(const Game *g, double dt) {
+  int i, j, want = R.decTheme;
+  static int built = -1;
+  R.camUp = R.camY;
+  if (built != want) {
+    int n = 0;
+    for (i = 0; i < 24; i++) {
+      int kind = KINDS[want][i % 7];
+      if (kind < 0) kind = KINDS[want][i % 5];
+      R.dec[n].kind = kind; R.dec[n].placed = 0; R.dec[n].spin = (frand() - 0.5) * 0.2;
+      R.dec[n].scale = (kind == D_VOLCAN ? 1.2 : kind <= D_CASTILLO || kind == D_ARCO ? 1.6 : 1) * (0.75 + frand() * 0.5);
+      R.dec[n].checkT = 0; n++;
+    }
+    R.nDec = n; built = want;
+  }
+  R.decUp = vnorm(vlerp(vlen(R.decUp) > 0.5 ? R.decUp : R.camUp, R.camUp, minf(1, dt * 0.8)));
+  for (i = 0; i < R.nDec; i++) {
+    if (!R.dec[i].placed) dec_place(i, g, 0);
+    else if (R.dec[i].k < g->s - 30) dec_place(i, g, 1);
+    R.dec[i].yaw += R.dec[i].spin * dt;
+    R.dec[i].up = vnorm(vlerp(R.dec[i].up, R.decUp, minf(1, dt * 0.6)));
+    if ((R.dec[i].checkT -= dt) <= 0) {
+      R.dec[i].checkT = 0.25;
+      for (j = (int)floor(g->s); j <= game_klast(g); j += 3) { const Frame *r = track_ring(&R.tr, j); if (r && vlen(vsub(r->P, R.dec[i].pos)) < 90) { dec_place(i, g, 1); break; } }
+    }
+  }
 }
 
 /* ---------------------------------------------------------------- cajas */
@@ -579,7 +755,6 @@ static void coins_update(const Game *g, double dt) {
 
 /* ---------------------------------------------------------------- actualización (Renderer.update) */
 static double clamp01(double x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
-static double minf(double a, double b) { return a < b ? a : b; }
 
 void rn_update(const Game *g, double s, double theta, double dt, RenderOpts o) {
   Section sec; Surf sp; Frame fr, fr2;
@@ -663,6 +838,8 @@ void rn_update(const Game *g, double s, double theta, double dt, RenderOpts o) {
   R.fogNear = R.fogFar * 0.3;
   R.hit = R.hit - dt * 3; if (R.hit < 0) R.hit = 0;
   tunnel_update(g, dt);
+  props_update(g);
+  decor_update(g, dt);
   flashId = !g->alive && R.deathT > 0 && ((int)floor(R.deathT * 10)) % 2 ? g->killer : 0;
   boxes_update(g, dt, flashId);
   R.outside += ((g->fold < 29 ? 1 : 0) - R.outside) * minf(1, dt * 2);
@@ -689,6 +866,18 @@ void rn_update(const Game *g, double s, double theta, double dt, RenderOpts o) {
 }
 
 /* ---------------------------------------------------------------- dibujo */
+static void kit_uniforms(GLuint p, const M4 *vp) {
+  glUseProgram(p); u1(p, "uSatAmt", R.satAmt);
+  um(p, "uVP", vp); u3(p, "uCam", 0, 0, 0);
+  uc(p, "uFog", R.uFog); u1(p, "uFogNear", (float)R.fogNear); u1(p, "uFogFar", (float)R.fogFar); u1(p, "uUseFog", 1);
+  uv(p, "uSunDir", R.sunDir); uc(p, "uSunCol", R.sunCol); uc(p, "uShadowCol", R.shadowCol); uc(p, "uRimCol", R.rimCol);
+  uc(p, "uInlay", R.inlay); uc(p, "uSeamGlow", R.seamGlow); uc(p, "uTint", R.tint); u1(p, "uGlowK", R.uDark > 0.5f ? 1.4f : 1.0f);
+  u1(p, "uInvert", (float)R.invert); uc(p, "uInvBase", R.uInvBase); u1(p, "uHit", (float)R.hit);
+  bind_tex(p, "tAlb", 0, R.tAlb); bind_tex(p, "tNrm", 1, R.tNrm); bind_tex(p, "tOrm", 2, R.tOrm); bind_tex(p, "tCAlb", 3, R.tCAlb); bind_tex(p, "tCNrm", 4, R.tCNrm);
+  u3(p, "uBlocks", 1, 1, 1); u3(p, "uEmis", 0, 0, 0); u1(p, "uAlphaK", 1);
+}
+static int is_mat(const Prim *pr, const char *m) { return strstr(pr->mat, m) != NULL; }
+
 static void set_common(GLuint p) { u1(p, "uSatAmt", R.satAmt); }
 
 void rn_render(void) {
@@ -754,6 +943,55 @@ void rn_render(void) {
   }
   glEnable(GL_DEPTH_TEST); glDepthFunc(GL_LEQUAL);
 
+  /* decorado lejano (islas, nubes, cristales, ruinas, volcanes): mate, sin niebla, con perspectiva aérea */
+  if (R.kitOk) {
+    GLuint p = R.pModel;
+    int pass;
+    kit_uniforms(p, &vp); u1(p, "uUseFog", 0); uc(p, "uAirCol", R.airCol);
+    for (pass = 0; pass < 2; pass++) {       /* 0: opaco, 1: cascadas transparentes */
+      if (pass) { glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); glDepthMask(GL_FALSE); }
+      for (i = 0; i < R.nDec; i++) {
+        const Model *md = &R.mDecor[R.dec[i].kind];
+        V3 u = R.dec[i].up, ref = fabs(u.x) < 0.9 ? v3(1, 0, 0) : v3(0, 0, 1), a = vnorm(vcross(ref, u));
+        V3 X = vadd(vscale(a, cos(R.dec[i].yaw)), vscale(vcross(u, a), sin(R.dec[i].yaw))), Z = vcross(X, u);
+        double sc = R.dec[i].scale;
+        M4 mm = m4_basis(vscale(X, sc), vscale(u, sc), vscale(Z, sc), vsub(R.dec[i].pos, R.origin));
+        int j;
+        if (!R.dec[i].placed) continue;
+        um(p, "uModel", &mm);
+        for (j = 0; j < md->n; j++) {
+          const Prim *pr = &md->p[j];
+          if (pr->blend != pass) continue;
+          glUniform1i(U(p, "uMode"), pr->blend ? 7 : 6);
+          u3(p, "uColor", pr->color[0] * 0.9f, pr->color[1] * 0.9f, pr->color[2] * 0.9f);
+          u3(p, "uEmis", pr->emissive[0] * 0.6f, pr->emissive[1] * 0.6f, pr->emissive[2] * 0.6f);
+          glBindVertexArray(pr->vao);
+          glDrawElements(GL_TRIANGLES, pr->nIdx, GL_UNSIGNED_INT, 0);
+        }
+      }
+      if (pass) { glDisable(GL_BLEND); glDepthMask(GL_TRUE); }
+    }
+  }
+
+  /* túnel: losas del kit de Blender, instanciadas */
+  if (R.kitOk) {
+    GLuint p = R.pCell;
+    int v, j;
+    kit_uniforms(p, &vp);
+    glEnable(GL_CULL_FACE); glCullFace(GL_BACK); glFrontFace(GL_CCW);
+    for (v = 0; v < 4; v++) {
+      if (!R.tileN[v]) continue;
+      glBindBuffer(GL_ARRAY_BUFFER, R.tileVbo[v]);
+      glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)(R.tileN[v] * KI * sizeof(float)), kitI[v]);
+      for (j = 0; j < R.tile[v].n; j++) {
+        const Prim *pr = &R.tile[v].p[j];
+        glUniform1i(U(p, "uMode"), is_mat(pr, "crystal") ? 1 : 0);
+        glBindVertexArray(pr->vao);
+        glDrawElementsInstanced(GL_TRIANGLES, pr->nIdx, GL_UNSIGNED_INT, 0, R.tileN[v]);
+      }
+    }
+    glDisable(GL_CULL_FACE);
+  } else
   /* túnel */
   {
     GLuint p = R.pTun;
@@ -774,6 +1012,52 @@ void rn_render(void) {
     glDrawElements(GL_TRIANGLES, tunQuads * 6, GL_UNSIGNED_SHORT, 0);
   }
 
+  /* adornos del túnel: costillas, cristales y enredaderas (por fuera del tubo) */
+  if (R.kitOk && R.nProps) {
+    GLuint p = R.pModel;
+    const Model *PM[4] = { &R.mRib, &R.mCry, &R.mVine, &R.mHang };
+    kit_uniforms(p, &vp);
+    for (i = 0; i < R.nProps; i++) {
+      const Model *md = PM[R.props[i].m];
+      int j;
+      um(p, "uModel", &R.props[i].x);
+      for (j = 0; j < md->n; j++) {
+        const Prim *pr = &md->p[j];
+        glUniform1i(U(p, "uMode"), 5);
+        u3(p, "uColor", pr->color[0], pr->color[1], pr->color[2]);
+        u3(p, "uEmis", pr->emissive[0], pr->emissive[1], pr->emissive[2]);
+        glBindVertexArray(pr->vao);
+        glDrawElements(GL_TRIANGLES, pr->nIdx, GL_UNSIGNED_INT, 0);
+      }
+    }
+  }
+
+  /* cajas del kit: piedra con runa (fijas) y cristal (rodantes); las largas en bloques cúbicos */
+  if (R.kitOk) {
+    GLuint p = R.pModel;
+    kit_uniforms(p, &vp);
+    glEnable(GL_CULL_FACE); glCullFace(GL_BACK);
+    for (i = 0; i < R.nBoxDraw; i++) {
+      BoxDraw *b = &R.boxes[i];
+      const Model *md = b->flat ? &R.boxCrystal : &R.boxBlock;
+      double w = b->scale.x;
+      int nH = (int)floor(b->scale.y / w + 0.5), nL = (int)floor(b->scale.z / w + 0.5), a, c, j;
+      nH = nH < 1 ? 1 : nH > 4 ? 4 : nH; nL = nL < 1 ? 1 : nL > 3 ? 3 : nL;
+      uc(p, "uColor", b->col); u1(p, "uGlow", b->glow);
+      for (a = 0; a < nH; a++) for (c = 0; c < nL; c++) {
+        M4 sub = m4_basis(v3(1, 0, 0), v3(0, 1.0 / nH, 0), v3(0, 0, 1.0 / nL), v3(0, (a + 0.5) / nH - 0.5, (c + 0.5) / nL - 0.5));
+        M4 mm = m4_mul(b->m, sub);
+        um(p, "uModel", &mm);
+        for (j = 0; j < md->n; j++) {
+          const Prim *pr = &md->p[j];
+          glUniform1i(U(p, "uMode"), b->flat ? 4 : is_mat(pr, "rune") ? 3 : 2);
+          glBindVertexArray(pr->vao);
+          glDrawElements(GL_TRIANGLES, pr->nIdx, GL_UNSIGNED_INT, 0);
+        }
+      }
+    }
+    glDisable(GL_CULL_FACE);
+  } else
   /* cajas: primero el cuerpo y después el contorno (casco invertido, caras traseras) */
   {
     GLuint p = R.pBox;

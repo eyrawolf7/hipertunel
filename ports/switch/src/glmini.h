@@ -145,6 +145,8 @@ typedef ptrdiff_t GLintptr;
   X(void, glTexParameteri, (GLenum t, GLenum p, GLint v)) \
   X(void, glGenerateMipmap, (GLenum t)) \
   X(void, glUniform1i, (GLint l, GLint v)) \
+  X(void, glVertexAttribDivisor, (GLuint i, GLuint d)) \
+  X(void, glDrawElementsInstanced, (GLenum m, GLsizei n, GLenum t, const void *i, GLsizei c)) \
   X(void, glBlitFramebuffer, (GLint a, GLint b, GLint c, GLint d, GLint e, GLint f, GLint g, GLint h, GLbitfield m, GLenum fl))
 
 /* Los punteros llevan el prefijo ht_ para no chocar con los símbolos de libGLESv2/libGL al enlazar;
@@ -161,6 +163,8 @@ HT_GL_FUNCS(HT_GL_DECL)
 #define glTexParameteri ht_glTexParameteri
 #define glGenerateMipmap ht_glGenerateMipmap
 #define glUniform1i ht_glUniform1i
+#define glVertexAttribDivisor ht_glVertexAttribDivisor
+#define glDrawElementsInstanced ht_glDrawElementsInstanced
 #define glClearColor ht_glClearColor
 #define glClear ht_glClear
 #define glEnable ht_glEnable

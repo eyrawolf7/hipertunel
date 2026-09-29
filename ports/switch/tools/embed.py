@@ -16,6 +16,21 @@ FILES = [
     ('sky_noche', 'app/src/assets/sky/noche.jpg'),
     ('sky_templo', 'app/src/assets/sky/templo.jpg'),
     ('sky_volcan', 'app/src/assets/sky/volcan.jpg'),
+    ('glb_tunnel_kit', 'app/src/assets/kit/tunnel_kit.glb'),
+    ('glb_boxes_kit', 'app/src/assets/kit/boxes_kit.glb'),
+    ('glb_rib_stone', 'app/src/assets/rib_stone.glb'),
+    ('glb_crystal_cluster', 'app/src/assets/crystal_cluster.glb'),
+    ('glb_vine_edge', 'app/src/assets/vine_edge.glb'),
+    ('glb_vine_hang', 'app/src/assets/vine_hang.glb'),
+    ('glb_island_a', 'app/src/assets/island_a.glb'),
+    ('glb_island_b', 'app/src/assets/island_b.glb'),
+    ('glb_island_c', 'app/src/assets/island_c.glb'),
+    ('glb_island_castle', 'app/src/assets/island_castle.glb'),
+    ('glb_cloud', 'app/src/assets/cloud.glb'),
+    ('glb_crystal', 'app/src/assets/crystal.glb'),
+    ('glb_ruin_arch', 'app/src/assets/ruin_arch.glb'),
+    ('glb_volcano', 'app/src/assets/volcano.glb'),
+    ('glb_coin', 'app/src/assets/coin.glb'),
 ]
 out = ['/* Generado por tools/embed.py: no editar a mano. */', '#include "assets.h"', '']
 for name, rel in FILES:
