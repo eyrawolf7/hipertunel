@@ -717,3 +717,41 @@
 .htui .hud-count.go { animation: htCount .7s cubic-bezier(.2,1.4,.4,1) both; }
 @keyframes htCount { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.3) rotate(-8deg); } 25% { opacity: 1; transform: translate(-50%, -50%) scale(1.15) rotate(2deg); } 45% { transform: translate(-50%, -50%) scale(1) rotate(0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -62%) scale(.9); } }
 @media (prefers-reduced-motion: reduce) { .htui .hud-count.go { animation-duration: .01s; opacity: 1; } }
+
+/* ---------- misiones ---------- */
+.htui .toast-mission { background: linear-gradient(180deg, #ffe16a, var(--yel)); color: var(--ink); }
+.htui .chip-rank b { background: var(--yel); color: var(--ink); border-radius: 999px; padding: 0 .45em; margin-left: .15em; box-shadow: inset 0 0 0 .1em var(--ink); }
+.htui .chip-rank .ico { color: #f0a020; }
+.htui .miss { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .35em; }
+.htui .miss li {
+  display: grid; grid-template-columns: 1.3em 1fr; grid-template-rows: auto auto; column-gap: .45em; row-gap: .2em;
+  align-items: center; font-size: .8em; line-height: 1.15;
+  animation: rowIn .45s var(--out) both;
+}
+.htui .miss .mi-ico {
+  grid-row: 1 / 3; width: 1.3em; height: 1.3em; border-radius: 50%;
+  display: grid; place-items: center; font-size: .9em; font-weight: 700;
+  background: #fff; box-shadow: inset 0 0 0 .12em var(--ink); color: var(--ink);
+}
+.htui .miss li.done .mi-ico { background: var(--yel); }
+.htui .miss .mi-txt { font-weight: 600; display: flex; gap: .4em; align-items: baseline; }
+.htui .miss .mi-txt small { margin-left: auto; font-size: .85em; color: #7a7299; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.htui .miss .mi-bar { height: .38em; border-radius: 999px; background: #e2d8c5; overflow: hidden; box-shadow: inset 0 0 0 .08em rgba(30, 20, 60, .25); }
+.htui .miss .mi-bar i { display: block; height: 100%; background: linear-gradient(90deg, #ffb13d, var(--yel)); border-radius: 999px; transition: width .5s var(--out); }
+.htui .miss-rank { margin-top: .45em; font-size: .7em; color: #6b6394; }
+.htui .miss-done .md { font-size: .76em; font-weight: 700; background: var(--yel); border-radius: 999px; padding: .15em .6em; margin-bottom: .35em; box-shadow: inset 0 0 0 .1em var(--ink); animation: popIn .5s var(--spring) both; }
+.htui .oc-tabs { display: flex; gap: .3em; margin-bottom: .45em; }
+.htui .oc-tab {
+  font: inherit; font-size: .7em; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  border: 0; border-radius: 999px; padding: .25em .7em; cursor: pointer;
+  background: transparent; color: #6b6394;
+}
+.htui .oc-tab.on { background: var(--ink); color: #fff; }
+.htui .oc-pane[hidden] { display: none; }
+/* pausa en dos columnas: botones y misiones */
+.htui .pc-cols { position: relative; display: flex; gap: 1.1em; align-items: stretch; }
+.htui .pc-btns { display: flex; flex-direction: column; gap: .75em; min-width: 13em; }
+.htui .miss-box { background: var(--paper-2); border-radius: 1em; padding: .6em .8em .6em; width: 19em; margin-top: 3.1em; }
+.htui .miss-title { font-size: .78em; letter-spacing: .08em; text-transform: uppercase; color: #6b6394; margin: 0 0 .5em; display: flex; flex-direction: column; gap: .1em; }
+.htui .miss-title small { text-transform: none; letter-spacing: 0; font-weight: 500; }
+.htui .foot-l { display: flex; gap: .5em; align-items: center; }

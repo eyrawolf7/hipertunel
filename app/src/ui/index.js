@@ -83,7 +83,10 @@ function titleHTML() {
     </div>
   </div>
   <div class="title-foot">
-    <div class="chip chip-best">${ICON.trophy}<span>Récord</span><b data-bind="best">—</b></div>
+    <div class="foot-l">
+      <div class="chip chip-best">${ICON.trophy}<span>Récord</span><b data-bind="best">—</b></div>
+      <div class="chip chip-rank">${ICON.sparkle}<span data-bind="rankName">Novato</span><b data-bind="rankLvl">1</b></div>
+    </div>
     <div class="press">Pulsa para jugar</div>
     <div class="chip chip-ver">v0.40</div>
   </div>
@@ -178,12 +181,20 @@ function pauseHTML() {
   <div class="vig vig-dim"></div>
   <div class="pop-card pause-card">
     <div class="pc-stripe"></div>
-    <h2 class="pc-title">${ICON.pause}Pausa</h2>
-    <button class="btn btn-primary" data-nav data-act="resume" data-default><span class="btn-ico">${ICON.play}</span><span>Continuar</span></button>
-    <button class="btn btn-sec" data-nav data-act="restart"><span class="btn-ico">${ICON.retry}</span><span>Reiniciar</span></button>
-    <div class="pc-row">
-      <button class="btn btn-sec btn-sm" data-nav data-act="settings"><span class="btn-ico">${ICON.gear}</span><span>Ajustes</span></button>
-      <button class="btn btn-sec btn-sm" data-nav data-act="menu"><span class="btn-ico">${ICON.home}</span><span>Menú</span></button>
+    <div class="pc-cols">
+      <div class="pc-btns">
+        <h2 class="pc-title">${ICON.pause}Pausa</h2>
+        <button class="btn btn-primary" data-nav data-act="resume" data-default><span class="btn-ico">${ICON.play}</span><span>Continuar</span></button>
+        <button class="btn btn-sec" data-nav data-act="restart"><span class="btn-ico">${ICON.retry}</span><span>Reiniciar</span></button>
+        <div class="pc-row">
+          <button class="btn btn-sec btn-sm" data-nav data-act="settings"><span class="btn-ico">${ICON.gear}</span><span>Ajustes</span></button>
+          <button class="btn btn-sec btn-sm" data-nav data-act="menu"><span class="btn-ico">${ICON.home}</span><span>Menú</span></button>
+        </div>
+      </div>
+      <div class="miss-box">
+        <h3 class="miss-title">Misiones <small data-bind="rankLine"></small></h3>
+        <ul class="miss" data-bind="missions"></ul>
+      </div>
     </div>
   </div>
 </section>`;
@@ -208,8 +219,9 @@ function overHTML() {
         </div>
       </div>
       <div class="oc-side">
-        <h3 class="oc-toptitle">Tus mejores</h3>
-        <ol class="top5" data-bind="top"></ol>
+        <div class="oc-tabs"><button class="oc-tab on" data-tab="miss">Misiones</button><button class="oc-tab" data-tab="top">Tus mejores</button></div>
+        <div class="oc-pane" data-pane="miss"><div class="miss-done" data-bind="missDone"></div><ul class="miss" data-bind="missions"></ul><div class="miss-rank" data-bind="rankLine"></div></div>
+        <div class="oc-pane" data-pane="top" hidden><ol class="top5" data-bind="top"></ol></div>
       </div>
     </div>
     <div class="oc-btns">
@@ -591,9 +603,36 @@ export function createUI(root, handlers = {}) {
       rows.push(`<li class="${me ? 'me' : ''} r${i + 1}"><i>${i + 1}</i><b>${fmtInt(v)} m</b>${when}</li>`);
     }
     bind('top').innerHTML = rows.join('');
+    // misiones cumplidas en esta partida (ya sustituidas en la lista por las nuevas)
+    const done = Array.isArray(r.missionsDone) ? r.missionsDone : [];
+    bind('missDone').innerHTML = done.map((m) => `<div class="md">✔ ${esc(m.text)}</div>`).join('');
+    // con récord se enseña primero la tabla; si no, las misiones
+    setTab(r.isRecord ? 'top' : 'miss');
     show('over');
     // se reinicia la animación de entrada
     restart($('.over-card', scr), 'enter');
+  }
+
+  // ----- misiones -----
+  let missData = { list: [], rank: { level: 1, name: 'Novato', toNext: 3 } };
+  const missRow = (m) => {
+    const p = Math.round(100 * m.got / m.n);
+    const cnt = m.n > 1 ? `<small>${fmtInt(m.got)}/${fmtInt(m.n)}</small>` : '';
+    return `<li class="${m.done ? 'done' : ''}"><span class="mi-ico">${m.done ? '✔' : ''}</span><span class="mi-txt">${esc(m.text)}${cnt}</span><span class="mi-bar"><i style="width:${p}%"></i></span></li>`;
+  };
+  function missions(list = [], rank = missData.rank) {
+    missData = { list, rank };
+    for (const el of $$('[data-bind="missions"]', root)) el.innerHTML = list.map(missRow).join('');
+    const line = `Rango ${rank.level} · ${esc(rank.name)} · ${rank.toNext === 1 ? 'falta 1 misión' : `faltan ${rank.toNext}`} para subir`;
+    for (const el of $$('[data-bind="rankLine"]', root)) el.textContent = line;
+    for (const el of $$('[data-bind="rankName"]', root)) el.textContent = rank.name;
+    for (const el of $$('[data-bind="rankLvl"]', root)) el.textContent = rank.level;
+  }
+  // pestañas de la tarjeta de fin de partida
+  for (const b of $$('.oc-tab', root)) b.addEventListener('click', (ev) => { ev.stopPropagation(); setTab(b.dataset.tab); });
+  function setTab(t) {
+    for (const b of $$('.oc-tab', root)) b.classList.toggle('on', b.dataset.tab === t);
+    for (const p of $$('.oc-pane', root)) p.hidden = p.dataset.pane !== t;
   }
 
   function settings(values = {}) {
@@ -606,7 +645,7 @@ export function createUI(root, handlers = {}) {
   show('none');
 
   return {
-    show, hud, toast, over, settings, tiltMeter, records: setRecords,
+    show, hud, toast, over, settings, tiltMeter, records: setRecords, missions,
     navigate, confirm, back,
     get screen() { return current; },
     root,

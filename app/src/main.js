@@ -7,6 +7,7 @@ import { Renderer } from './render/index.js';
 import { createAudio } from './audio/index.js';
 import { createUI } from './ui/index.js';
 import { createInput } from './input/index.js';
+import { createMissions } from './missions.js';
 
 const VERSION = '0.40';
 const STEP = 1 / 60;
@@ -33,6 +34,8 @@ try { renderer = new Renderer(canvas, { quality: settings.quality }); }
 catch (e) { document.body.classList.add('sin-webgl'); $('fatal').hidden = false; throw e; }
 const audio = createAudio();
 const input = createInput(canvas);
+const missions = createMissions();
+let missDist = 0;
 input.configure(settings);
 
 let game = null, mode = 'classic', state = 'attract';
@@ -59,8 +62,10 @@ const ui = createUI($('ui'), {
   onPause: () => pause(),
   keyboard: false,
 });
+const pushMissions = () => ui.missions?.(missions.list(), missions.rank());
 const pushRecords = () => ui.records?.({ classic: bestOf('classic'), survival: bestOf('survival'), timetrial: bestOf('timetrial') });
 pushRecords();
+pushMissions();
 ui.settings(settings);
 audio.setMusic(settings.music); audio.setMuted(!settings.sound);
 
@@ -122,6 +127,7 @@ function startGame(m, quick = false) {
   newGame(m);
   coins = 0;
   bestAtStart[m] = bestOf(m);
+  missions.start(); missDist = 0;
   // reintento rápido: sin 3-2-1, solo un instante antes del ¡YA!
   state = 'countdown'; countdown = quick ? 0.6 : 3; pendingChime = false; nearT = 0;
   ui.show('hud');
@@ -133,7 +139,7 @@ function startGame(m, quick = false) {
   if (seen >= 3 && !input.hasTilt && settings.tilt && COARSE) setTimeout(() => { if (!input.hasTilt) ui.toast('Sin giroscopio: toca a izquierda o derecha', 'info'); }, 1500);
 }
 
-function pause() { if (state !== 'play') return; pausedFrom = state; state = 'paused'; ui.show('pause'); audio.pause(true); }
+function pause() { if (state !== 'play') return; pausedFrom = state; state = 'paused'; pushMissions(); ui.show('pause'); audio.pause(true); }
 function resume() {
   // el mismo toque que ha pausado no debe pulsar también "Continuar", que sale debajo del dedo
   if (state !== 'paused' || performance.now() - pausedAt < 450) return;
@@ -150,7 +156,10 @@ function finish() {
   list.push(me); list.sort((a, b) => (b.distM ?? b.score) - (a.distM ?? a.score));
   const top = list.slice(0, 5); saveTop(mode, top);
   const isRecord = top[0] === me && list.length > 1;
-  ui.over({ mode, distM, coins, score, best: top[0].distM ?? top[0].score, isRecord, time: game.time, maxBoostTime: mode === 'classic' ? game.boostTotal : game.maxBoostTime, top: top.map((e) => ({ ...e, me: e === me })) });
+  const mr = missions.finish();
+  pushMissions();
+  ui.over({ mode, distM, coins, score, best: top[0].distM ?? top[0].score, isRecord, time: game.time, maxBoostTime: mode === 'classic' ? game.boostTotal : game.maxBoostTime, top: top.map((e) => ({ ...e, me: e === me })), missionsDone: mr.completed, rankUp: mr.rankUp, rank: missions.rank() });
+  if (mr.rankUp) setTimeout(() => { audio.play('record'); ui.toast(`¡Rango ${missions.rank().level}: ${missions.rank().name}!`, 'mission'); }, 700);
   ui.show('over');
   if (isRecord) audio.play('record');
   pushRecords();
@@ -198,13 +207,20 @@ function stepSim() {
       if (!game.inverted) { if (game.gaps.some((g) => g.to + 1 > game.s)) pendingChime = true; else audio.play('world'); }
     }
   }
+  // misiones: escuchan los sucesos de la partida (no cambian nada de ella)
+  if (state === 'play' || state === 'dying') {
+    const fresh = [];
+    for (const e of ev) fresh.push(...missions.event(e, game));
+    const d = game.distanceM; fresh.push(...missions.tick(game, Math.max(0, d - missDist))); missDist = d;
+    for (const f of fresh) { ui.toast('Misión cumplida: ' + f.text, 'mission'); audio.play('world'); buzz([20, 40, 20]); }
+  }
   // ¡Por los pelos!: una caja pasa rozando por el carril de al lado a más de 60 m/s (solo aviso)
   if (state === 'play' && game.alive && game.speedMS > 60 && (nearT -= STEP) <= 0) {
     const hw = Math.PI / 6;
     for (const b of game.boxes) {
       if (b.hit || b.k + 0.5 <= prev.s || b.k + 0.5 > game.s) continue;
       let d = game.theta - (b.lane * hw); d = Math.atan2(Math.sin(d), Math.cos(d));
-      if (Math.abs(d) > hw * 0.8 && Math.abs(d) < hw * 1.6) { audio.play('nearMiss'); buzz(10); nearT = 0.4; break; }
+      if (Math.abs(d) > hw * 0.8 && Math.abs(d) < hw * 1.6) { audio.play('nearMiss'); buzz(10); nearT = 0.4; for (const f of missions.event({ type: 'near' }, game)) ui.toast('Misión cumplida: ' + f.text, 'mission'); break; }
     }
   }
   if (padHint && state === 'play' && game.pads.some((p) => !p.taken && (p.k - game.s) / Math.max(1e-3, game.v / 13.176 * 60) < 1.6 && p.k > game.s)) { padHint = false; ui.toast('Pisa las flechas azules para acelerar', 'boost'); }
@@ -260,7 +276,7 @@ requestAnimationFrame(frame);
 // Gancho para pruebas automáticas (capturas, bots).
 window.__hip = {
   VERSION,
-  get game() { return game; }, get state() { return state; }, renderer, ui, audio, input,
+  get game() { return game; }, get state() { return state; }, renderer, ui, audio, input, missions,
   start: (m = 'classic', seed) => { startGame(m); if (seed !== undefined) newGame(m, seed); state = 'play'; },
   skipTo(rows) { while (game.s < rows && game.alive) { game.step({ steer: botSteer(game) }); renderer.track.sync(game); } prev = { s: game.s, theta: game.theta }; },
   step(n = 1, steer = null) { for (let i = 0; i < n; i++) { prev.s = game.s; prev.theta = game.theta; const ev = game.step({ steer: steer ?? botSteer(game) }); renderer.onEvents(ev, game); renderer.track.sync(game); } },

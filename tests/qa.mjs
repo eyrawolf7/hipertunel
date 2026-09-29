@@ -722,6 +722,38 @@ await run(16, async () => {
 });
 
 // ------------------------------------------------------------------ 17. partida larga (10 min) con memoria
+// ------------------------------------------------------------------ 18. misiones
+await run(18, async () => {
+  const { page, errors } = await open(DESKTOP);
+  const r = await page.evaluate(() => {
+    const M = window.__hip.missions; M.reset();
+    const l0 = M.list();
+    // se cumple "velocidad máxima" con un suceso de impulso a nivel 3, si está activa; si no, se fuerza
+    M.start();
+    const want = l0.map((m) => m.text);
+    const done = [];
+    for (let i = 0; i < 20; i++) done.push(...M.event({ type: 'boost', level: 3 }, window.__hip.game));
+    for (let i = 0; i < 80; i++) done.push(...M.event({ type: 'coin' }, window.__hip.game));
+    for (let i = 0; i < 20; i++) done.push(...M.event({ type: 'near' }, window.__hip.game));
+    const fin = M.finish();
+    const l1 = M.list();
+    const saved = JSON.parse(localStorage.getItem('hipertunel-misiones'));
+    return { want, done: done.map((d) => d.text), fin: fin.completed.length, l1: l1.map((m) => [m.text, m.done]), n1: l1.length, rank: M.rank(), savedN: saved.active.length };
+  });
+  rec(18, 'siempre hay 3 misiones activas y se guardan', r.n1 === 3 && r.savedN === 3, r);
+  rec(18, 'las cumplidas avisan en partida y se sustituyen al acabar', r.done.length === r.fin && r.l1.every((m) => !m[1]), { done: r.done, fin: r.fin, l1: r.l1 });
+  rec(18, 'el rango sube cada 3 cumplidas', r.rank.level === 1 + Math.floor(r.rank.done / 3), r.rank);
+  // pausa y fin de partida enseñan las misiones
+  await page.evaluate(() => { window.__hip.start('classic', 5); });
+  await waitState(page, 'play', 4000);
+  await page.keyboard.press('Escape'); await sleep(200);
+  const np = await page.evaluate(() => document.querySelectorAll('.scr[data-screen="pause"] .miss li').length);
+  rec(18, 'la pausa enseña las 3 misiones', np === 3, np);
+  if (errors.length) rec(18, 'sin errores', false, errors);
+  await page.evaluate(() => window.__hip.missions.reset());
+  await page.close();
+});
+
 await run(17, async () => {
   const MIN = +(opt.long || 10);
   const { page, errors } = await open(DESKTOP);
