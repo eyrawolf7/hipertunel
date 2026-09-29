@@ -53,8 +53,11 @@ export class Hero {
   }
 
   // pos: punto de la superficie bajo el jugador; up: normal del carril; fwd: dirección de avance
-  update(visible, pos, up, fwd, omega, air, level, dt) {
+  // spin: voltereta hacia delante (muerte); mood 'record': celebra con el puño de vez en cuando
+  // scale: la mascota del título va en miniatura muy cerca de la cámara (así nada se interpone)
+  update(visible, pos, up, fwd, omega, air, level, dt, spin = 0, mood = null, scale = 1) {
     this.group.visible = visible;
+    this.group.scale.setScalar(scale);
     if (!visible) return;
     this.t += dt;
     // inclinación hacia el giro (suavizada), hasta ~32° como la nave de WipEout; al soltar se
@@ -70,6 +73,8 @@ export class Hero {
     const k = this.mixer ? 0.45 : 1;
     this.group.rotateZ(this.lean * k);
     this.group.rotateY(-this.lean * 0.35 * k);
+    if (spin) { this.group.translateY(0.6); this.group.rotateX(spin); this.group.translateY(-0.6); }
+    if (mood === 'record' && (this.moodT = (this.moodT || 0) + dt) > 1.8) { this.moodT = 0; this.once('smash'); }
     if (this.mixer) {
       const L = this.actions.leanL, R = this.actions.leanR, B = this.actions.boost;
       if (L) L.weight = Math.max(0, this.lean / 0.56);

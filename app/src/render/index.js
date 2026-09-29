@@ -77,7 +77,7 @@ export class Renderer {
     this.tunnel = new Tunnel(this.scene);
     this.kit = new TunnelKit(this.scene);
     this.kit.onReady = () => this.warmup();
-    this.props = new TunnelProps(this.scene); this.life = new Life(this.scene); this.adv = new AdvView(this.scene); this.hero = new Hero(this.scene); this.third = false; this.heroPos = new THREE.Vector3(); this.ghostGame = null;
+    this.props = new TunnelProps(this.scene); this.life = new Life(this.scene); this.adv = new AdvView(this.scene); this.hero = new Hero(this.scene); this.third = false; this._hp = new THREE.Vector3(); this._hu = new THREE.Vector3(); this._hf = new THREE.Vector3(); this.introT = -1; this.deadT = 0; this.heroPos = new THREE.Vector3(); this.ghostGame = null;
     this.scene.fog = new THREE.Fog(0xffffff, 40, 120);
     this.stoneTint = new THREE.Color(1, 1, 1);
     this.boxes = new Boxes(this.scene);
@@ -130,7 +130,7 @@ export class Renderer {
     this.camera.updateProjectionMatrix();
   }
 
-  reset() { this.track.reset(); this.fx.reset(); this.cam.shake = 0; this.cam.kick = 0; this.cam.roll = 0; this.cam.rollAmp = 0; this.deathFocus = null; this.themeIdx = this.themeBase || 0; this.pendingTheme = 0; this.applyTheme(this.themeIdx, this.themeIdx, 1); this.look.set(0, 0, -1); this.upS.set(0, 1, 0); this.firstFrame = true; }
+  reset() { this.introT = -1; this.deadT = 0; this.heroMood = null; this.track.reset(); this.fx.reset(); this.cam.shake = 0; this.cam.kick = 0; this.cam.roll = 0; this.cam.rollAmp = 0; this.deathFocus = null; this.themeIdx = this.themeBase || 0; this.pendingTheme = 0; this.applyTheme(this.themeIdx, this.themeIdx, 1); this.look.set(0, 0, -1); this.upS.set(0, 1, 0); this.firstFrame = true; }
 
   applyTheme(from, to, t) {
     const A = THEMES[from % THEMES.length], B = THEMES[to % THEMES.length];
@@ -161,7 +161,7 @@ export class Renderer {
       // el empujón crece con cada nivel: +9°, +12°, +16° de campo de visión
       if (e.type === 'boost') { this.cam.kick = 1; this.cam.kickAmp = [0, 0.75, 1, 1.35][e.level] || 1; this.cam.rollAmp = (Math.random() * 2 - 1) * 0.127; this.cam.roll = 1; this.streakKick = [0, 0.6, 0.8, 1][e.level] || 1; if (e.level === 3) this.cam.blueVig = 0.15; }
       if (e.type === 'crash') {
-        if (this.third) this.hero.hit();
+        this.hero.hit();
         const p = this.boxes.positions.get(e.id);
         const bc = this.colors[(game.boxes.find((b) => b.id === e.id) || { color: 0 }).color];
         if (p) this.fx.explode(p, bc, 80, this.look, 60, 1.5);
@@ -211,7 +211,45 @@ export class Renderer {
   flash(hex, a) { this.cam.flashCol.set(hex); this.cam.flash = Math.max(this.cam.flash, a); }
 
   // s y theta vienen interpolados entre los dos últimos pasos de la simulación
-  update(game, s, theta, dt, { reduceFx = false, intro = 0 } = {}) {
+  // Arranque de la partida (desde el menú): se ve al zorro desde fuera y la cámara vuela hasta su
+  // cabeza dentro de la cuenta atrás. Un toque lo salta.
+  startIntro() { this.introT = 0; }
+  skipIntro() { if (this.introT >= 0 && this.introT < 2.2) { this.introT = -1; this.flash(this.fogColor.getHex(), 0.3); } }
+  get introOn() { return this.introT >= 0; }
+
+  // Vista de fuera (0 = primera persona): arranque y muerte. Devuelve null si no toca.
+  // yaw: ángulo alrededor del zorro (0 = detrás, 180° = delante); aim: altura del punto al que se
+  // mira; shift: desplaza el encuadre (el zorro queda a un lado y la tarjeta final no lo tapa)
+  outView(game, dt) {
+    if (this.third) return null;
+    if (this.introT >= 0) {
+      const t = (this.introT += dt);
+      if (t > 2.4) { this.introT = -1; return null; }
+      // 0-1 s: plano de tres cuartos por delante; 1-2,2 s: vuelo hasta la nuca (easeInOutCubic)
+      const f = Math.min(1, Math.max(0, (t - 1.0) / 1.2)), k = f < 0.5 ? 4 * f * f * f : 1 - Math.pow(-2 * f + 2, 3) / 2;
+      // (de lado y algo alto: detrás del zorro se ve el túnel, no la boca vacía del arranque)
+      const yaw = t < 1 ? 128 - 16 * t : 112 * (1 - k);
+      return { e: 1 - k, yaw: yaw * DEG, dist: 3.0, h: 1.3 * (1 - k * 0.3), aim: 0.7, shift: 0, fov: 50, intro: true };
+    }
+    if (!game.alive) {
+      // muerte: micro-pausa y la cámara sale hacia atrás y arriba; el zorro sale despedido por
+      // encima de la caja dando una voltereta y cae de pie sobre la tabla
+      const t0 = this.deadT, t = (this.deadT += dt);
+      const f = Math.min(1, Math.max(0, (t - 0.08) / 0.7)), e = 1 - Math.pow(1 - f, 4);
+      const hitBox = !!this.deathFocus, a = Math.min(1, t / 0.75);
+      if (hitBox && t0 < 0.75 && t >= 0.75) this.hero.once('land');
+      // durante la caída el zorro va algo a la izquierda; cuando sale la tarjeta final (al centro)
+      // la cámara se desliza hasta dejarlo en la franja izquierda (x ≈ −0,64 en pantalla)
+      const side = 4.4 * 0.64 * Math.tan(29 * DEG) * this.camera.aspect, g = Math.min(1, Math.max(0, (t - 0.95) / 0.6));
+      const shift = 1.25 + (side - 1.25) * g * g * (3 - 2 * g);
+      const arc = hitBox ? 1.7 * Math.sin(Math.PI * a) : 0;
+      return { e, yaw: 26 * DEG, dist: 4.4, h: 1.9, aim: 0.7 + arc * 0.7, shift, fov: 58, arc, spin: hitBox ? -Math.PI * 2 * (1 - (1 - a) * (1 - a)) : 0 };
+    }
+    this.deadT = 0;
+    return null;
+  }
+
+  update(game, s, theta, dt, { reduceFx = false, intro = 0, mascot = false } = {}) {
     this.time += dt;
     const tr = this.track;
     tr.sync(game);
@@ -222,7 +260,7 @@ export class Renderer {
     const landing = gapAhead ? gapAhead.to + 1 : -1;
     if (this.pendingTheme && (!gapAhead || s >= landing - 0.5)) {
       this.themeFrom = this.themeIdx; this.themeIdx += this.pendingTheme; this.pendingTheme = 0; this.themeBlend = 0;
-      if (gapAhead || this.wasFlying) { this.flash(THEMES[this.themeIdx % THEMES.length].glow, 0.3); this.landT = 1.5; this.landed = true; }
+      if (gapAhead || this.wasFlying) { this.flash(THEMES[this.themeIdx % THEMES.length].glow, 0.3); this.landT = 1.5; this.landed = true; this.cam.worldFov = 0.4; }
     }
     this.wasFlying = game.jumpAt(s) > 0.2;
     const inv = game.inverted || (this.pendingTheme > 0) ? 1 : 0;
@@ -246,7 +284,8 @@ export class Renderer {
     const jump = game.jumpAt(camS);
     let pos = new THREE.Vector3().copy(fr.P).addScaledVector(fr.X, sp.x).addScaledVector(fr.U, sp.y).addScaledVector(N, 0.62 + jump);
     let heroN = N, heroAt = null;
-    if (this.third) {
+    const V = this.outView(game, dt);
+    if (this.third || V) {
       // tercera persona: el zorro va donde iría la cámara (en s), y la cámara detrás y por encima
       tr.frameAt(s, this.frH || (this.frH = makeFrame()));
       const spH = surfSmooth(sec, u, closed, this.spH || (this.spH = {}));
@@ -261,15 +300,14 @@ export class Renderer {
     if (this.third) {
       // la cámara sube solo la mitad del salto: así se ve al zorro elevarse sobre las cajas
       pos = new THREE.Vector3().copy(heroAt).addScaledVector(this.look, -4.2).addScaledVector(this.upS, 2.0).addScaledVector(heroN, -0.55 * (game.airH || 0));
-      this.hero.update(true, heroAt, heroN, this.look, game.alive ? game.omega : 0, game.jumpAt(s) > 0.15, game.level, dt);
-    } else this.hero.update(false);
+    }
     this.firstFrame = false;
 
     const c = this.cam;
     const cam = this.camera;
     cam.position.copy(pos);
     // travelling de entrada en la cuenta atrás: empieza 1,5 m atrás y abierto, y se acerca
-    const iq = intro * intro * (3 - 2 * intro);
+    const iq = V && V.intro ? 0 : intro * intro * (3 - 2 * intro);
     if (iq > 0) cam.position.addScaledVector(this.look, -1.5 * iq).addScaledVector(this.upS, 0.4 * iq);
     if (c.shake > 0) {
       const a = c.shake * (reduceFx ? 0.3 : 1);
@@ -280,6 +318,17 @@ export class Renderer {
     // (como Sonic Dash: mira más lejos cuanto más rápido vas)
     const target = this.third ? new THREE.Vector3().copy(heroAt).addScaledVector(this.look, 8 + 6 * Math.min(1, Math.max(0, (game.speedMS - 36) / 64))).addScaledVector(this.upS, 0.6) : new THREE.Vector3().copy(pos).add(this.look);
     if (!game.alive && this.deathFocus) { this.deathT = (this.deathT || 0) + dt; target.lerp(this.deathFocus, Math.min(1, this.deathT * 2) * 0.6); } else this.deathT = 0;
+    const right = new THREE.Vector3().crossVectors(this.look, this.upS).normalize();
+    if (V && V.e > 0) {
+      // en el marco local de la pista donde está el zorro (look apunta 10 filas más allá y en las
+      // curvas se va de lado)
+      const fw = this.frH.F, rt = this._hf.crossVectors(fw, heroN).normalize();
+      const ext = new THREE.Vector3().copy(heroAt).addScaledVector(fw, -Math.cos(V.yaw) * V.dist).addScaledVector(rt, Math.sin(V.yaw) * V.dist).addScaledVector(heroN, V.h);
+      const extT = new THREE.Vector3().copy(heroAt).addScaledVector(heroN, V.aim).addScaledVector(rt, V.shift);
+      const dFp = target.clone().sub(cam.position).normalize(), dEx = extT.sub(ext).normalize();
+      cam.position.lerp(ext, V.e);
+      target.copy(cam.position).add(dFp.lerp(dEx, V.e).normalize());
+    }
     cam.up.copy(this.upS);
     // giro del impulso (Camera::boostEffect): ±0,127 rad que se apaga
     if (c.roll > 0) { cam.up.applyAxisAngle(this.look, c.rollAmp * c.roll * (reduceFx ? 0.3 : 1)); c.roll = Math.max(0, c.roll - dt * 1.4); }
@@ -294,9 +343,33 @@ export class Renderer {
     const sp01 = Math.min(1, Math.max(0, (game.speedMS - 36) / 64));
     const fov = this.baseFov + (this.third ? 6 : 0) + iq * 18 + sp01 * 14 + easeKick(c.kick) * (reduceFx ? 4 : 12) * (c.kickAmp || 1) + (c.foldFov > 0 ? Math.sin(Math.min(1, (1.2 - c.foldFov) / 1.2) * Math.PI) * 8 : 0);
     if (c.foldFov > 0) c.foldFov -= dt;
+    // aterrizaje en un mundo nuevo: pulso de +6° en 0,4 s
+    let fovF = fov + (c.worldFov > 0 ? Math.sin(Math.PI * (1 - c.worldFov / 0.4)) * 6 * (reduceFx ? 0.4 : 1) : 0);
+    if (c.worldFov > 0) c.worldFov -= dt;
+    if (V && V.e > 0) fovF += (V.fov - fovF) * V.e;
     if (!reduceFx && sp01 > 0) cam.rotateZ((Math.random() * 2 - 1) * 0.003 * sp01 * sp01);
     c.kick = Math.max(0, c.kick - dt * 1.8);
-    if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
+    if (Math.abs(cam.fov - fovF) > 0.01) { cam.fov = fovF; cam.updateProjectionMatrix(); }
+
+    // ---- el zorro: en tercera persona, en la vista de fuera y de mascota en el título
+    if (this.third) this.hero.update(true, heroAt, heroN, this.look, game.alive ? game.omega : 0, game.jumpAt(s) > 0.15, game.level, dt);
+    else if (V && V.e > 0.25) {
+      this.hero.update(true, this._hp.copy(heroAt).addScaledVector(heroN, V.arc || 0), heroN, this.frH.F, 0, false, game.level, dt, V.spin || 0, this.heroMood);
+      this.heroShown = true;
+    } else if (mascot) {
+      // en el título es una mascota fija en pantalla (tercio derecho, junto al logo), girada hacia
+      // ti (3/4); mide ~36 % del alto de la pantalla
+      const th = Math.tan(cam.fov * DEG / 2), d = 0.9, k = (0.72 * th * d) / 1.5;
+      const cq = cam.quaternion, cF = this._hf.set(0, 0, -1).applyQuaternion(cq), camUp = this._hu.set(0, 1, 0).applyQuaternion(cq), cR = new THREE.Vector3(1, 0, 0).applyQuaternion(cq);
+      const at = this._hp.copy(cam.position).addScaledVector(cF, d).addScaledVector(cR, 0.7 * th * cam.aspect * d).addScaledVector(camUp, -0.74 * th * d);
+      const a = -150 * DEG, fwd = cF.multiplyScalar(Math.cos(a)).addScaledVector(cR, Math.sin(a));
+      this.hero.update(true, at, camUp, fwd, game.omega, false, 0, dt, 0, null, k);
+    } else {
+      // al entrar en su cabeza en el arranque: velo breve para no ver el interior del modelo
+      if (this.heroShown && V && V.intro) this.flash(this.fogColor.getHex(), 0.3);
+      this.heroShown = false;
+      this.hero.update(false);
+    }
 
     // ---- mundo
     this.tunnel.uniforms.uCam.value.copy(cam.position);
@@ -305,7 +378,6 @@ export class Renderer {
     // biseles, arcos) tienen volumen y al girar alrededor del tubo cambia la luz. Una parte sigue a
     // la cámara (la mitad dentro, el 80 % por fuera) para que la cara por la que corres no quede en
     // sombra (legibilidad).
-    const right = new THREE.Vector3().crossVectors(this.look, this.upS).normalize();
     const camKey = new THREE.Vector3().copy(this.upS).multiplyScalar(0.85).addScaledVector(this.look, -0.35).addScaledVector(right, -0.4).normalize();
     const trackKey = new THREE.Vector3().copy(fr.U).multiplyScalar(0.8).addScaledVector(fr.X, -0.5).addScaledVector(fr.F, -0.3).normalize();
     const outsideK = game.fold < 29 ? 0.8 : 0.5;         // por fuera, tu cara casi siempre al sol

@@ -108,11 +108,17 @@ ui.settings(settings);
 audio.setMusic(settings.music); audio.setMuted(!settings.sound);
 
 // tocar la pantalla mientras juegas = pausa (el botón de continuar sale en el centro)
-input.onTap = () => { if (state === 'play') { pause(); pausedAt = performance.now(); } };
+input.onPress = () => { if (state === 'countdown' && renderer.introOn) skipIntro(); };
+input.onTap = () => {
+  if (state === 'play') { pause(); pausedAt = performance.now(); }
+};
+// saltar el vuelo del arranque: la cuenta atrás sigue, pero ya en primera persona
+function skipIntro() { renderer.skipIntro(); countdown = Math.min(countdown, 0.8); }
 input.onButton = (b) => {
   if (b === 'mute') { settings.sound = !settings.sound; audio.setMuted(!settings.sound); saveSettings(); ui.settings(settings); return; }
   if (state === 'play' && (b === 'pause' || b === 'back')) { pause(); return; }
   if (state === 'over' && b === 'ok' && overT > 0.6) { startGame(mode, true); return; }
+  if (state === 'countdown' && renderer.introOn && (b === 'ok' || b === 'back')) { skipIntro(); return; }
   if (state !== 'play' && state !== 'countdown') {
     if (b === 'up' || b === 'left' || b === 'down' || b === 'right') ui.navigate?.(b);
     else if (b === 'ok') ui.confirm?.();
@@ -190,6 +196,8 @@ function startGame(m, quick = false, fromCp = false) {
   renderer.setRecordRow?.(bestAtStart[m] > 0 ? Math.round(bestAtStart[m] / 4) : -1);
   // reintento rápido: sin 3-2-1, solo un instante antes del ¡YA!
   state = 'countdown'; countdown = quick ? 0.6 : 3; pendingChime = false; nearT = 0;
+  // desde el menú (no en el reintento rápido): se ve al zorro y la cámara entra en su cabeza
+  if (!quick && m !== 'zorro' && !settings.reduceFx) renderer.startIntro();
   ui.show('hud');
   audio.setWorld(worldBase * 2);
   audio.play('countdown');
@@ -220,6 +228,7 @@ function finish() {
   if (isArcade(mode)) list.sort((a, b) => b.score - a.score); else list.sort((a, b) => (b.distM ?? b.score) - (a.distM ?? a.score));
   const top = list.slice(0, 5); saveTop(mode, top);
   const isRecord = top[0] === me && list.length > 1;
+  if (isRecord) renderer.heroMood = 'record';
   try { const w = worldBase + visWorld - 1; if (w > maxWorld()) localStorage.setItem('hipertunel-mundo-max', String(Math.min(w, 4))); } catch (e) {}
   shop.add(game.coinsGot);
   const mr = missions.finish();
@@ -374,7 +383,7 @@ function stepSim() {
       if (!e.fatal) lostAt = game.time; else killBox = game.boxes.find((b) => b.id === e.id) || null;
       if (mult > 1 && !e.fatal) ui.toast(`Racha perdida (×${mult})`, 'info');
       mult = 1; multDist = 0;
-      audio.play(e.fatal ? 'death' : 'crash'); buzz(e.fatal ? [120, 60, 200] : [40, 30, 60]); if (!e.fatal) { ui.toast('¡Impulsos perdidos!', 'info'); hitstop = settings.reduceFx ? 0 : 0.07; } }
+      audio.play(e.fatal ? 'death' : 'crash'); buzz(e.fatal ? [120, 60, 200] : [40, 30, 60]); if (!e.fatal) { ui.toast('¡Impulsos perdidos!', 'info'); hitstop = settings.reduceFx ? 0 : 0.07; } else if (!settings.reduceFx) hitstop = 0.08; }
     else if (e.type === 'coin') { coins = game.coinsGot; audio.play('coin', { combo: e.combo }); buzz(e.combo >= 3 ? [12, 25, 12] : 10); coinFly(e); }
     else if (e.type === 'fall') { ui.toast(game.boostOn || game.invul > 0 ? '¡Por poco! Caes y pierdes los impulsos' : '¡Al vacío!', 'info'); renderer.flash(0x000000, 0.35); }
     else if (e.type === 'crumble') { audio.play('collapse'); buzz(25); }
@@ -463,7 +472,7 @@ function frame(now) {
   let dth = game.theta - prev.theta;
   if (dth > Math.PI) dth -= Math.PI * 2; else if (dth < -Math.PI) dth += Math.PI * 2;
   const theta = prev.theta + dth * a;
-  renderer.update(game, s, theta, dt, { reduceFx: settings.reduceFx, intro: state === 'countdown' && countdown > 0.6 ? Math.min(1, (countdown - 0.6) / 2.4) : 0 });
+  renderer.update(game, s, theta, dt, { reduceFx: settings.reduceFx, intro: state === 'countdown' && countdown > 0.6 ? Math.min(1, (countdown - 0.6) / 2.4) : 0, mascot: state === 'attract' && (ui.screen === 'title' || ui.screen === 'shop') });
   renderer.render();
   audio.setSpeed(game.speedMS, game.level);
   audio.setHover?.(!!game.hero && (state === 'play' || state === 'countdown') && game.alive, Math.min(1, game.speedMS / 100));
@@ -483,6 +492,7 @@ requestAnimationFrame(frame);
 window.__hip = {
   VERSION,
   get game() { return game; }, get state() { return state; }, renderer, ui, audio, input, missions, shop,
+  startMenu: (m = 'arcade') => startGame(m),
   start: (m = 'classic', seed) => { startGame(m); if (seed !== undefined) newGame(m, seed); state = 'play'; },
   skipTo(rows) { while (game.s < rows && game.alive) { game.step({ steer: botSteer(game) }); renderer.track.sync(game); } prev = { s: game.s, theta: game.theta }; },
   step(n = 1, steer = null) { for (let i = 0; i < n; i++) { prev.s = game.s; prev.theta = game.theta; const ev = game.step({ steer: steer ?? botSteer(game) }); renderer.onEvents(ev, game); renderer.track.sync(game); } },

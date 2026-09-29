@@ -10,7 +10,7 @@ export function createInput(target) {
     raw: 0, has: false, motionN: 0, listening: false, target: null,
     keys: new Set(), touches: new Map(), holdT: 0, dir: 0,
     pad: { x: 0, dl: false, dr: false, a: false, b: false, start: false, up: false, down: false, prev: {} },
-    onButton: null, onTap: null,
+    onButton: null, onTap: null, onPress: null,
     heroMode: false, jumpQ: false, swipe: new Map(),   /* modo Zorro: saltar */
   };
   try { st.cal = +(localStorage.getItem('hipertunel-cal2') || 0) || 0; } catch (e) {}
@@ -57,6 +57,7 @@ export function createInput(target) {
 
   const el = target;
   el.addEventListener('pointerdown', (e) => {
+    st.onPress && st.onPress();          // cualquier toque (p. ej. saltar el vuelo del arranque)
     // modo Zorro: con inclinación, tocar = saltar (la pausa va en su botón); sin sensor, los toques
     // giran y el salto es deslizar hacia arriba
     if (st.heroMode) {
@@ -107,6 +108,7 @@ export function createInput(target) {
     get state() { return st; },
     set onButton(fn) { st.onButton = fn; },
     set onTap(fn) { st.onTap = fn; },
+    set onPress(fn) { st.onPress = fn; },
     set heroMode(v) { st.heroMode = !!v; st.jumpQ = false; },
     // salto pedido desde el último paso (toque, deslizar, Espacio/↑/W o botón A del mando)
     consumeJump() { const j = st.jumpQ || ((st.keys.has('Space') || st.keys.has('ArrowUp') || st.keys.has('KeyW') || st.pad.a) && !st.jumpHeld); st.jumpHeld = st.keys.has('Space') || st.keys.has('ArrowUp') || st.keys.has('KeyW') || st.pad.a; st.jumpQ = false; return j; },
