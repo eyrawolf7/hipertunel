@@ -1,4 +1,4 @@
-// QA de Hipertúnel v0.40: pruebas de extremo a extremo con eventos reales en Chrome sin cabeza.
+// QA de Hipertúnel: pruebas de extremo a extremo con eventos reales en Chrome sin cabeza.
 // Uso:
 //   node tests/qa.mjs                       (todas; necesita `npx vite --config app/vite.config.js --host`)
 //   node tests/qa.mjs --only=1,2,3          (solo algunas)

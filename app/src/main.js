@@ -12,7 +12,7 @@ import { createShop, SHOP } from './shop.js';
 import { Adventure, STAGES, packGhost, unpackGhost, quantSteer } from './sim/adventure.js';
 import { Arcade } from './sim/arcade.js';
 
-const VERSION = '0.40';
+const VERSION = '0.50';
 const STEP = 1 / 60;
 const $ = (id) => document.getElementById(id);
 const QS = new URLSearchParams(location.search);
