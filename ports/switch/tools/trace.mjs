@@ -30,7 +30,7 @@ const hd = (x) => { dv.setFloat64(0, x, true); hu(dv.getUint32(0, true)); hu(dv.
 function hashObjects(g) {
   H = 2166136261;
   hi(g.boxes.length);
-  for (const b of g.boxes) { hi(b.id); hi(b.k); hi(b.lane); hi(b.fixed); hi(b.tall); hi(b.hit); hi(b.opp); hi(b.color); hi(b.group); hi(b.joined); }
+  for (const b of g.boxes) { hi(b.id); hi(b.k); hi(b.lane); hi(b.fixed); hi(b.tall); hi(b.hit); hi(b.opp); hi(b.color); hi(b.group); hi(b.joined); hi(!!b.wall); hi(!!b.carton); }
   hi(g.pads.length);
   for (const p of g.pads) { hi(p.k); hi(p.lane); hi(p.taken); }
   hi(g.coins.length);
@@ -44,6 +44,7 @@ function hashBits(g) {
   H = 2166136261;
   for (const x of [g.s, g.theta, g.omega, g.v, g.vTarget, g.fold, g.timeLeft, g.time, g.invul, g.boostTime, g.maxBoostTime, g.coinStreakT]) hd(x);
   hd(g.boostTotal); hi(g.pendingRow);
+  if (g.variant === 'arcade') { hd(g.trickT); hi(g.tricks); }
   const t = g.turn;
   for (const x of [t.yawT, t.pitchT, t.dYaw, t.dPitch, t.thr]) hd(x);
   for (const r of g.rows) { hi(r.k); hd(r.yaw); hd(r.pitch); hi(r.taken); }
@@ -55,6 +56,7 @@ const g = mode === 'arcade' ? new Arcade({ seed }) : new Game({ mode, seed });
 if (god) {
   // choque sin consecuencias en los choques mortales; igual que g->god en game.c
   g.crash = function (box) {
+    if (this.wallCrash && this.wallCrash(box)) return;
     if (this.invul > 0 || box.hit || !this.alive) return;
     box.hit = true;
     this.v = 1.0;
@@ -75,7 +77,8 @@ let deadAt = -1;
 while (g.frame < frames) {
   if (god && g.mode === 'timetrial' && g.timeLeft < 10) g.timeLeft += 60;
   const st = botSteer(g, 14);
-  const ev = g.step({ steer: st });
+  // Arcade: se pulsa la pirueta cada 11 fotogramas (solo cuenta en el salto entre mundos)
+  const ev = g.step({ steer: st, trick: mode === 'arcade' && g.frame % 11 === 0 });
   if (g.frame % 60 === 0 || ev.length > 0) {
     P(`f=${g.frame} s=${g9(g.s)} th=${g9(g.theta)} v=${g9(g.v)} vt=${g9(g.vTarget)} lv=${g.level} wi=${g.waveIdx} wl=${g.waveLeft} fold=${g9(g.fold)} w=${g.world} al=${b01(g.alive)} nb=${g.boxes.length} np=${g.pads.length} nc=${g.coins.length} cg=${g.coinsGot} tl=${g9(g.timeLeft)} st=${g9(st)} h=${hex(hashObjects(g))} b=${hex(hashBits(g))} rng=${g.rng.state >>> 0} crng=${g.coinRng.state >>> 0}`);
     for (const e of ev) {
@@ -91,6 +94,10 @@ while (g.frame < frames) {
         case 'crash': s += ` id=${e.id} lane=${e.lane} k=${e.k} fatal=${b01(e.fatal)}`; break;
         case 'death': s += ` id=${e.id}`; break;
         case 'camp': s += ` lane=${e.lane}`; break;
+        case 'trick': s += ` n=${e.n}`; break;
+        case 'wall': s += ` k=${e.k} lane=${e.lane}`; break;
+        case 'smash': s += ` id=${e.id} lane=${e.lane} k=${e.k}`; break;
+        case 'trickDone': s += ` n=${e.n} perfect=${b01(e.perfect)}`; break;
       }
       P(s + ` frame=${e.frame}`);
     }

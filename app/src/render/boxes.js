@@ -7,6 +7,7 @@ import { LANES, ROW_M, M_PER_UNIT, SHORT_H } from '../sim/game.js';
 import { section, surf, CELL_W, R, makeFrame } from './track.js';
 import { stylize } from './stylize.js';
 import { loadModel, loadTexture } from './assets.js';
+import { Carton } from './carton.js';
 
 const MAX = 40;
 const DEG = Math.PI / 180;
@@ -61,6 +62,9 @@ export class Boxes {
     this.sm = new THREE.Matrix4(); this.sp2 = new THREE.Vector3(); this.ssc = new THREE.Vector3();
     this.types = new Uint8Array(MAX); this.dims = new Float32Array(MAX * 3); this.cols = []; this._rc = new THREE.Color();
     this.loadKit(scene);
+    this.carton = new Carton(scene);           // bloque rompible del muro del Arcade
+    this.cartonMats = new Map();               // id -> matriz (para la rotura)
+    this.kraft = new THREE.Color(0xc8894a);
     this.nShadow = 0;
     this.outline.frustumCulled = false; this.outline.count = 0;
     scene.add(this.outline);
@@ -132,7 +136,7 @@ export class Boxes {
     const on = game.playerStrips();
     const { fr, m, T, N, B, p, sc, sp } = this;
     let n = 0, ns = 0;
-    this.positions.clear();
+    this.positions.clear(); this.cartonMats.clear();
     for (const b of game.boxes) {
       if (b.hit || n >= MAX) continue;
       const tall = b.tall && game.fold > 26;
@@ -181,8 +185,9 @@ export class Boxes {
       this.glowBy.set(b.id, g1);
       this.glow[n] = g1;
       if (flashId === b.id) { this.mesh.setColorAt(n, this.col.setRGB(1, 1, 1)); this.glow[n] = 2; }
-      else this.mesh.setColorAt(n, colors[b.color]);
-      this.types[n] = b.fixed ? 0 : 1;
+      else this.mesh.setColorAt(n, b.carton ? this.kraft : colors[b.color]);
+      this.types[n] = b.carton && this.carton.ready ? 2 : b.fixed ? 0 : 1;
+      if (b.carton) this.cartonMats.set(b.id, m.clone());
       this.dims[n * 3] = w; this.dims[n * 3 + 1] = h; this.dims[n * 3 + 2] = len;
       this.positions.set(b.id, p.clone());
       // con invulnerabilidad atraviesas las cajas: la que tienes encima no debe llenar la pantalla
@@ -193,28 +198,32 @@ export class Boxes {
     this.mesh.instanceMatrix.needsUpdate = true;
     this.outline.count = n;
     if (this.kitBlock && this.kitBlock.length) {
-      let nb = 0, nc = 0;
+      let nb = 0, nc = 0, nk = 0;
+      const kList = this.carton.ready ? [this.carton.inst] : null;
       const tm = new THREE.Matrix4(), tc = new THREE.Color(), sub = new THREE.Matrix4(), cm = new THREE.Matrix4();
       for (let i = 0; i < n; i++) {
         this.mesh.getMatrixAt(i, tm); this.mesh.getColorAt(i, tc);
-        const list = this.types[i] === 0 ? this.kitBlock : (this.kitCrystal.length ? this.kitCrystal : this.kitBlock);
+        const list = this.types[i] === 2 ? kList : this.types[i] === 0 ? this.kitBlock : (this.kitCrystal.length ? this.kitCrystal : this.kitBlock);
         // la pieza del kit es un cubo: una caja alargada (o un pilar) se monta con varios bloques
         // casi cúbicos apilados, en vez de estirar uno (la runa saldría deformada)
         const w = this.dims[i * 3], hh = this.dims[i * 3 + 1], ll = this.dims[i * 3 + 2];
         const nH = Math.max(1, Math.min(4, Math.round(hh / w))), nL = Math.max(1, Math.min(3, Math.round(ll / w)));
         for (let a = 0; a < nH; a++) for (let c = 0; c < nL; c++) {
-          const j = list === this.kitBlock ? nb++ : nc++;
+          const j = list === kList ? nk++ : list === this.kitBlock ? nb++ : nc++;
+          if (list === kList && j >= 16) continue;
           sub.makeScale(1, 1 / nH, 1 / nL).setPosition(0, (a + 0.5) / nH - 0.5, (c + 0.5) / nL - 0.5);
           cm.multiplyMatrices(tm, sub);
           for (const im of list) {
             im.setMatrixAt(j, cm);
             // la runa brilla con el color de la caja (más cuanto más cerca estás de su carril)
+            if (list === kList) continue;         // el cartón lleva su textura, sin teñir
             if (im.userData.isRune) im.setColorAt(j, this._rc.copy(tc).multiplyScalar(1.9 + this.glow[i] * 1.6));
             else im.setColorAt(j, tc);
           }
         }
       }
       for (const im of this.kitBlock) { im.count = nb; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
+      if (kList) { kList[0].count = Math.min(16, nk); kList[0].instanceMatrix.needsUpdate = true; }
       for (const im of this.kitCrystal) { im.count = nc; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
     }
     this.shadow.count = ns; this.shadow.instanceMatrix.needsUpdate = true;

@@ -345,6 +345,8 @@ function finishAdventure() {
 // vibración (móvil): se apaga con "Reducir efectos"
 const buzz = (p) => { if (settings.reduceFx || settings.vibe === false || state === 'attract') return; try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
 let nearT = 0, pendingChime = false, padHint = false, hitstop = 0;
+let flightT = 0, wasFlight = false, trickHints = 0, wallHints = 0;
+try { trickHints = +(localStorage.getItem('hipertunel-pistas-pirueta') || 0); wallHints = +(localStorage.getItem('hipertunel-pistas-muro') || 0); } catch (e) {}
 
 // moneda que vuela desde donde la coges hasta el contador (por el borde, nunca por el centro)
 function coinFly(e) {
@@ -374,7 +376,16 @@ function stepSim() {
     if (ghostGame && ghostGame.alive) { const gs = ghostSteers[ghostGame.frame]; ghostGame.step({ steer: gs === undefined ? 0 : gs }); }
   }
   else input.steer(STEP, game.theta, false);
-  const ev = game.step({ steer, jump: state === 'play' && game.hero ? input.consumeJump() : false });
+  const arc = state === 'play' && game.variant === 'arcade';
+  const ev = game.step({ steer, jump: state === 'play' && game.hero ? input.consumeJump() : false, trick: arc ? input.consumeTrick() : false });
+  // pirueta: mientras vuelas (y 0,5 s después de caer) tocar la pantalla no pausa
+  if (arc) {
+    const fl = !!game.flight();
+    if (fl) flightT = 0.5; else flightT -= STEP;
+    input.trickArm = flightT > 0;
+    if (fl && !wasFlight && trickHints < 3 && !game.tricksTotal) { trickHints++; try { localStorage.setItem('hipertunel-pistas-pirueta', String(trickHints)); } catch (e) {} ui.toast(COARSE ? '¡Toca para hacer una pirueta!' : '¡Pirueta! Pulsa Espacio o X', 'boost'); }
+    wasFlight = fl;
+  } else input.trickArm = false;
   renderer.onEvents(ev, game);
   for (const e of ev) {
     if (state === 'attract') continue;
@@ -394,6 +405,11 @@ function stepSim() {
     else if (e.type === 'shield') { ui.toast('El escudo te ha salvado', 'mission'); audio.play('crash'); renderer.flash(0xb58cff, 0.35); }
     else if (e.type === 'clear') { audio.play('record'); buzz([30, 40, 30, 40, 60]); }
     else if (e.type === 'jump') { audio.play('jump'); buzz(12); }
+    else if (e.type === 'wall') { if (wallHints < 3) { wallHints++; try { localStorage.setItem('hipertunel-pistas-muro', String(wallHints)); } catch (x) {} ui.toast('¡Un muro! Busca el bloque de cartón y atraviésalo', 'boost'); } }
+    else if (e.type === 'smash') { coins = game.coinsGot; audio.play('smash'); buzz([20, 15, 30]); ui.toast('¡Cartón roto! +5', 'mission'); }
+    else if (e.type === 'trick') { audio.play('whiff'); buzz(8); }
+    else if (e.type === 'trickDone') { coins = game.coinsGot; audio.play('coin', { combo: e.perfect ? 8 : 4 }); buzz(e.perfect ? [15, 30, 15, 30, 30] : [12, 25, 12]); const why = e.perfect ? '¡Pirueta perfecta! +10' : e.n > 1 ? `Pirueta ×${e.n} +5` : 'Pirueta +5'; if (mult >= 5) ui.toast(why, 'mission'); else bumpMult(why); }
+    else if (e.type === 'trickFail') { if (mult > 1) ui.toast(`Tropiezo: racha perdida (×${mult})`, 'info'); else ui.toast('¡Tropiezo! Acaba la pirueta antes de caer', 'info'); mult = 1; multDist = 0; audio.play('land'); buzz([40, 30, 40]); renderer.stumble?.(); }
     else if (e.type === 'noJump') { audio.play('whiff'); ui.jumpDenied?.(); }
     else if (e.type === 'charge') { audio.play('coin', { combo: 6 }); buzz([8, 20, 8]); ui.toast(e.why === 'near' ? '+1 salto · 5 roces seguidos' : '+1 salto', 'mission'); }
     else if (e.type === 'jumpClose') { audio.play('nearMiss'); buzz(10); bumpMult('¡Al límite!'); }

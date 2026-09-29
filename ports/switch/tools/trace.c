@@ -20,7 +20,7 @@ static uint32_t hash_objects(const Game *g) {
   for (i = 0; i < g->nBoxes; i++) {
     const Box *b = &g->boxes[i];
     hi(b->id); hi(b->k); hi(b->lane); hi(b->fixed); hi(b->tall); hi(b->hit); hi(b->opp);
-    hi(b->color); hi(b->group); hi(b->joined);
+    hi(b->color); hi(b->group); hi(b->joined); hi(b->wall); hi(b->carton);
   }
   hi(g->nPads);
   for (i = 0; i < g->nPads; i++) { hi(g->pads[i].k); hi(g->pads[i].lane); hi(g->pads[i].taken); }
@@ -38,6 +38,7 @@ static uint32_t hash_bits(const Game *g) {
   hd(g->s); hd(g->theta); hd(g->omega); hd(g->v); hd(g->vTarget); hd(g->fold);
   hd(g->timeLeft); hd(g->time); hd(g->invul); hd(g->boostTime); hd(g->maxBoostTime); hd(g->coinStreakT);
   hd(g->boostTotal); hi(g->pendingRow);
+  if (g->arcade) { hd(g->trickT); hi(g->tricks); }
   hd(g->turn.yawT); hd(g->turn.pitchT); hd(g->turn.dYaw); hd(g->turn.dPitch); hd(g->turn.thr);
   for (i = 0; i < g->nRows; i++) { hi(g->rows[i].k); hd(g->rows[i].yaw); hd(g->rows[i].pitch); hi(g->rows[i].taken); }
   for (i = 0; i < g->nBoxes; i++) { const Box *b = &g->boxes[i]; hd(b->h); hd(b->roll); hd(b->rollSpeed); hd(b->grow); }
@@ -61,7 +62,8 @@ int main(int argc, char **argv) {
     double st;
     if (god && g.mode == MODE_TIMETRIAL && g.timeLeft < 10) g.timeLeft += 60;
     st = bot_steer(&g, 14);
-    game_step(&g, st);
+    /* Arcade: se pulsa la pirueta cada 11 fotogramas (solo cuenta en el salto entre mundos) */
+    game_step_in(&g, st, g.arcade && g.frame % 11 == 0);
     if (g.frame % 60 == 0 || g.nEvents > 0) {
       printf("f=%d s=%.9g th=%.9g v=%.9g vt=%.9g lv=%d wi=%d wl=%d fold=%.9g w=%d al=%d nb=%d np=%d nc=%d cg=%d tl=%.9g st=%.9g h=%08x b=%08x rng=%u crng=%u\n",
              g.frame, g.s, g.theta, g.v, g.vTarget, g.level, g.waveIdx, g.waveLeft, g.fold, g.world, g.alive,
@@ -80,6 +82,10 @@ int main(int argc, char **argv) {
           case EV_CRASH: printf(" id=%d lane=%d k=%d fatal=%d", e->id, e->lane, e->k, e->fatal); break;
           case EV_DEATH: printf(" id=%d", e->id); break;
           case EV_CAMP: printf(" lane=%d", e->lane); break;
+          case EV_TRICK: printf(" n=%d", e->n); break;
+          case EV_WALL: printf(" k=%d lane=%d", e->k, e->lane); break;
+          case EV_SMASH: printf(" id=%d lane=%d k=%d", e->id, e->lane, e->k); break;
+          case EV_TRICK_DONE: printf(" n=%d perfect=%d", e->n, e->perfect); break;
           default: break;
         }
         printf(" frame=%d\n", e->frame);

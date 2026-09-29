@@ -37,6 +37,10 @@ static double js_sign(double x) { return x > 0 ? 1 : x < 0 ? -1 : x; }
 #define ARC_COMPRESS 0.4
 #define ARC_GAP_ROWS 6
 #define ARC_CAMP_ROWS 22
+#define ARC_WALL_LEAD 5
+#define ARC_WALL_MAX_BOXES 18
+#define ARC_TRICK_T 0.4
+#define ARC_PERFECT_T 0.3
 static double js_round(double x) { double r = floor(x); return (x - r >= 0.5) ? r + 1 : r; }
 
 double strip_half_width(double fold) {
@@ -299,9 +303,23 @@ static void spiral_step(Collection *c) {
   else if (c->lane < 0) c->lane = LANES - 1;
 }
 
+static void arc_spawn_wall(Game *g, int k);
 static void spawn_new_boxes(Game *g, int k) {
   const Wave *w = g->wave; Rng *rng = &g->rng;
   Collection *c;
+  /* Arcade: 1 s sin cajas al aterrizar del salto entre mundos (arcade.js spawnNewBoxes) */
+  if (g->arcade) {
+    int i, clear = (int)ceil((g->v > g->vTarget ? g->v : g->vTarget) * 60 / R_UNITS * 0.75);
+    for (i = 0; i < g->nGaps; i++) if (k > g->gaps[i].to && k <= g->gaps[i].to + 1 + clear) return;
+    if (g->wallAfter > 0) { g->wallAfter--; return; }
+    if (g->wallLead > 0) { if (--g->wallLead == 0) arc_spawn_wall(g, k); return; }
+    if (g->wallWorld != g->world && !game_inverted(g) && g->time >= 20 && g->time - g->worldT >= 6
+        && g->fold == FOLD_IN && !g->folding && g->nBoxes <= ARC_WALL_MAX_BOXES) {
+      int nearGap = 0;
+      for (i = 0; i < g->nGaps; i++) if (g->gaps[i].to + 40 > k) nearGap = 1;
+      if (!nearGap) { g->wallWorld = g->world; g->wallLead = ARC_WALL_LEAD; return; }
+    }
+  }
   if (--g->gap >= 1) return;
   g->gap = 0;
   if (!g->hasColl) {
@@ -406,6 +424,27 @@ static void spawn_box(Game *g, int k, Collection *c) {
   g->boxes[g->nBoxes++] = b;
   if (w->n >= 0 && (g->fold == FOLD_IN || g->fold == FOLD_OUT)) g->waveLeft--;
   event(g, EV_SPAWN, &e); e->id = b.id;
+}
+
+/* Arcade: muro de piedra en los 12 carriles con un bloque de cartón (arcade.js spawnWall) */
+static void arc_spawn_wall(Game *g, int k) {
+  int l, lane = game_lane(g), r = rng_int(&g->rng, 0, 1000) % 9;
+  int hole = imod(lane + r - 4, LANES), color = pick_color(g);
+  double vm = g->v > g->vTarget ? g->v : g->vTarget;
+  Event *e;
+  for (l = 0; l < LANES; l++) {
+    Box b;
+    memset(&b, 0, sizeof b);
+    b.lane = l; b.h = SHORT_H; b.fixed = 1; b.dir = 1; b.color = color; b.group = 0; b.joined = 0;
+    b.wall = 1; b.carton = l == hole;
+    b.id = g->nextBoxId++; b.k = k; b.tall = 0; b.roll = 0; b.rollSpeed = 1.5; b.grow = 1; b.hit = 0;
+    b.bornFrame = g->frame; b.opp = -1;
+    if (g->nBoxes == MAX_BOXES) { memmove(&g->boxes[0], &g->boxes[1], sizeof(Box) * (MAX_BOXES - 1)); g->nBoxes--; }
+    g->boxes[g->nBoxes++] = b;
+  }
+  g->walls++;
+  g->wallAfter = (int)ceil(vm * 60 / R_UNITS * 0.5);
+  event(g, EV_WALL, &e); e->k = k; e->lane = hole;
 }
 
 /* ------------------------------------------------------------------ placas */
@@ -538,6 +577,18 @@ static void die(Game *g, const Box *box) {
 
 static void crash(Game *g, Box *box) {         /* Box::collide + GameManager::collide */
   int fatal; Event *e;
+  if (g->arcade && box->wall && g->alive && !box->hit) {   /* arcade.js crash */
+    int i;
+    if (box->carton) {
+      box->hit = 1; g->coinsGot += 5; g->smashes++;
+      event(g, EV_SMASH, &e); e->id = box->id; e->lane = box->lane; e->k = box->k;
+      return;
+    }
+    for (i = 0; i < g->nBoxes; i++) {
+      const Box *h = &g->boxes[i];
+      if (h->wall && h->carton && h->k == box->k) { if (game_lane(g) == h->lane) return; break; }
+    }
+  }
   if (g->invul > 0 || box->hit || !g->alive) return;
   box->hit = 1;
   g->v = 1.0;
@@ -668,13 +719,45 @@ static void prune(Game *g) {
 }
 
 static int game_step_core(Game *g, double steer_in);
-int game_step(Game *g, double steer_in) {
+/* tramo de vuelo del salto entre mundos (arcade.js flight) */
+static int arc_flight(const Game *g, double *a, double *b) {
+  int i;
+  for (i = 0; i < g->nGaps; i++) {
+    double fa = g->gaps[i].from - 3, fb = g->gaps[i].to + 1;
+    if (g->s > fa && g->s < fb) { if (a) *a = fa; if (b) *b = fb; return 1; }
+  }
+  return 0;
+}
+double game_land_in(const Game *g) {
+  double b;
+  if (!arc_flight(g, NULL, &b)) return INFINITY;
+  return (b - g->s) / (g->v * 60 / R_UNITS);
+}
+int game_step(Game *g, double steer_in) { return game_step_in(g, steer_in, 0); }
+int game_step_in(Game *g, double steer_in, int trick) {
   double before = g->s;
+  int start = g->arcade && trick && g->alive && g->trickT < 0 && arc_flight(g, NULL, NULL);
   int n = game_step_core(g, steer_in);
   if (g->arcade && g->alive) {
     int lane = game_lane(g);
+    Event *e;
+    double b;
+    if (g->world != g->seenWorld) { g->seenWorld = g->world; g->worldT = g->time; }
+    if (start) { g->trickT = 0; event(g, EV_TRICK, &e); e->n = g->tricks + 1; }
+    else if (g->trickT >= 0) {
+      g->trickT += 1.0 / 60;
+      if (!arc_flight(g, NULL, &b)) { g->trickT = -1; g->tricks = 0; event(g, EV_TRICK_FAIL, NULL); }
+      else if (g->trickT >= ARC_TRICK_T - 1e-9) {
+        int perfect = (b - g->s) / (g->v * 60 / R_UNITS) <= ARC_PERFECT_T;
+        g->trickT = -1; g->tricks++; g->tricksTotal++;
+        g->coinsGot += perfect ? 10 : 5;
+        event(g, EV_TRICK_DONE, &e); e->n = g->tricks; e->perfect = perfect;
+      }
+    }
+    if (g->tricks && g->trickT < 0 && !arc_flight(g, NULL, NULL)) g->tricks = 0;
     if (lane == g->campLane) g->campRows += g->s - before;
     else { g->campLane = lane; g->campRows = 0; }
+    n = g->nEvents;
   }
   return n;
 }
@@ -730,7 +813,7 @@ double game_speed_ms(const Game *g) { return g->v * 60 * M_PER_UNIT; }
 
 const char *event_name(EventType t) {
   static const char *n[] = { "world", "wave", "spawn", "coin", "foldOrder", "foldStart", "foldEnd",
-                             "boost", "crash", "death", "camp" };
+                             "boost", "crash", "death", "camp", "trick", "trickDone", "trickFail", "wall", "smash" };
   return n[t];
 }
 
@@ -755,6 +838,9 @@ void game_init_arcade(Game *g, uint32_t seed) {
   }
   g->waveLeft = g->wave->n;
   g->campRows = 0; g->campLane = -1; g->camps = 0;
+  g->trickT = -1; g->tricks = 0; g->tricksTotal = 0;
+  g->wallWorld = -1; g->wallLead = 0; g->wallAfter = 0; g->walls = 0; g->smashes = 0;
+  g->seenWorld = g->world; g->worldT = 0;
   init_boost(g);
 }
 

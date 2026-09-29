@@ -12,6 +12,7 @@ export function createInput(target) {
     pad: { x: 0, dl: false, dr: false, a: false, b: false, start: false, up: false, down: false, prev: {} },
     onButton: null, onTap: null, onPress: null,
     heroMode: false, jumpQ: false, swipe: new Map(),   /* modo Zorro: saltar */
+    trickArm: false, trickQ: false, trickHeld: false,   /* pirueta en el salto entre mundos */
   };
   try { st.cal = +(localStorage.getItem('hipertunel-cal2') || 0) || 0; } catch (e) {}
 
@@ -58,6 +59,8 @@ export function createInput(target) {
   const el = target;
   el.addEventListener('pointerdown', (e) => {
     st.onPress && st.onPress();          // cualquier toque (p. ej. saltar el vuelo del arranque)
+    // en pleno salto entre mundos, tocar en cualquier sitio = pirueta (y no pausa)
+    if (st.trickArm) { st.trickQ = true; if (e.pointerType === 'mouse' || (st.tiltOn && st.has)) return; }
     // modo Zorro: con inclinación, tocar = saltar (la pausa va en su botón); sin sensor, los toques
     // giran y el salto es deslizar hacia arriba
     if (st.heroMode) {
@@ -81,7 +84,7 @@ export function createInput(target) {
     let gps = null;
     try { gps = navigator.getGamepads ? navigator.getGamepads() : null; } catch (e) { gps = null; }
     const p = st.pad;
-    p.x = 0; p.dl = p.dr = p.a = p.b = p.start = p.up = p.down = false;
+    p.x = 0; p.dl = p.dr = p.a = p.b = p.start = p.up = p.down = p.trick = false;
     if (!gps) return;
     for (const gp of gps) {
       if (!gp || !gp.connected) continue;
@@ -90,6 +93,7 @@ export function createInput(target) {
       const b = (i) => !!(gp.buttons[i] && gp.buttons[i].pressed);
       p.dl = b(14); p.dr = b(15); p.up = b(12) || (gp.axes[1] || 0) < -0.6; p.down = b(13) || (gp.axes[1] || 0) > 0.6;
       p.a = b(0); p.b = b(1); p.start = b(9);
+      p.trick = b(2) || b(3);             // X (arriba en los mandos de Nintendo, a la izquierda en Xbox)
       break;
     }
     for (const k of ['a', 'b', 'start', 'up', 'down', 'dl', 'dr']) {
@@ -111,6 +115,14 @@ export function createInput(target) {
     set onPress(fn) { st.onPress = fn; },
     set heroMode(v) { st.heroMode = !!v; st.jumpQ = false; },
     // salto pedido desde el último paso (toque, deslizar, Espacio/↑/W o botón A del mando)
+    // main.js lo activa mientras vuelas en el salto entre mundos (y hasta 0,5 s después de caer:
+    // un toque tardío no debe pausar)
+    set trickArm(v) { st.trickArm = !!v; if (!v) st.trickQ = false; },
+    consumeTrick() {
+      const held = st.keys.has('Space') || st.keys.has('ArrowUp') || st.keys.has('KeyX') || !!st.pad.trick;
+      const t = st.trickQ || (held && !st.trickHeld);
+      st.trickHeld = held; st.trickQ = false; return t;
+    },
     consumeJump() { const j = st.jumpQ || ((st.keys.has('Space') || st.keys.has('ArrowUp') || st.keys.has('KeyW') || st.pad.a) && !st.jumpHeld); st.jumpHeld = st.keys.has('Space') || st.keys.has('ArrowUp') || st.keys.has('KeyW') || st.pad.a; st.jumpQ = false; return j; },
     configure({ tilt, invert, sens }) { if (tilt !== undefined) st.tiltOn = tilt; if (invert !== undefined) st.invert = invert; if (sens !== undefined) st.sens = sens; },
     calibrate() { st.cal = st.raw; try { localStorage.setItem('hipertunel-cal2', String(st.cal)); } catch (e) {} },

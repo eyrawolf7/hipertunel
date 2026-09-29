@@ -130,7 +130,7 @@ export class Renderer {
     this.camera.updateProjectionMatrix();
   }
 
-  reset() { this.introT = -1; this.deadT = 0; this.heroMood = null; this.track.reset(); this.fx.reset(); this.cam.shake = 0; this.cam.kick = 0; this.cam.roll = 0; this.cam.rollAmp = 0; this.deathFocus = null; this.themeIdx = this.themeBase || 0; this.pendingTheme = 0; this.applyTheme(this.themeIdx, this.themeIdx, 1); this.look.set(0, 0, -1); this.upS.set(0, 1, 0); this.firstFrame = true; }
+  reset() { this.boxes?.carton?.reset(); this.introT = -1; this.deadT = 0; this.heroMood = null; this.track.reset(); this.fx.reset(); this.cam.shake = 0; this.cam.kick = 0; this.cam.roll = 0; this.cam.rollAmp = 0; this.deathFocus = null; this.themeIdx = this.themeBase || 0; this.pendingTheme = 0; this.applyTheme(this.themeIdx, this.themeIdx, 1); this.look.set(0, 0, -1); this.upS.set(0, 1, 0); this.firstFrame = true; }
 
   applyTheme(from, to, t) {
     const A = THEMES[from % THEMES.length], B = THEMES[to % THEMES.length];
@@ -171,6 +171,16 @@ export class Renderer {
         this.cam.hit = 1;
       }
       if (e.type === 'coin') this.coins.collect(game, e, this.track);
+      if (e.type === 'smash') {
+        // cartón roto: trozos hacia los bordes, confeti sin azul, viñeta kraft breve, golpe de FOV
+        const m = this.boxes.cartonMats.get(e.id), p = this.boxes.positions.get(e.id);
+        const camDir = new THREE.Vector3(); this.camera.getWorldDirection(camDir);
+        if (m) this.boxes.carton.smash(m, this.look, game.speedMS, this.camera.position, camDir);
+        if (p) for (const [hex, n] of [[0xc8894a, 26], [0xffffff, 10], [0xffc21a, 8], [0xff4b4b, 6], [0x5cc85a, 6]]) this.fx.explode(p, new THREE.Color(hex), n, this.look, game.speedMS, 0.8);
+        this.cam.vigT = 0.08; this.cam.vigCol = new THREE.Color(0xc8894a).multiplyScalar(0.25);
+        this.cam.smashFov = 0.15; this.cam.shake = Math.max(this.cam.shake, 0.06); this.cam.shakeDecay = 0.5;
+        this.hero.once('smash');
+      }
       if (e.type === 'foldStart') { this.cam.shake = Math.max(this.cam.shake, 0.12); this.cam.shakeDecay = 0.15; }
       if (e.type === 'foldEnd') { this.flash(0xffffff, 0.3); }
       if (e.type === 'foldStart') this.cam.foldFov = 1.2;
@@ -208,6 +218,9 @@ export class Renderer {
 
   consumeLanding() { const l = !!this.landed; this.landed = false; return l; }
 
+  // tropiezo al caer a mitad de una pirueta: sacudida corta
+  stumble() { this.cam.shake = Math.max(this.cam.shake, 0.25); this.cam.shakeDecay = 1.2; this.cam.rollShake = 0.2; this.hero.hit(); }
+
   flash(hex, a) { this.cam.flashCol.set(hex); this.cam.flash = Math.max(this.cam.flash, a); }
 
   // s y theta vienen interpolados entre los dos últimos pasos de la simulación
@@ -231,6 +244,20 @@ export class Renderer {
       const yaw = t < 1 ? 128 - 16 * t : 112 * (1 - k);
       return { e: 1 - k, yaw: yaw * DEG, dist: 3.0, h: 1.3 * (1 - k * 0.3), aim: 0.7, shift: 0, fov: 50, intro: true };
     }
+    // pirueta en el salto entre mundos: la cámara se retira 2,5 m (atrás y arriba) en 0,25 s y
+    // vuelve a la cabeza en 0,3 s, siempre al menos 0,25 s antes de aterrizar; en vuelos cortos
+    // (< 1 s) solo sale la mitad. Gira el zorro, nunca la cámara (no marea).
+    if (game.alive && game.flight) {
+      const f = game.flight();
+      if (f && !this.flightDur) this.flightDur = (f.b - f.a) / (game.v * 60 / 13.176254);
+      if (!f) this.flightDur = 0;
+      const want = f && (game.trickT >= 0 || game.tricks > 0) && game.landIn > 0.55 ? (this.flightDur < 1 ? 0.5 : 1) : 0;
+      this.trickCam = Math.max(0, Math.min(1, (this.trickCam || 0) + Math.sign(want - (this.trickCam || 0)) * Math.min(Math.abs(want - (this.trickCam || 0)), dt / (want > (this.trickCam || 0) ? 0.25 : 0.3))));
+      if (this.trickCam > 0) {
+        const k = this.trickCam, e = 1 - Math.pow(1 - k, 3);
+        return { e, yaw: 0, dist: 2.5, h: 1.1, aim: 0.4, ahead: 7, shift: 0, fov: null, twist: game.trickT >= 0 ? game.trickT / 0.4 : 0 };
+      }
+    } else this.trickCam = 0;
     if (!game.alive) {
       // muerte: micro-pausa y la cámara sale hacia atrás y arriba; el zorro sale despedido por
       // encima de la caja dando una voltereta y cae de pie sobre la tabla
@@ -324,7 +351,7 @@ export class Renderer {
       // curvas se va de lado)
       const fw = this.frH.F, rt = this._hf.crossVectors(fw, heroN).normalize();
       const ext = new THREE.Vector3().copy(heroAt).addScaledVector(fw, -Math.cos(V.yaw) * V.dist).addScaledVector(rt, Math.sin(V.yaw) * V.dist).addScaledVector(heroN, V.h);
-      const extT = new THREE.Vector3().copy(heroAt).addScaledVector(heroN, V.aim).addScaledVector(rt, V.shift);
+      const extT = new THREE.Vector3().copy(heroAt).addScaledVector(heroN, V.aim).addScaledVector(rt, V.shift).addScaledVector(fw, V.ahead || 0);
       const dFp = target.clone().sub(cam.position).normalize(), dEx = extT.sub(ext).normalize();
       cam.position.lerp(ext, V.e);
       target.copy(cam.position).add(dFp.lerp(dEx, V.e).normalize());
@@ -346,7 +373,8 @@ export class Renderer {
     // aterrizaje en un mundo nuevo: pulso de +6° en 0,4 s
     let fovF = fov + (c.worldFov > 0 ? Math.sin(Math.PI * (1 - c.worldFov / 0.4)) * 6 * (reduceFx ? 0.4 : 1) : 0);
     if (c.worldFov > 0) c.worldFov -= dt;
-    if (V && V.e > 0) fovF += (V.fov - fovF) * V.e;
+    if (c.smashFov > 0) { fovF += 4 * (c.smashFov / 0.15) * (reduceFx ? 0.4 : 1); c.smashFov -= dt; }
+    if (V && V.e > 0 && V.fov) fovF += (V.fov - fovF) * V.e;
     if (!reduceFx && sp01 > 0) cam.rotateZ((Math.random() * 2 - 1) * 0.003 * sp01 * sp01);
     c.kick = Math.max(0, c.kick - dt * 1.8);
     if (Math.abs(cam.fov - fovF) > 0.01) { cam.fov = fovF; cam.updateProjectionMatrix(); }
@@ -354,7 +382,7 @@ export class Renderer {
     // ---- el zorro: en tercera persona, en la vista de fuera y de mascota en el título
     if (this.third) this.hero.update(true, heroAt, heroN, this.look, game.alive ? game.omega : 0, game.jumpAt(s) > 0.15, game.level, dt);
     else if (V && V.e > 0.25) {
-      this.hero.update(true, this._hp.copy(heroAt).addScaledVector(heroN, V.arc || 0), heroN, this.frH.F, 0, false, game.level, dt, V.spin || 0, this.heroMood);
+      this.hero.update(true, this._hp.copy(heroAt).addScaledVector(heroN, V.arc || 0), heroN, this.frH.F, game.alive ? game.omega : 0, false, game.level, dt, V.spin || 0, this.heroMood, 1, V.twist || 0);
       this.heroShown = true;
     } else if (mascot) {
       // en el título es una mascota fija en pantalla (tercio derecho, junto al logo), girada hacia
@@ -417,6 +445,7 @@ export class Renderer {
     this.pads.update(game, tr, dt);
     this.coins.update(game, tr, dt, cam.position);
     this.fx.update(dt);
+    this.boxes.carton.update(dt);
     // el horizonte del paisaje sigue sobre todo a la cámara (70 %): así queda casi a nivel en la
     // vista y el paisaje llena la mitad de abajo, aunque vayas por un carril girado; el 30 % de la
     // pista conserva algo de la sensación de rodar alrededor del tubo

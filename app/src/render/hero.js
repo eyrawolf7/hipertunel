@@ -55,7 +55,8 @@ export class Hero {
   // pos: punto de la superficie bajo el jugador; up: normal del carril; fwd: dirección de avance
   // spin: voltereta hacia delante (muerte); mood 'record': celebra con el puño de vez en cuando
   // scale: la mascota del título va en miniatura muy cerca de la cámara (así nada se interpone)
-  update(visible, pos, up, fwd, omega, air, level, dt, spin = 0, mood = null, scale = 1) {
+  // twist: giro sobre sí mismo (pirueta del salto entre mundos, en vueltas)
+  update(visible, pos, up, fwd, omega, air, level, dt, spin = 0, mood = null, scale = 1, twist = 0) {
     this.group.visible = visible;
     this.group.scale.setScalar(scale);
     if (!visible) return;
@@ -74,6 +75,7 @@ export class Hero {
     this.group.rotateZ(this.lean * k);
     this.group.rotateY(-this.lean * 0.35 * k);
     if (spin) { this.group.translateY(0.6); this.group.rotateX(spin); this.group.translateY(-0.6); }
+    if (twist) { this.group.rotateY(twist * Math.PI * 2); this.group.rotateZ(Math.sin(twist * Math.PI) * 0.35); }
     if (mood === 'record' && (this.moodT = (this.moodT || 0) + dt) > 1.8) { this.moodT = 0; this.once('smash'); }
     if (this.mixer) {
       const L = this.actions.leanL, R = this.actions.leanR, B = this.actions.boost;

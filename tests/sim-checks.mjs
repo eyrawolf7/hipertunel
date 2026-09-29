@@ -71,6 +71,49 @@ console.log('Arcade (capa encima del clásico)');
   ok(c.waves[3].n === 50 && g.waves[3].n === 20, 'comprime el guion (50 → 20 cajas) sin tocar el del clásico');
   let t = 0; for (let n = 0; n < 10; n++) { const q = new Arcade({ seed: 300 + n }); while (q.alive && q.time < 60) q.step({ steer: 0 }); t += q.time; }
   ok(t / 10 < 12, `quieto en un carril no aguantas (mueres a los ${(t / 10).toFixed(1)} s de media)`);
+
+  // salto entre mundos: al menos 1 s sin cajas al aterrizar, y piruetas
+  const { botSteer } = await import('../app/src/sim/bot.js');
+  let minClear = Infinity, done = 0, perfect = 0, fail = 0;
+  for (let seed = 1; seed <= 4; seed++) {
+    const q = new Arcade({ seed }); q.crash = (b) => { b.hit = true; };
+    const lands = new Map();
+    while (q.time < 150) {
+      // semillas pares: pirueta al despegar (limpia o tropiezo); impares: justo a tiempo (perfecta)
+      const li = q.landIn;
+      const ev = q.step({ steer: botSteer(q), trick: seed % 2 ? li < 0.68 && li > 0.62 : !!q.flight() });
+      for (const e of ev) { if (e.type === 'trickDone') { done++; if (e.perfect) perfect++; } if (e.type === 'trickFail') fail++; }
+      for (const gp of q.gaps) if (!lands.has(gp.to + 1)) lands.set(gp.to + 1, { first: Infinity, v: 0 });
+      for (const [land, o] of lands) { for (const b of q.boxes) if (b.k >= land && b.k < o.first) o.first = b.k; if (Math.abs(q.s - land) < 0.5) o.v = q.v; }
+    }
+    for (const [land, o] of lands) if (o.v) minClear = Math.min(minClear, (o.first - land) / (o.v * 60 / 13.176254));
+  }
+  ok(minClear >= 0.99, `al aterrizar del salto entre mundos hay 1 s sin cajas (mínimo ${minClear.toFixed(2)} s)`);
+  ok(done > 4 && perfect > 0, `piruetas en el salto (${done} hechas, ${perfect} perfectas, ${fail} fallidas)`);
+  const q2 = new Arcade({ seed: 5 }); let early = 0;
+  for (let i = 0; i < 600; i++) for (const e of q2.step({ steer: 0, trick: true })) if (e.type === 'trick') early++;
+  ok(early === 0, 'fuera del salto no hay piruetas');
+
+  // muro de cartón: uno por mundo, el cartón cerca de tu carril; yendo a por él no chocas
+  let walls = 0, smash = 0, stone = 0, far = 0, before20 = 0;
+  for (let seed = 1; seed <= 4; seed++) {
+    const q = new Arcade({ seed });
+    while (q.time < 150) {
+      const hole = q.boxes.find((b) => b.carton && !b.hit && b.k > q.s);
+      let st = botSteer(q);
+      if (hole && hole.k - q.s < 30) { let d = hole.lane * Math.PI / 6 - q.theta; d = Math.atan2(Math.sin(d), Math.cos(d)); st = Math.max(-1, Math.min(1, d * 3)); }
+      for (const e of q.step({ steer: st })) {
+        if (e.type === 'wall') { walls++; let o = e.lane - q.lane; o = ((o + 18) % 12) - 6; if (Math.abs(o) > 4) far++; if (q.time < 20) before20++; }
+        if (e.type === 'smash') smash++;
+        if (e.type === 'crash') { const b = q.boxes.find((x) => x.id === e.id); if (b && b.wall) stone++; }
+      }
+      q.invul = 0; if (!q.boostOn) q.initBoost(); q.alive = true;
+    }
+  }
+  ok(walls >= 8 && far === 0 && before20 === 0, `muros de cartón (${walls}; cartón a ≤4 carriles: ${far === 0}; ninguno antes de 20 s: ${before20 === 0})`);
+  ok(smash === walls && stone === 0, `yendo al cartón se rompe y la piedra no toca (${smash} rotos, ${stone} choques con piedra)`);
+  const lit = (() => { const q = new Arcade({ seed: 1 }); q.crash = (b) => { b.hit = true; }; while (!q.boxes.some((b) => b.carton)) q.step({ steer: botSteer(q) }); const h = q.boxes.find((b) => b.carton); const m = q.litStrips(); return !(m.get(h.lane) || []).some((x) => x.id === h.id) && (m.get((h.lane + 1) % 12) || []).length > 0; })();
+  ok(lit, 'el carril del cartón no se enciende y los de piedra sí');
 }
 
 console.log('Zorro (salto)');
