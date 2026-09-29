@@ -10,25 +10,30 @@
 //   tiempo a volver de la pirueta y a leer la pista.
 // - Piruetas en ese salto (input.trick: X en Switch, toque en el móvil): cada una dura 0,4 s y da
 //   monedas; se encadenan. Si la acabas en los últimos 0,3 s antes de tocar suelo es "perfecta"
-//   (más monedas). Si aterrizas a mitad de una, tropiezas (pierdes la racha; no mueres). No hacerla
-//   no se castiga.
+//   (más monedas). Si aterrizas a mitad de una, tropiezas: pierdes la racha y las monedas de las
+//   piruetas de ese salto (aporrear no sale a cuenta); no mueres. Si le faltaban 0,12 s o menos,
+//   cuenta como hecha (no perfecta). No hacerla no se castiga.
 // - Muro de cartón: una vez por mundo (nunca antes de los 20 s) sale una fila de piedra en los 12
 //   carriles con UN bloque de cartón a 4 carriles o menos del tuyo. El cartón se rompe siempre,
 //   no frena ni quita el impulso y da 5 monedas; la piedra es una caja normal (con impulso la
 //   atraviesas y los pierdes; sin impulso, fin). Si tu carril más cercano es el del cartón, la piedra
-//   de los lados no te toca. 5 filas vacías antes y 0,5 s después para leerlo.
+//   de los lados no te toca. 5 filas vacías antes y 0,5 s después para leerlo. Los primeros muros
+//   (opts.easyWalls, los de las primeras partidas) ponen el cartón a 2 carriles o menos.
 import { Game, R_UNITS, LANES, SHORT_H, FOLD_IN, FOLD_OUT } from './game.js';
 
 export const TRICK_T = 0.4;      // s que dura una pirueta
 const PERFECT_T = 0.3;          // s antes de aterrizar en los que acabarla es perfecta
+const GRACE_T = 0.12;           // s que le pueden faltar al aterrizar para que cuente
 const WALL_LEAD = 5;            // filas vacías antes del muro
 const WALL_MAX_BOXES = 18;      // el muro son 12 cajas: solo si caben (tope de 32)
+const WALL_MAX_FIRST = 24;      // el primero de la partida, algo más fácil de colocar
+const WALL_WAIT = 3;            // s tras entrar en un mundo
 const COMPRESS = 0.4;           // cajas por oleada respecto al guion original
 const GAP_ROWS = 6;             // filas vacías entre oleadas (20 en el original)
 export const CAMP_ROWS = 22;    // filas en un carril antes de que te echen una caja encima
 
 export class Arcade extends Game {
-  constructor({ seed = 1 } = {}) {
+  constructor({ seed = 1, easyWalls = 0 } = {}) {
     super({ mode: 'classic', seed });
     this.variant = 'arcade';
     for (const w of this.waves) {
@@ -37,7 +42,8 @@ export class Arcade extends Game {
     }
     this.waveLeft = this.wave.n;
     this.campRows = 0; this.campLane = -1; this.camps = 0;
-    this.trickT = -1; this.tricks = 0; this.tricksTotal = 0;
+    this.trickT = -1; this.tricks = 0; this.tricksTotal = 0; this.trickCoins = 0;
+    this.easyWalls = easyWalls;
     this.wallWorld = -1; this.wallLead = 0; this.wallAfter = 0; this.walls = 0; this.smashes = 0;
     this.seenWorld = this.world; this.worldT = 0;
     this.initBoost();
@@ -58,17 +64,20 @@ export class Arcade extends Game {
     for (const g of this.gaps) if (row.k > g.to && row.k <= g.to + 1 + clear) return;
     if (this.wallAfter > 0) { this.wallAfter--; return; }
     if (this.wallLead > 0) { if (--this.wallLead === 0) this.spawnWall(row); return; }
-    if (this.wallWorld !== this.world && !this.inverted && this.time >= 20 && this.time - this.worldT >= 6
-      && this.fold === FOLD_IN && !this.folding && this.boxes.length <= WALL_MAX_BOXES
+    if (this.wallWorld !== this.world && !this.inverted && this.time >= 20 && this.time - this.worldT >= WALL_WAIT
+      && this.fold === FOLD_IN && !this.folding && this.boxes.length <= (this.walls ? WALL_MAX_BOXES : WALL_MAX_FIRST)
       && !this.gaps.some((g) => g.to + 40 > row.k)) {
       this.wallWorld = this.world; this.wallLead = WALL_LEAD;
+      this.event('wallSoon', {});
       return;
     }
     super.spawnNewBoxes(row);
   }
 
   spawnWall(row) {
-    const hole = ((this.lane + (this.rng.int(0, 1000) % 9) - 4) % LANES + LANES) % LANES;
+    const easy = this.easyWalls > 0, r = this.rng.int(0, 1000);
+    if (easy) this.easyWalls--;
+    const hole = ((this.lane + (easy ? r % 5 - 2 : r % 9 - 4)) % LANES + LANES) % LANES;
     const color = this.pickColor();
     for (let l = 0; l < LANES; l++) {
       const b = { lane: l, h: SHORT_H, fixed: true, dir: 1, color, group: 0, joined: false, wall: true, carton: l === hole };
@@ -144,15 +153,22 @@ export class Arcade extends Game {
     else if (this.trickT >= 0) {
       this.trickT += 1 / 60;
       const f = this.flight();
-      if (!f) { this.trickT = -1; this.tricks = 0; this.event('trickFail', {}); }
+      if (!f && TRICK_T - this.trickT <= GRACE_T + 1e-9) {
+        // le faltaba un pelín: cuenta (sin perfecta)
+        this.trickT = -1; this.tricks++; this.tricksTotal++; this.coinsGot += 5; this.trickCoins += 5;
+        this.event('trickDone', { n: this.tricks, perfect: false });
+      } else if (!f) {
+        this.trickT = -1; this.tricks = 0;
+        this.coinsGot -= this.trickCoins; this.event('trickFail', { lost: this.trickCoins }); this.trickCoins = 0;
+      }
       else if (this.trickT >= TRICK_T - 1e-9) {
         this.trickT = -1; this.tricks++; this.tricksTotal++;
         const perfect = (f.b - this.s) / (this.v * 60 / R_UNITS) <= PERFECT_T;
-        this.coinsGot += perfect ? 10 : 5;
+        this.coinsGot += perfect ? 10 : 5; this.trickCoins += perfect ? 10 : 5;
         this.event('trickDone', { n: this.tricks, perfect });
       }
     }
-    if (this.tricks && this.trickT < 0 && !this.flight()) this.tricks = 0;
+    if (this.tricks && this.trickT < 0 && !this.flight()) { this.tricks = 0; this.trickCoins = 0; }
     const lane = this.laneOf();
     if (lane === this.campLane) this.campRows += this.s - before;
     else { this.campLane = lane; this.campRows = 0; }

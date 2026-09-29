@@ -40,7 +40,8 @@ typedef enum {
   EV_BOOST, EV_CRASH, EV_DEATH,
   EV_CAMP,                      /* Arcade: una caja va a por ti por quedarte en un carril */
   EV_TRICK, EV_TRICK_DONE, EV_TRICK_FAIL,  /* Arcade: piruetas en el salto entre mundos */
-  EV_WALL, EV_SMASH                        /* Arcade: muro de cartón y cartón roto */
+  EV_WALL, EV_SMASH,                       /* Arcade: muro de cartón y cartón roto */
+  EV_WALL_SOON                             /* Arcade: el muro viene (5 filas vacías antes) */
 } EventType;
 
 typedef struct {
@@ -48,7 +49,7 @@ typedef struct {
   int frame;
   int id, lane, k, level, world, wave, combo;
   int toIn, fatal;
-  int n, perfect;               /* piruetas: número en el salto y si ha sido perfecta */
+  int n, perfect, lost;         /* piruetas: número en el salto, si ha sido perfecta, monedas perdidas */
 } Event;
 
 typedef struct { int k; double yaw, pitch; int taken; } Row;
@@ -126,7 +127,7 @@ typedef struct {
   int arcade;
   double waveA0[MAX_WAVES];
   double campRows; int campLane, camps;
-  double trickT; int tricks, tricksTotal;
+  double trickT; int tricks, tricksTotal, trickCoins, easyWalls;
   int wallWorld, wallLead, wallAfter, walls, smashes, seenWorld; double worldT;
 } Game;
 
@@ -134,6 +135,8 @@ void   game_init(Game *g, GameMode mode, uint32_t seed);
 void   game_reset(Game *g);
 /* Arcade: reglas del clásico con el guion comprimido, un impulso de salida y sin acampar */
 void   game_init_arcade(Game *g, uint32_t seed);
+/* los primeros `n` muros ponen el cartón a 2 carriles o menos (primeras partidas del jugador) */
+void   game_init_arcade_easy(Game *g, uint32_t seed, int easyWalls);
 /* Avanza un fotograma de 60 Hz. Los sucesos quedan en g->events[0..g->nEvents). */
 int    game_step(Game *g, double steer);
 /* igual, con el botón de pirueta (X en Switch); solo cuenta en el Arcade y durante el salto */

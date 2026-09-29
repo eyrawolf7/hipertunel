@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
   frames = atoi(argv[3]);
   god = argc > 4 && !strcmp(argv[4], "god");
 
-  if (!strcmp(argv[1], "arcade")) game_init_arcade(&g, seed); else game_init(&g, mode, seed);
+  if (!strcmp(argv[1], "arcade")) game_init_arcade_easy(&g, seed, seed % 2 ? 2 : 0); else game_init(&g, mode, seed);
   g.god = god;
   printf("start mode=%s seed=%u waves=%d rng=%u crng=%u lastLoc=%d\n", argv[1], seed, g.nWaves, g.rng.a, g.coinRng.a, g.lastLoc);
   while (g.frame < frames) {
@@ -83,6 +83,7 @@ int main(int argc, char **argv) {
           case EV_DEATH: printf(" id=%d", e->id); break;
           case EV_CAMP: printf(" lane=%d", e->lane); break;
           case EV_TRICK: printf(" n=%d", e->n); break;
+          case EV_TRICK_FAIL: printf(" lost=%d", e->lost); break;
           case EV_WALL: printf(" k=%d lane=%d", e->k, e->lane); break;
           case EV_SMASH: printf(" id=%d lane=%d k=%d", e->id, e->lane, e->k); break;
           case EV_TRICK_DONE: printf(" n=%d perfect=%d", e->n, e->perfect); break;

@@ -39,6 +39,9 @@ static double js_sign(double x) { return x > 0 ? 1 : x < 0 ? -1 : x; }
 #define ARC_CAMP_ROWS 22
 #define ARC_WALL_LEAD 5
 #define ARC_WALL_MAX_BOXES 18
+#define ARC_WALL_MAX_FIRST 24
+#define ARC_WALL_WAIT 3
+#define ARC_GRACE_T 0.12
 #define ARC_TRICK_T 0.4
 #define ARC_PERFECT_T 0.3
 static double js_round(double x) { double r = floor(x); return (x - r >= 0.5) ? r + 1 : r; }
@@ -313,11 +316,11 @@ static void spawn_new_boxes(Game *g, int k) {
     for (i = 0; i < g->nGaps; i++) if (k > g->gaps[i].to && k <= g->gaps[i].to + 1 + clear) return;
     if (g->wallAfter > 0) { g->wallAfter--; return; }
     if (g->wallLead > 0) { if (--g->wallLead == 0) arc_spawn_wall(g, k); return; }
-    if (g->wallWorld != g->world && !game_inverted(g) && g->time >= 20 && g->time - g->worldT >= 6
-        && g->fold == FOLD_IN && !g->folding && g->nBoxes <= ARC_WALL_MAX_BOXES) {
+    if (g->wallWorld != g->world && !game_inverted(g) && g->time >= 20 && g->time - g->worldT >= ARC_WALL_WAIT
+        && g->fold == FOLD_IN && !g->folding && g->nBoxes <= (g->walls ? ARC_WALL_MAX_BOXES : ARC_WALL_MAX_FIRST)) {
       int nearGap = 0;
       for (i = 0; i < g->nGaps; i++) if (g->gaps[i].to + 40 > k) nearGap = 1;
-      if (!nearGap) { g->wallWorld = g->world; g->wallLead = ARC_WALL_LEAD; return; }
+      if (!nearGap) { g->wallWorld = g->world; g->wallLead = ARC_WALL_LEAD; event(g, EV_WALL_SOON, NULL); return; }
     }
   }
   if (--g->gap >= 1) return;
@@ -428,8 +431,10 @@ static void spawn_box(Game *g, int k, Collection *c) {
 
 /* Arcade: muro de piedra en los 12 carriles con un bloque de cartón (arcade.js spawnWall) */
 static void arc_spawn_wall(Game *g, int k) {
-  int l, lane = game_lane(g), r = rng_int(&g->rng, 0, 1000) % 9;
-  int hole = imod(lane + r - 4, LANES), color = pick_color(g);
+  int l, lane = game_lane(g), r = rng_int(&g->rng, 0, 1000), easy = g->easyWalls > 0, hole, color;
+  if (easy) g->easyWalls--;
+  hole = imod(lane + (easy ? r % 5 - 2 : r % 9 - 4), LANES);
+  color = pick_color(g);
   double vm = g->v > g->vTarget ? g->v : g->vTarget;
   Event *e;
   for (l = 0; l < LANES; l++) {
@@ -746,15 +751,21 @@ int game_step_in(Game *g, double steer_in, int trick) {
     if (start) { g->trickT = 0; event(g, EV_TRICK, &e); e->n = g->tricks + 1; }
     else if (g->trickT >= 0) {
       g->trickT += 1.0 / 60;
-      if (!arc_flight(g, NULL, &b)) { g->trickT = -1; g->tricks = 0; event(g, EV_TRICK_FAIL, NULL); }
+      if (!arc_flight(g, NULL, &b) && ARC_TRICK_T - g->trickT <= ARC_GRACE_T + 1e-9) {
+        g->trickT = -1; g->tricks++; g->tricksTotal++; g->coinsGot += 5; g->trickCoins += 5;
+        event(g, EV_TRICK_DONE, &e); e->n = g->tricks; e->perfect = 0;
+      } else if (!arc_flight(g, NULL, &b)) {
+        g->trickT = -1; g->tricks = 0;
+        g->coinsGot -= g->trickCoins; event(g, EV_TRICK_FAIL, &e); e->lost = g->trickCoins; g->trickCoins = 0;
+      }
       else if (g->trickT >= ARC_TRICK_T - 1e-9) {
         int perfect = (b - g->s) / (g->v * 60 / R_UNITS) <= ARC_PERFECT_T;
         g->trickT = -1; g->tricks++; g->tricksTotal++;
-        g->coinsGot += perfect ? 10 : 5;
+        g->coinsGot += perfect ? 10 : 5; g->trickCoins += perfect ? 10 : 5;
         event(g, EV_TRICK_DONE, &e); e->n = g->tricks; e->perfect = perfect;
       }
     }
-    if (g->tricks && g->trickT < 0 && !arc_flight(g, NULL, NULL)) g->tricks = 0;
+    if (g->tricks && g->trickT < 0 && !arc_flight(g, NULL, NULL)) { g->tricks = 0; g->trickCoins = 0; }
     if (lane == g->campLane) g->campRows += g->s - before;
     else { g->campLane = lane; g->campRows = 0; }
     n = g->nEvents;
@@ -813,7 +824,7 @@ double game_speed_ms(const Game *g) { return g->v * 60 * M_PER_UNIT; }
 
 const char *event_name(EventType t) {
   static const char *n[] = { "world", "wave", "spawn", "coin", "foldOrder", "foldStart", "foldEnd",
-                             "boost", "crash", "death", "camp", "trick", "trickDone", "trickFail", "wall", "smash" };
+                             "boost", "crash", "death", "camp", "trick", "trickDone", "trickFail", "wall", "smash", "wallSoon" };
   return n[t];
 }
 
@@ -838,10 +849,15 @@ void game_init_arcade(Game *g, uint32_t seed) {
   }
   g->waveLeft = g->wave->n;
   g->campRows = 0; g->campLane = -1; g->camps = 0;
-  g->trickT = -1; g->tricks = 0; g->tricksTotal = 0;
+  g->trickT = -1; g->tricks = 0; g->tricksTotal = 0; g->trickCoins = 0; g->easyWalls = 0;
   g->wallWorld = -1; g->wallLead = 0; g->wallAfter = 0; g->walls = 0; g->smashes = 0;
   g->seenWorld = g->world; g->worldT = 0;
   init_boost(g);
+}
+
+void game_init_arcade_easy(Game *g, uint32_t seed, int easyWalls) {
+  game_init_arcade(g, seed);
+  g->easyWalls = easyWalls;
 }
 
 GameMode mode_from_name(const char *name) {

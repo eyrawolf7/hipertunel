@@ -52,7 +52,7 @@ function hashBits(g) {
   return H;
 }
 
-const g = mode === 'arcade' ? new Arcade({ seed }) : new Game({ mode, seed });
+const g = mode === 'arcade' ? new Arcade({ seed, easyWalls: seed % 2 ? 2 : 0 }) : new Game({ mode, seed });
 if (god) {
   // choque sin consecuencias en los choques mortales; igual que g->god en game.c
   g.crash = function (box) {
@@ -95,6 +95,7 @@ while (g.frame < frames) {
         case 'death': s += ` id=${e.id}`; break;
         case 'camp': s += ` lane=${e.lane}`; break;
         case 'trick': s += ` n=${e.n}`; break;
+        case 'trickFail': s += ` lost=${e.lost}`; break;
         case 'wall': s += ` k=${e.k} lane=${e.lane}`; break;
         case 'smash': s += ` id=${e.id} lane=${e.lane} k=${e.k}`; break;
         case 'trickDone': s += ` n=${e.n} perfect=${b01(e.perfect)}`; break;
