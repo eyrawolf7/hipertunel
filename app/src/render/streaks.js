@@ -39,6 +39,9 @@ export class Streaks {
     const light = bright > 0.6 && !this.outside;
     this.mat.blending = light ? THREE.NormalBlending : THREE.AdditiveBlending;
     this.c.set(light ? 0x3a3170 : bright > 0.5 ? 0xffffff : 0xfff1c9);
+    // estela de la tienda (solo estética)
+    const sty = this.style;
+    if (sty && sty.col) { this.c.set(sty.col); this.mat.blending = THREE.NormalBlending; }
     // por fuera, sobre el cielo, se tiñen y bajan: si no parecen arañazos
     if (this.outside) this.c.lerp(fogColor, 0.5);
     for (let i = 0; i < N; i++) {
@@ -51,6 +54,7 @@ export class Streaks {
       this.pos[p] = X; this.pos[p + 1] = Y; this.pos[p + 2] = z0;
       this.pos[p + 3] = X; this.pos[p + 4] = Y; this.pos[p + 5] = z1;
       const f = Math.min(1, (z0 + D * o.r / 0.42) / 6);
+      if (sty && sty.rainbow) { this.c.setHSL((i * 0.137 + 0.02) % 1, 0.9, 0.62); if (this.c.b > this.c.r && this.c.b > this.c.g) this.c.setHSL(0.9, 0.9, 0.65); this.mat.blending = THREE.NormalBlending; }
       for (let j = 0; j < 2; j++) { this.col[p + j * 3] = this.c.r * f; this.col[p + j * 3 + 1] = this.c.g * f; this.col[p + j * 3 + 2] = this.c.b * f; }
     }
     this.lines.geometry.attributes.position.needsUpdate = true;

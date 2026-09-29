@@ -35,17 +35,23 @@ async function open(viewport = DESKTOP, url = URL0, { clearStorage = true } = {}
   const errors = [];
   page.on('pageerror', (e) => errors.push('pageerror: ' + String(e)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
-  page.on('requestfailed', (r) => errors.push('requestfailed: ' + r.url() + ' ' + (r.failure()?.errorText || '')));
+  // las cancelaciones (ERR_ABORTED) mientras se abre la página son de un intento de carga anterior
+  // o de una recarga del servidor de desarrollo, no fallos del juego
+  let opening = true;
+  page.on('requestfailed', (r) => { const t = r.failure()?.errorText || ''; if (opening && /ERR_ABORTED/.test(t)) return; errors.push('requestfailed: ' + r.url() + ' ' + t); });
   let loads = 0;
   page.on('load', () => { loads++; if (loads > 1 && !page.__qaReload) reloads.push(page.url()); });
   if (clearStorage) await page.evaluateOnNewDocument(() => { if (!sessionStorage.getItem('qa-keep')) { try { localStorage.clear(); } catch (e) {} sessionStorage.setItem('qa-keep', '1'); } });
   page.__qaReload = true;
   for (let tries = 0; ; tries++) {
+    // los errores de un intento fallido (peticiones canceladas al reintentar) no cuentan
+    errors.length = 0;
     try { await page.goto(url, { waitUntil: 'networkidle0' }); await page.waitForFunction(() => window.__hip && window.__hip.game, { timeout: 15000 }); break; }
     catch (e) { if (tries >= 2) throw e; await sleep(2000); }
   }
   page.__qaReload = false;
   await sleep(600);
+  opening = false;
   return { page, errors };
 }
 const st = (page) => page.evaluate(() => window.__hip.state);
@@ -241,7 +247,7 @@ await run(5, async () => {
   }, sign, n, gs, gz, angle);
   await motion(1);
   const a = await page.evaluate(() => ({ has: window.__hip.input.hasTilt, v: +window.__hip.input.tiltValue.toFixed(3) }));
-  rec(5, 'devicemotion detectado', a.has && Math.abs(a.v) > 0.2, { screenAngle: angle, ...a, esperado: +(0.981 * Math.sin(15 * Math.PI / 180)).toFixed(3) });
+  rec(5, 'devicemotion detectado, con la magnitud del original (g lateral × 0,1)', a.has && Math.abs(Math.abs(a.v) - 0.981 * Math.SQRT1_2 * Math.sin(15 * Math.PI / 180)) < 0.005, { screenAngle: angle, ...a, esperado: +(0.981 * Math.SQRT1_2 * Math.sin(15 * Math.PI / 180)).toFixed(3) });
   const out = {};
   for (const sign of [1, -1]) {
     await page.evaluate(() => window.__hip.start('classic', 11)); await invul(page);
@@ -269,6 +275,20 @@ await run(5, async () => {
   // meter del título
   const meter = await page.evaluate(() => getComputedStyle(document.getElementById('tiltMeter')).getPropertyValue('--v'));
   note(5, 'medidor de inclinación (--v)', meter);
+  // con inclinación, tocar la pantalla jugando pausa; el mismo toque no pulsa "Continuar"
+  await page.evaluate(() => { window.__hip.ui.show('hud'); window.__hip.start('classic', 11); });
+  await invul(page); await motion(1);
+  const wp = await waitState(page, 'play', 6000);
+  await page.touchscreen.tap(PHONE.width / 2, PHONE.height / 2);
+  await sleep(60);
+  const p1 = { st: await st(page), scr: await scr(page) };
+  rec(5, 'con inclinación, un toque en la pantalla pausa', wp.ok && p1.st === 'paused' && p1.scr === 'pause', { wp, ...p1 });
+  await page.evaluate(() => document.querySelector('.scr[data-screen="pause"] [data-act="resume"]').click());
+  rec(5, 'el toque que pausa no reanuda al instante', (await st(page)) === 'paused', await st(page));
+  await sleep(500);
+  await clickIn(page, 'pause', '[data-act="resume"]');
+  const w2 = await waitState(page, ['countdown', 'play'], 1500);
+  rec(5, 'Continuar reanuda la partida', w2.ok, w2);
   if (errors.length) rec(5, 'sin errores', false, errors);
   await page.close();
 });
@@ -701,7 +721,60 @@ await run(16, async () => {
   await page.close();
 });
 
+// ------------------------------------------------------------------ 19. Aventura
+await run(19, async () => {
+  const { page, errors } = await open(PHONE);
+  await page.evaluate(() => localStorage.removeItem('hipertunel-aventura'));
+  await page.evaluate(() => { window.__hip.ui.show('modes'); document.querySelector('.card-adventure').click(); });
+  await sleep(500);
+  const map = await page.evaluate(() => ({ scr: document.getElementById('ui').dataset.screen, n: document.querySelectorAll('.stage').length, locked: document.querySelectorAll('.stage.locked').length }));
+  rec(19, 'el mapa enseña 12 tramos y solo el primero abierto', map.scr === 'map' && map.n === 12 && map.locked === 11, map);
+  await page.evaluate(() => document.querySelector('[data-stage="0"]').click());
+  const w = await waitState(page, 'play', 6000);
+  await page.evaluate(() => { const h = window.__hip; h.input.steer = () => h.bot(h.game, 11); });
+  const t0 = Date.now();
+  await page.waitForFunction(() => window.__hip.state === 'over', { timeout: 90000 }).catch(() => {});
+  const r = await page.evaluate(() => ({ st: window.__hip.state, cleared: window.__hip.game.cleared, stars: window.__hip.game.stars, saved: JSON.parse(localStorage.getItem('hipertunel-aventura') || '{}')[0] || null, next: getComputedStyle(document.querySelector('.btn-next')).display }));
+  rec(19, 'el tramo 1 se juega hasta el final con el bot', w.ok && r.st === 'over', { w, st: r.st, s: Math.round((Date.now() - t0) / 1000) });
+  rec(19, 'superado: guarda estrellas y fantasma y ofrece Siguiente', !r.cleared || (r.saved && r.saved.stars === r.stars && r.saved.ghost && r.saved.ghost.length > 100 && r.next !== 'none'), { cleared: r.cleared, stars: r.stars, ghost: r.saved && r.saved.ghost ? r.saved.ghost.length : 0, next: r.next });
+  if (errors.length) rec(19, 'sin errores', false, errors);
+  await page.evaluate(() => localStorage.removeItem('hipertunel-aventura'));
+  await page.close();
+});
+
 // ------------------------------------------------------------------ 17. partida larga (10 min) con memoria
+// ------------------------------------------------------------------ 18. misiones
+await run(18, async () => {
+  const { page, errors } = await open(DESKTOP);
+  const r = await page.evaluate(() => {
+    const M = window.__hip.missions; M.reset();
+    const l0 = M.list();
+    // se cumple "velocidad máxima" con un suceso de impulso a nivel 3, si está activa; si no, se fuerza
+    M.start();
+    const want = l0.map((m) => m.text);
+    const done = [];
+    for (let i = 0; i < 20; i++) done.push(...M.event({ type: 'boost', level: 3 }, window.__hip.game));
+    for (let i = 0; i < 80; i++) done.push(...M.event({ type: 'coin' }, window.__hip.game));
+    for (let i = 0; i < 20; i++) done.push(...M.event({ type: 'near' }, window.__hip.game));
+    const fin = M.finish();
+    const l1 = M.list();
+    const saved = JSON.parse(localStorage.getItem('hipertunel-misiones'));
+    return { want, done: done.map((d) => d.text), fin: fin.completed.length, l1: l1.map((m) => [m.text, m.done]), n1: l1.length, rank: M.rank(), savedN: saved.active.length };
+  });
+  rec(18, 'siempre hay 3 misiones activas y se guardan', r.n1 === 3 && r.savedN === 3, r);
+  rec(18, 'las cumplidas avisan en partida y se sustituyen al acabar', r.done.length === r.fin && r.l1.every((m) => !m[1]), { done: r.done, fin: r.fin, l1: r.l1 });
+  rec(18, 'el rango sube cada 3 cumplidas', r.rank.level === 1 + Math.floor(r.rank.done / 3), r.rank);
+  // pausa y fin de partida enseñan las misiones
+  await page.evaluate(() => { window.__hip.start('classic', 5); });
+  await waitState(page, 'play', 4000);
+  await page.keyboard.press('Escape'); await sleep(200);
+  const np = await page.evaluate(() => document.querySelectorAll('.scr[data-screen="pause"] .miss li').length);
+  rec(18, 'la pausa enseña las 3 misiones', np === 3, np);
+  if (errors.length) rec(18, 'sin errores', false, errors);
+  await page.evaluate(() => window.__hip.missions.reset());
+  await page.close();
+});
+
 await run(17, async () => {
   const MIN = +(opt.long || 10);
   const { page, errors } = await open(DESKTOP);

@@ -102,4 +102,36 @@ export function surf(sec, u, closed, out) {
   return out;
 }
 
-export const toWorld = (fr, x, y, v) => v.copy(fr.P).addScaledVector(fr.X, x).addScaledVector(fr.U, y);
+// Posición y normal de la cámara: como surf(), pero suaves. surf() sigue las caras planas del
+// dodecágono, así que su normal solo gira cerca de las juntas; con la cámara pegada a ella, un
+// deslizamiento a velocidad constante se veía a golpes (quieta en medio del carril, giro brusco al
+// cruzar la junta): los "saltitos de carril". Aquí, entre los centros de dos carriles vecinos, la
+// posición es una curva de Bézier cuadrática con la junta como punto de control (tangente continua,
+// siempre por dentro de la superficie) y la normal gira de forma lineal: en el tubo cerrado la vista
+// rota a ritmo constante con el ángulo, como en Boost 2. Solo es la cámara: la simulación no cambia.
+export function surfSmooth(sec, u, closed, out) {
+  surf(sec, u, closed, out);
+  if (closed) u = ((u + 0.5) % LANES + LANES) % LANES - 0.5;
+  let i = Math.floor(u);
+  const s = u - i;
+  if (!closed && (i < 0 || i + 1 > LANES - 1)) return out;
+  i = (i + LANES) % LANES;
+  const j = (i + 1) % LANES;
+  const { b, d } = sec;
+  const h = CELL_W * 0.5;
+  const m0x = b[i * 2] + d[i * 2] * h, m0y = b[i * 2 + 1] + d[i * 2 + 1] * h;
+  const m1x = b[j * 2] + d[j * 2] * h, m1y = b[j * 2 + 1] + d[j * 2 + 1] * h;
+  const vx = b[(i + 1) * 2], vy = b[(i + 1) * 2 + 1];                  // junta entre los dos
+  const k0 = (1 - s) * (1 - s), k1 = 2 * s * (1 - s), k2 = s * s;
+  out.x = k0 * m0x + k1 * vx + k2 * m1x;
+  out.y = k0 * m0y + k1 * vy + k2 * m1y;
+  // la normal gira por ángulo (no mezclando vectores): ritmo exactamente constante
+  const a0 = Math.atan2(d[i * 2], -d[i * 2 + 1]);
+  let da = Math.atan2(d[j * 2], -d[j * 2 + 1]) - a0;
+  da = Math.atan2(Math.sin(da), Math.cos(da));
+  const a = a0 + da * s;
+  out.nx = Math.cos(a); out.ny = Math.sin(a);
+  return out;
+}
+
+export const toWorld =(fr, x, y, v) => v.copy(fr.P).addScaledVector(fr.X, x).addScaledVector(fr.U, y);

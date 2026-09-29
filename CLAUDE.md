@@ -69,9 +69,11 @@ web, desde un Android, sale el botón "App para Android"). Emulador para probarl
 Mira las capturas y compáralas con `referencias/video-original/` y `referencias/estilo-visual/`.
 Sé autocrítico. Para trabajos grandes, reparte en agentes según `docs/CONTRATO.md` (cada uno
 dueño de su carpeta). El equipo está en `.claude/agents/`: `director-arte` (crítico visual con
-contexto limpio), `qa-jugador`, `auditor-fidelidad` (contra el descompilado de Boost 2 en
+contexto limpio), `critico-jugador` (perspectiva gamer: diversión, adicción, justicia),
+`qa-jugador` (fallos funcionales), `auditor-fidelidad` (contra el descompilado de Boost 2 en
 `referencias/boost2-decompilado/`), `sonido`, `interfaz` y `modelador-blender`. Tras cambios
-visuales, pasa el director de arte; tras cambios de reglas, el auditor; antes de publicar, el QA.
+visuales, pasa el director de arte; tras cambios de reglas, el auditor; tras mecánicas o modos
+nuevos, el crítico jugador; antes de publicar, el QA.
 
 ## Siguientes pasos
 

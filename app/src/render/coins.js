@@ -10,7 +10,7 @@ export class Coins {
   constructor(scene) {
     let geo = new THREE.CylinderGeometry(0.45, 0.45, 0.13, 32);
     geo.rotateX(Math.PI / 2);
-    this.mat = new THREE.MeshStandardMaterial({ color: 0xffc21a, metalness: 0.85, roughness: 0.22, emissive: 0xff9a00, emissiveIntensity: 0.15 });
+    this.mat = new THREE.MeshStandardMaterial({ color: 0xffd23a, metalness: 0.9, roughness: 0.25, envMapIntensity: 1.5, emissive: 0xff9a00, emissiveIntensity: 0.06 });
     this.mesh = new THREE.InstancedMesh(geo, this.mat, MAX);
     this.mesh.frustumCulled = false; this.mesh.count = 0;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);

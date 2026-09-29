@@ -8,25 +8,30 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { CELL_DEG, LANES } from '../sim/game.js';
-import { Track, makeFrame, section, surf } from './track.js';
+import { Track, makeFrame, section, surf, surfSmooth } from './track.js';
 import { Tunnel } from './tunnel.js';
 import { Boxes } from './boxes.js';
 import { Pads } from './pads.js';
-import { Sky } from './sky.js';
-import { Decor } from './decor.js';
+import { Sky, setPanoRenderer } from './sky.js';
+import { Decor, aerialU } from './decor.js';
 import { Fx } from './fx.js';
 import { Coins } from './coins.js';
 import { Streaks } from './streaks.js';
+import { TunnelKit, kitU } from './tunnelkit.js';
+import { TunnelProps } from './tunnelprops.js';
+import { Life } from './life.js';
+import { AdvView } from './advview.js';
+import { styleUniforms } from './stylize.js';
 import { THEMES, BOX_COLORS } from './worlds.js';
 
 const DEG = Math.PI / 180;
 const INV_FOG = new THREE.Color(0x0b0822);
 const BOOST_BLUE = new THREE.Color(0x3fb6ff).multiplyScalar(2);
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, uBlur: { value: 0 }, uFlash: { value: new THREE.Vector4(1, 1, 1, 0) }, uVig: { value: 0.1 }, uCA: { value: 0.0 }, uVigCol: { value: new THREE.Color(0x2b2257) }, uTime: { value: 0 }, uSat: { value: 1.08 } },
+  uniforms: { tDiffuse: { value: null }, uBlur: { value: 0 }, uFlash: { value: new THREE.Vector4(1, 1, 1, 0) }, uVig: { value: 0.1 }, uCA: { value: 0.0 }, uVigCol: { value: new THREE.Color(0x2b2257) }, uTime: { value: 0 }, uSat: { value: 1.14 }, uCon: { value: 1.12 }, uLo: { value: new THREE.Color(0.95, 0.98, 1.07) }, uHi: { value: new THREE.Color(1.05, 1.0, 0.93) } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: /* glsl */`
-    uniform sampler2D tDiffuse; uniform float uBlur; uniform vec4 uFlash; uniform float uVig; uniform float uCA; uniform float uTime; uniform float uSat; uniform vec3 uVigCol;
+    uniform sampler2D tDiffuse; uniform float uBlur; uniform vec4 uFlash; uniform float uVig; uniform float uCA; uniform float uTime; uniform float uSat; uniform vec3 uVigCol; uniform float uCon; uniform vec3 uLo; uniform vec3 uHi;
     varying vec2 vUv;
     void main(){
       vec2 c = vec2(0.5, 0.52); vec2 d = vUv - c; float r = length(d);
@@ -38,6 +43,9 @@ const GradeShader = {
         acc += vec3(texture2D(tDiffuse, uv + d * uCA).r, texture2D(tDiffuse, uv).g, texture2D(tDiffuse, uv - d * uCA).b) * w; tot += w; }
       vec3 col = acc / tot;
       float l = dot(col, vec3(0.2126, 0.7152, 0.0722)); col = mix(vec3(l), col, uSat);
+      col = max(vec3(0.0), (col - 0.18) * uCon + 0.18);                 // contraste alrededor del gris medio (lineal)
+      // virado partido: sombras hacia el frío, luces hacia el cálido (luz de tarde estilizada)
+      col *= mix(uLo, uHi, smoothstep(0.03, 0.5, dot(col, vec3(0.2126, 0.7152, 0.0722))));
       col = mix(col, col * uVigCol * 1.6, uVig * smoothstep(0.35, 0.95, r * 1.25));
       col = mix(col, uFlash.rgb, uFlash.a);
       gl_FragColor = vec4(col, 1.0);
@@ -66,6 +74,11 @@ export class Renderer {
     this.sky = new Sky(this.scene);
     this.decor = new Decor(this.scene);
     this.tunnel = new Tunnel(this.scene);
+    this.kit = new TunnelKit(this.scene);
+    this.kit.onReady = () => this.warmup();
+    this.props = new TunnelProps(this.scene); this.life = new Life(this.scene); this.adv = new AdvView(this.scene); this.ghostGame = null;
+    this.scene.fog = new THREE.Fog(0xffffff, 40, 120);
+    this.stoneTint = new THREE.Color(1, 1, 1);
     this.boxes = new Boxes(this.scene);
     this.pads = new Pads(this.scene);
     this.fx = new Fx(this.scene);
@@ -116,17 +129,26 @@ export class Renderer {
     this.camera.updateProjectionMatrix();
   }
 
-  reset() { this.track.reset(); this.fx.reset(); this.cam.shake = 0; this.cam.kick = 0; this.cam.roll = 0; this.cam.rollAmp = 0; this.deathFocus = null; this.themeIdx = 0; this.pendingTheme = 0; this.applyTheme(0, 0, 1); this.look.set(0, 0, -1); this.upS.set(0, 1, 0); this.firstFrame = true; }
+  reset() { this.track.reset(); this.fx.reset(); this.cam.shake = 0; this.cam.kick = 0; this.cam.roll = 0; this.cam.rollAmp = 0; this.deathFocus = null; this.themeIdx = this.themeBase || 0; this.pendingTheme = 0; this.applyTheme(this.themeIdx, this.themeIdx, 1); this.look.set(0, 0, -1); this.upS.set(0, 1, 0); this.firstFrame = true; }
 
   applyTheme(from, to, t) {
     const A = THEMES[from % THEMES.length], B = THEMES[to % THEMES.length];
     const c = (k, target) => target.set(A[k]).lerp(new THREE.Color(B[k]), t);
     const u = this.tunnel.uniforms;
-    c('base', u.uBase.value); c('base2', u.uBase2.value); c('seam', u.uSeam.value); c('fog', u.uFog.value); c('glow', u.uGlow.value);
+    c('base', u.uBase.value); c('base2', u.uBase2.value); c('seam', u.uSeam.value); c('fog', u.uFog.value); c('glow', u.uGlow.value); c('moss', u.uMoss.value);
     u.uDark.value = (A.dark || 0) + ((B.dark || 0) - (A.dark || 0)) * t;
+    styleUniforms.uShadowCol.value.set(A.shadow || 0x6d5fc4).lerp(new THREE.Color(B.shadow || 0x6d5fc4), t);
+    styleUniforms.uRimCol.value.set(A.rim || 0xbfe8ff).lerp(new THREE.Color(B.rim || 0xbfe8ff), t);
+    kitU.uInlay.value.set(A.inlay || 0xffc861).lerp(new THREE.Color(B.inlay || 0xffc861), t);
+    kitU.uSeamGlow.value.set(A.seamGlow || 0).lerp(new THREE.Color(B.seamGlow || 0), t);
+    // sol con el color de cada mundo (dorado, rosado, frío de noche…)
+    const ka = A.sunK || [1.15, 1, 0.8], kb = B.sunK || [1.15, 1, 0.8];
+    styleUniforms.uSunCol.value.setRGB(ka[0] + (kb[0] - ka[0]) * t, ka[1] + (kb[1] - ka[1]) * t, ka[2] + (kb[2] - ka[2]) * t);
     u.uInvBase.value.set(A.inv || 0x13112a).lerp(new THREE.Color(B.inv || 0x13112a), t);
     this.sky.setTheme(A, B, t);
     this.decor.setTheme(t < 0.5 ? A : B);
+    // color del horizonte de cada panorama (el decorado 3D se funde con él)
+    aerialU.uAirCol.value.set(A.air || A.fog).lerp(new THREE.Color(B.air || B.fog), t);
     this.themeFog = u.uFog.value.clone();
     this.themeGlow = u.uGlow.value.clone();
     this.fogColor = u.uFog.value;
@@ -164,6 +186,7 @@ export class Renderer {
     this.scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
     try { this.renderer.compile(this.scene, this.camera); } catch (e) {}
     for (const o of hidden) o.visible = false;
+    setPanoRenderer(this.renderer);
   }
 
   // posición en pantalla (px) de una moneda recogida
@@ -176,6 +199,10 @@ export class Renderer {
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
     return { x: (v.x * 0.5 + 0.5) * w, y: (-v.y * 0.5 + 0.5) * h };
   }
+
+  setRecordRow(k) { this.kit.recordRow = k; }
+  // cosméticos de la tienda
+  setCosmetics({ trail, life }) { this.streaks.style = trail || null; this.life.skin = life || null; this.life.kind = -1; }
 
   consumeLanding() { const l = !!this.landed; this.landed = false; return l; }
 
@@ -211,7 +238,7 @@ export class Renderer {
     const camS = s - 0.12;
     tr.frameAt(camS, this.fr);
     const u = theta / (CELL_DEG * DEG);
-    surf(sec, u, closed, this.sp);
+    surfSmooth(sec, u, closed, this.sp);
     const sp = this.sp, fr = this.fr;
     const N = new THREE.Vector3().copy(fr.X).multiplyScalar(sp.nx).addScaledVector(fr.U, sp.ny);
     const jump = game.jumpAt(camS);
@@ -256,10 +283,19 @@ export class Renderer {
 
     // ---- mundo
     this.tunnel.uniforms.uCam.value.copy(cam.position);
-    // la luz principal va con la cámara (arriba, algo por detrás y a la izquierda): la cara por la
-    // que corres siempre queda bien iluminada, dentro o fuera del tubo
+    // sol fijo en el marco de la pista (arriba del tubo, algo a la izquierda y por detrás): el suelo
+    // recibe sol cálido y el techo queda en sombra fría de color, así las formas grandes (losas,
+    // biseles, arcos) tienen volumen y al girar alrededor del tubo cambia la luz. Una parte sigue a
+    // la cámara (la mitad dentro, el 80 % por fuera) para que la cara por la que corres no quede en
+    // sombra (legibilidad).
     const right = new THREE.Vector3().crossVectors(this.look, this.upS).normalize();
-    this.tunnel.uniforms.uKey.value.copy(this.upS).multiplyScalar(0.85).addScaledVector(this.look, -0.35).addScaledVector(right, -0.4).normalize();
+    const camKey = new THREE.Vector3().copy(this.upS).multiplyScalar(0.85).addScaledVector(this.look, -0.35).addScaledVector(right, -0.4).normalize();
+    const trackKey = new THREE.Vector3().copy(fr.U).multiplyScalar(0.8).addScaledVector(fr.X, -0.5).addScaledVector(fr.F, -0.3).normalize();
+    const outsideK = game.fold < 29 ? 0.8 : 0.5;         // por fuera, tu cara casi siempre al sol
+    this.keyFollow = this.keyFollow === undefined ? outsideK : this.keyFollow + (outsideK - this.keyFollow) * Math.min(1, dt * 1.5);
+    this.tunnel.uniforms.uKey.value.copy(trackKey).lerp(camKey, this.keyFollow).normalize();
+    cam.updateMatrixWorld();
+    styleUniforms.uSunDirV.value.copy(this.tunnel.uniforms.uKey.value).transformDirection(cam.matrixWorldInverse);
     const gapNear = game.gaps.some((g) => g.from - s < 34 && g.to - s > -6);
     const outside = game.fold < 29 || gapNear;
     const fogFar = (outside ? 190 : 120) * (1 + 0.3 * (this.landT > 0 ? this.landT / 1.5 : 0));
@@ -269,6 +305,20 @@ export class Renderer {
     c.hit = Math.max(0, c.hit - dt * 3);
     this.tunnel.uniforms.uHit.value = c.hit;
     this.tunnel.update(game, tr, this.colors, dt);
+    // túnel modelado (kit de Blender) si está cargado y la calidad lo permite
+    // (en Aventura siempre el kit: los huecos y las grietas solo los dibuja él)
+    const useKit = this.kit.ready && (this.quality !== 'baja' || game.mode === 'adventure');
+    this.tunnel.mesh.visible = !useKit;
+    this.kit.setVisible(useKit);
+    if (useKit) {
+      const dk = Math.max(this.tunnel.uniforms.uDark.value, this.cam.invert);
+      this.stoneTint.setRGB(1, 1, 1).lerp(new THREE.Color(0.46, 0.48, 0.64), dk);   // mundos oscuros: la piedra no baja de ~25 % de luminancia
+      this.kit.update(game, tr, this.colors, this.tunnel.laneGlow, this.stoneTint, dk > 0.5);
+    }
+    this.props.setVisible(this.quality !== 'baja');
+    if (this.quality !== 'baja') this.props.update(game, tr);
+    const tu = this.tunnel.uniforms;
+    this.scene.fog.color.copy(tu.uFog.value); this.scene.fog.near = tu.uFogNear.value; this.scene.fog.far = tu.uFogFar.value;
     this.boxes.update(game, tr, this.colors, dt, !game.alive && this.deathT > 0 && Math.floor(this.deathT * 10) % 2 ? game.killer : 0, cam.position);
     this.tunnel.uniforms.uOutside.value += ((game.fold < 29 ? 1 : 0) - this.tunnel.uniforms.uOutside.value) * Math.min(1, dt * 2);
     this.tunnel.uniforms.uSkyFill.value.copy(this.sky.u.uTop.value);
@@ -278,8 +328,15 @@ export class Renderer {
     this.pads.update(game, tr, dt);
     this.coins.update(game, tr, dt, cam.position);
     this.fx.update(dt);
-    this.sky.update(cam, this.fr.U, outside ? 1 : 0, dt, this.cam.invert);
-    this.decor.update(game, tr, cam, outside, dt);
+    // el horizonte del paisaje sigue sobre todo a la cámara (70 %): así queda casi a nivel en la
+    // vista y el paisaje llena la mitad de abajo, aunque vayas por un carril girado; el 30 % de la
+    // pista conserva algo de la sensación de rodar alrededor del tubo
+    this._skyUp = (this._skyUp || new THREE.Vector3()).copy(this.fr.U).lerp(this.upS, 0.7).normalize();
+    this.sky.inside = gapNear ? 0 : Math.max(0, Math.min(1, (game.fold - 20) / 10));
+    this.sky.update(cam, this._skyUp, outside ? 1 : 0, dt, this.cam.invert, this.fr.F);
+    this.decor.update(game, tr, cam, true, dt);   // se ve también por los arcos del túnel
+    this.adv.update(game, tr, dt, this.ghostGame);
+    this.life.update(cam, this.look, this.upS, outside, this.themeIdx, dt, this.quality !== 'baja' && !reduceFx, this.cam.invert);
     this.renderer.setClearColor(this.fogColor, 1);
 
     // impulso: 0,4 s de azul eléctrico en juntas y anillos (nunca en los carriles)
@@ -288,7 +345,7 @@ export class Renderer {
     this.tunnel.uniforms.uRing.value.set(0xfff1c9).lerp(BOOST_BLUE, bk);
     if (this.grade) {
       const g = this.grade.uniforms;
-      g.uBlur.value = (0.01 + sp01 * 0.03 + c.kick * 0.06) * (reduceFx ? 0.3 : 1);
+      g.uBlur.value = (sp01 * 0.016 + c.kick * 0.05) * (reduceFx ? 0.3 : 1);
       g.uCA.value = c.kick * 0.004;
       g.uVigCol.value.copy(this.fogColor);
       if (c.blueVig > 0) { g.uVigCol.value.lerp(BOOST_BLUE, 0.8); g.uVig.value = 0.45; c.blueVig -= dt; }

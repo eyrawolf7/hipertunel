@@ -24,80 +24,97 @@ const frag = /* glsl */`
 uniform vec3 uBase; uniform vec3 uBase2; uniform vec3 uSeam; uniform vec3 uFog; uniform vec3 uGlow;
 uniform vec3 uCam; uniform vec3 uKey; uniform float uFogNear; uniform float uFogFar; uniform float uTime;
 uniform float uInvert; uniform vec2 uCellSize; uniform float uHit; uniform vec3 uRing; uniform float uOutside; uniform vec3 uSkyFill; uniform float uDark; uniform vec3 uInvBase;
+uniform vec3 uMoss; uniform float uGaps;
 varying vec2 vUv; varying vec4 vWarn; varying vec3 vN; varying vec3 vW; varying vec2 vCell;
-float edgeDist(vec2 uv, vec2 size){ vec2 p = uv * size; vec2 q = min(p, size - p); return min(q.x, q.y); }
+float h21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y); }
 void main(){
   vec2 size = uCellSize;
-  float d = edgeDist(vUv, size);
-  float px = fwidth(d) + 1e-4;
-  // junta entre paneles, bisel y subdivisiones finas (el original tiene 2x2 dentro de cada celda)
-  // la junta nunca baja de ~1,6 px: a tamaño de móvil las de lejos se perdían
-  float sw = max(0.02, px * 1.6);
-  float seam = 1.0 - smoothstep(sw - px, sw + px, d);
+  vec2 p = vUv * size;                               // metros dentro de la celda
+  float du = min(p.x, size.x - p.x);                 // distancia a la junta larga (entre carriles)
+  float dv = min(p.y, size.y - p.y);
+  float px = fwidth(du) + 1e-4;
   float camD = length(uCam - vW);
-  float bevel = smoothstep(0.03, 0.26, d);
-  vec2 sub = abs(fract(vUv * vec2(2.0, 2.0)) - 0.5) * size / 2.0;
-  float subD = min(sub.x, sub.y);
-  float subL = (1.0 - smoothstep(0.0, 0.008 + px, subD)) * 0.07;
-  float ao = smoothstep(0.02, 0.12, d);                // sombra suave junto a la junta
-  vec3 N = normalize(vN);
+  // Arcos abiertos en las juntas, una fila sí y otra no: se ve el paisaje entre carriles. El
+  // centro de cada carril es macizo (se conduce por las 12 caras, como en Boost 2).
+  float arch = mod(vCell.y, 2.0) < 1.0 ? sin(clamp(vUv.y, 0.0, 1.0) * 3.14159) : 0.0;
+  float gapW = uGaps * (0.02 + 0.36 * pow(arch, 0.45));
+  if (du < gapW && dv > 0.12) discard;
+  // bloques de piedra tallada: 2 a lo ancho, 4 a lo largo, en hiladas alternas
+  const float CH = 0.667;                            // alto de hilada
+  float bw = size.x / 3.0;                           // tres bloques a lo ancho
+  float course = floor(p.y / CH);
+  float xo = p.x + mod(course, 2.0) * bw * 0.5;
+  float bx = floor(xo / bw);
+  vec2 bl = vec2(fract(xo / bw) * bw, fract(p.y / CH) * CH);
+  float gb = min(min(bl.x, bw - bl.x), min(bl.y, CH - bl.y));
+  float grout = 1.0 - smoothstep(0.014, 0.014 + px * 2.0, gb);
+  // relieve: normal inclinada hacia fuera cerca del borde de cada bloque (canto redondeado) y
+  // un poco de rugosidad; da luz y sombra de piedra de verdad
+  vec2 toC = vec2(bl.x - bw * 0.5, bl.y - CH * 0.5);
+  float edgeK = 1.0 - smoothstep(0.02, 0.12, gb);
+  vec2 tilt = normalize(toC + 1e-4) * edgeK * 0.55 + (vec2(vn(p * 6.0), vn(p * 6.0 + 7.3)) - 0.5) * 0.18;
+  float blockId = h21(vec2(bx + vCell.x * 7.0, course + vCell.y * 5.0));
+  // borde tallado junto al arco o la junta
+  float rim = 1.0 - smoothstep(gapW, gapW + 0.07 + px, du);
+  vec3 N0 = normalize(vN);
+  // base tangente de la celda para inclinar la normal (x a lo ancho, y a lo largo)
+  vec3 Tx = normalize(dFdx(vW) * dFdx(p.x) + dFdy(vW) * dFdy(p.x) + 1e-6);
+  vec3 Ty = normalize(cross(N0, Tx));
+  vec3 N = normalize(N0 + Tx * tilt.x + Ty * tilt.y);
   vec3 V = normalize(uCam - vW);
-  float lam = mix(0.6, 0.86, uOutside) + mix(0.4, 0.14, uOutside) * max(dot(N, uKey), 0.0);
+  float lam = mix(0.55, 0.8, uOutside) + mix(0.5, 0.25, uOutside) * max(dot(N, uKey), 0.0);
   float hemi = 0.5 + 0.5 * N.y;
-  float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
-  vec3 base = mix(uBase2, uBase, hemi) * mix(0.84, 1.0, hemi);   // techo algo más oscuro: da volumen
-  // un leve degradado a lo largo de cada panel le da volumen, como plástico
-  base *= 0.92 + 0.1 * vUv.y;
+  vec3 base = mix(uBase2, uBase, hemi) * mix(0.85, 1.0, hemi);
+  // piedra: cada bloque un pelín distinto y una mancha suave (poco contraste: se lee a 360 km/h)
+  base *= 0.93 + 0.1 * blockId;
+  base *= 0.94 + 0.08 * vn(p * 1.7 + vCell.xy * 3.1);
   vec3 col = base * lam;
-  // aviso: color vivo. Apagado si no estás en ese carril, encendido (y brillante) si estás.
+  // bloque ligeramente abombado: más claro en el centro que en los bordes
+  col *= 0.9 + 0.1 * smoothstep(0.0, 0.18, gb);
+  // aviso: el carril se vuelve cristal del color de la caja. Apagado = cristal pálido, encendido =
+  // cristal vivo que brilla. Las facetas son suaves para no ensuciar la lectura.
   float wa = vWarn.a;
   vec3 warn = vWarn.rgb;
-  // apagado = tono pastel del color (se lee de lejos sin gritar); encendido = color puro que emite
   float on = clamp((wa - 0.42) / 0.58, 0.0, 1.0);
-  vec3 pastel = mix(warn, vec3(1.0), 0.3) * (0.82 + 0.18 * lam);
-  vec3 vivid = warn * (0.85 + 0.15 * lam);
-  if (wa > 0.0) col = mix(pastel, vivid, on);
-  col += warn * on * 0.38;                            // solo el encendido emite (y da bloom)
-  col *= mix(0.78, 1.0, bevel);
-  col += 0.1 * (1.0 - bevel) * step(0.5, vUv.x) * (1.0 - clamp(wa * 2.0, 0.0, 1.0));   // brillo del bisel
+  // facetas de cristal: celdas grandes con aristas claras
+  vec2 fq = p * vec2(1.6, 0.9); vec2 fi = floor(fq + vn(p * 0.7) * 0.8);
+  float facet = 0.5 + 0.5 * sin(h21(fi) * 6.28 + dot(N, uKey) * 3.0);
+  float fedge = 1.0 - smoothstep(0.0, 0.06 + px * 3.0, min(abs(fract(fq.x + vn(p * 0.7) * 0.8) - 0.5), abs(fract(fq.y + vn(p * 0.7) * 0.8) - 0.5)) - 0.44);
+  vec3 pastel = mix(warn, vec3(1.0), 0.32) * (0.8 + 0.2 * lam) * (0.9 + 0.12 * facet);
+  vec3 vivid = warn * (0.8 + 0.2 * lam) * (0.85 + 0.3 * facet);
+  if (wa > 0.0) {
+    col = mix(pastel, vivid, on);
+    col += warn * on * 0.4;                           // solo el encendido emite (y da bloom)
+    col += mix(warn, vec3(1.0), 0.5) * rim * (0.25 + 0.5 * on);   // canto del cristal
+    col += mix(warn, vec3(1.0), 0.6) * fedge * (0.12 + 0.25 * on);   // aristas de las facetas
+  }
+  // juntas entre bloques con musgo; en la piedra, nunca en el cristal del aviso
+  float moss = smoothstep(0.45, 0.8, vn(p * 2.3 + vec2(vCell.y * 1.7, vCell.x)));
+  vec3 groutC = mix(base * 0.42, uMoss * 0.75, moss * 0.75) * lam;
+  col = mix(col, groutC, grout * (1.0 - clamp(wa * 2.0, 0.0, 1.0)));
+  // canto tallado del arco: más claro arriba y con musgo que cuelga
+  vec3 rimC = mix(base * 1.08, uMoss, smoothstep(0.35, 0.75, vn(p * 3.0 + 11.0)) * 0.6) * lam;
+  col = mix(col, rimC, rim * 0.7 * (1.0 - clamp(wa * 2.0, 0.0, 1.0)));
+  // grosor del muro: el borde del arco se ve como piedra cortada, oscura por dentro
+  float depth = 1.0 - smoothstep(0.0, 0.05 + px, du - gapW);
+  col *= mix(0.72, 1.0, smoothstep(0.0, 0.14, du - gapW));
+  col = mix(col, base * 0.38 * lam, depth * step(0.001, gapW - 0.021) * (1.0 - clamp(wa * 2.0, 0.0, 1.0)));
   col += uSkyFill * 0.14 * max(N.y, 0.0) * uOutside;
-  col *= mix(0.86, 1.0, ao);
-  // junta: un tono del propio panel (no tinta morada), con un toque del color de junta del mundo
-  vec3 seamC = mix(base * 0.45, uSeam, 0.6);
-  col = mix(col, seamC, seam);
-  col = mix(col, seamC, subL * (1.0 - clamp(wa * 2.0, 0.0, 1.0) * 0.5));
-  // brillo de plástico: un reflejo especular suave que se mueve con la cámara
   vec3 H = normalize(uKey + V);
-  col += vec3(1.0) * pow(max(dot(N, H), 0.0), 64.0) * 0.1 * (1.0 - clamp(wa, 0.0, 1.0) * 0.5);
-  col += uGlow * fres * 0.25;
-  // anillos de luz neutros cada 8 filas, en la junta: pasan zumbando y dan velocidad sin
-  // teñir ningún carril (regla 2)
-  float ringLine = (mod(vCell.y, 8.0) < 0.5) ? (1.0 - smoothstep(0.02, 0.16 + px * 2.0, vUv.y * size.y)) : 0.0;
-  // en los mundos claros es una banda ancha y suave (no un aro fino en el centro de la vista)
-  float ringBand = (mod(vCell.y, 8.0) < 0.5) ? (1.0 - smoothstep(0.0, 1.4, vUv.y * size.y)) : 0.0;
-  // los anillos se apagan en los últimos metros: si no, pasan como un velo por el borde
-  float ringFade = smoothstep(6.0, 18.0, camD);
-  ringLine *= ringFade; ringBand *= ringFade;
-  float ring = ringLine;
-  float ringB2 = (mod(vCell.y, 8.0) < 0.5) ? (1.0 - smoothstep(0.0, 0.6, vUv.y * size.y)) : 0.0;
-  col = mix(col, uRing * 1.3, ringB2 * ringFade * 0.55 * (1.0 - uInvert));
-  // estado invertido (transición entre mundos): túnel oscuro con juntas de neón
-  // mundos oscuros y estado invertido: baldosa azul noche con juntas de luz (como las texturas
-  // invertidas del original). El aviso sigue siendo apagado/encendido.
-  // pulso de luz que recorre las juntas hacia ti: le da vida al neón
+  col += vec3(1.0) * pow(max(dot(N, H), 0.0), 40.0) * 0.06;
+  // mundos oscuros (noche bioluminiscente) y fase invertida: piedra oscura con juntas que brillan
   float pulse = 0.65 + 0.9 * smoothstep(0.88, 1.0, fract(vCell.y / 24.0 + uTime * 0.6));
-  vec3 neon = mix(uGlow, vec3(1.0), 0.35 + 0.4 * uInvert) * pulse;
-  vec3 inv = uInvBase * (0.7 + 0.3 * lam) * mix(0.8, 1.0, bevel) * (0.8 + 0.4 * hemi) * mix(0.8, 1.0, ao);
+  vec3 neon = mix(uGlow, vec3(1.0), 0.3 + 0.4 * uInvert) * pulse;
+  vec3 inv = uInvBase * (0.75 + 0.25 * lam) * (0.9 + 0.2 * blockId) * (0.8 + 0.4 * hemi);
   inv = mix(inv, vec3(0.03, 0.028, 0.06), uInvert);
-  if (wa > 0.0) inv = mix(warn * 0.4, warn * 1.1, on) + warn * on * 0.3;
-  inv += neon * (seam * 1.25 + subL * 0.45 + ring * 1.0) * (1.0 - clamp(wa * 2.0, 0.0, 1.0) * 0.5);
-  inv += vec3(1.0) * pow(max(dot(N, H), 0.0), 64.0) * 0.06;
+  if (wa > 0.0) inv = mix(warn * 0.4, warn * 1.1, on) + warn * on * 0.3 + mix(warn, vec3(1.0), 0.5) * rim * 0.4;
+  inv += neon * (grout * 0.55 + rim * 0.9) * (1.0 - clamp(wa * 2.0, 0.0, 1.0) * 0.6);
   col = mix(col, inv, max(uInvert, uDark));
-  float dist = length(uCam - vW);
-  float fog = smoothstep(uFogNear, uFogFar, dist);
+  float fog = smoothstep(uFogNear, uFogFar, camD);
   col = mix(col, uFog, fog);
-  // foco de luz al fondo del tubo (solo lejos, más allá de 80 m): tira del ojo hacia delante
-  col += uGlow * fog * (1.0 - fog) * 0.6 * smoothstep(80.0, 110.0, dist) * (1.0 - uOutside);
+  col += uGlow * fog * (1.0 - fog) * 0.5 * smoothstep(80.0, 110.0, camD) * (1.0 - uOutside);
   col = mix(col, vec3(1.0, 0.25, 0.3), uHit * 0.35);
   gl_FragColor = vec4(col, 1.0);
 }`;
@@ -127,7 +144,7 @@ export class Tunnel {
       uKey: { value: new THREE.Vector3(0.3, 0.8, 0.5).normalize() },
       uFogNear: { value: 40 }, uFogFar: { value: 118 }, uTime: { value: 0 }, uInvert: { value: 0 },
       uCellSize: { value: new THREE.Vector2(CELL_W, ROW_M) }, uHit: { value: 0 },
-      uRing: { value: new THREE.Color(0xfff1c9) }, uDark: { value: 0 }, uInvBase: { value: new THREE.Color(0x13112a) }, uOutside: { value: 0 }, uSkyFill: { value: new THREE.Color(0x8fc8ff) },
+      uRing: { value: new THREE.Color(0xfff1c9) }, uDark: { value: 0 }, uMoss: { value: new THREE.Color(0x5fae3a) }, uGaps: { value: 1 }, uInvBase: { value: new THREE.Color(0x13112a) }, uOutside: { value: 0 }, uSkyFill: { value: new THREE.Color(0x8fc8ff) },
     };
     this.mat = new THREE.ShaderMaterial({ vertexShader: vert, fragmentShader: frag, uniforms: this.uniforms, side: THREE.DoubleSide });
     this.mesh = new THREE.Mesh(g, this.mat);

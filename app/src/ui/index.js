@@ -14,12 +14,16 @@
 import { ICON } from './icons.js';
 
 const MODES = {
-  classic: { name: 'Clásico', desc: 'Sin límite. Llega lo más lejos que puedas.', tag: 'Lo de siempre' },
+  arcade: { name: 'Arcade', desc: 'Boost a tope: más cajas, mundos antes y racha ×5 si arriesgas.', tag: 'Recomendado', unit: 'pts' },
+  adventure: { name: 'Aventura', desc: '10 tramos: el tubo se rompe, el suelo se hunde, poderes y jefes.', tag: 'Nuevo' },
+  classic: { name: 'Clásico', desc: 'Boost 2 tal cual: sin límite, llega lo más lejos que puedas.', tag: 'El original' },
   survival: { name: 'Supervivencia', desc: 'Sin impulsos y la velocidad no para de subir.', tag: 'Para valientes' },
   timetrial: { name: 'Contrarreloj', desc: '60 s. Cada impulso suma tiempo, cada choque resta.', tag: 'A toda prisa' },
+  daily: { name: 'Reto diario', desc: 'El mismo túnel para todos hoy. ¿Hasta dónde llegas?', tag: 'Hoy' },
+  voyage: { name: 'Viaje', desc: 'Empieza en el último mundo al que llegaste.', tag: 'Mundos', lockedDesc: 'Llega al mundo 2 para desbloquearlo.' },
 };
 const MODE_KEYS = Object.keys(MODES);
-const MENU_SCREENS = new Set(['title', 'modes', 'settings', 'pause', 'over']);
+const MENU_SCREENS = new Set(['title', 'modes', 'settings', 'pause', 'over', 'shop', 'map']);
 const LOGO = 'Hipertúnel';
 const LOGO_TINTS = ['r', 'y', 'b', 'm'];
 
@@ -79,11 +83,15 @@ function titleHTML() {
     </button>
     <div class="title-row">
       <button class="btn btn-sec" data-nav data-act="modes"><span class="btn-ico">${ICON.grid}</span><span>Modos</span></button>
+      <button class="btn btn-sec" data-nav data-act="shop"><span class="btn-ico">${ICON.coin}</span><span>Tienda</span></button>
       <button class="btn btn-sec" data-nav data-act="settings"><span class="btn-ico">${ICON.gear}</span><span>Ajustes</span></button>
     </div>
   </div>
   <div class="title-foot">
-    <div class="chip chip-best">${ICON.trophy}<span>Récord</span><b data-bind="best">—</b></div>
+    <div class="foot-l">
+      <div class="chip chip-best">${ICON.trophy}<span>Récord</span><b data-bind="best">—</b></div>
+      <div class="chip chip-rank">${ICON.sparkle}<span data-bind="rankName">Novato</span><b data-bind="rankLvl">1</b></div>
+    </div>
     <div class="press">Pulsa para jugar</div>
     <div class="chip chip-ver">v0.40</div>
   </div>
@@ -117,6 +125,26 @@ function modesHTML() {
       </span>
     </button>`).join('')}
   </div>
+</section>`;
+}
+
+function mapHTML() {
+  return `
+<section class="scr scr-menu scr-map" data-screen="map">
+  <div class="vig vig-menu"></div>
+  ${headerHTML('Aventura')}
+  <div class="map-total" data-bind="mapTotal"></div>
+  <div class="map-path" data-bind="map"></div>
+</section>`;
+}
+
+function shopHTML() {
+  return `
+<section class="scr scr-menu scr-shop" data-screen="shop">
+  <div class="vig vig-menu"></div>
+  ${headerHTML('Tienda')}
+  <div class="shop-wallet">${ICON.coin}<b data-bind="wallet">0</b><small>monedas</small></div>
+  <div class="shop-cats" data-bind="shop"></div>
 </section>`;
 }
 
@@ -165,6 +193,7 @@ function settingsHTML() {
         </div>
       </div>
       ${toggleRow('reduceFx', 'eye', 'Menos efectos', 'Por si te mareas')}
+      ${toggleRow('vibe', 'phone', 'Vibración', 'Motor, monedas y choques')}
       ${toggleRow('music', 'music', 'Música')}
       ${toggleRow('sound', 'sound', 'Efectos de sonido')}
     </div>
@@ -178,12 +207,20 @@ function pauseHTML() {
   <div class="vig vig-dim"></div>
   <div class="pop-card pause-card">
     <div class="pc-stripe"></div>
-    <h2 class="pc-title">${ICON.pause}Pausa</h2>
-    <button class="btn btn-primary" data-nav data-act="resume" data-default><span class="btn-ico">${ICON.play}</span><span>Continuar</span></button>
-    <button class="btn btn-sec" data-nav data-act="restart"><span class="btn-ico">${ICON.retry}</span><span>Reiniciar</span></button>
-    <div class="pc-row">
-      <button class="btn btn-sec btn-sm" data-nav data-act="settings"><span class="btn-ico">${ICON.gear}</span><span>Ajustes</span></button>
-      <button class="btn btn-sec btn-sm" data-nav data-act="menu"><span class="btn-ico">${ICON.home}</span><span>Menú</span></button>
+    <div class="pc-cols">
+      <div class="pc-btns">
+        <h2 class="pc-title">${ICON.pause}Pausa</h2>
+        <button class="btn btn-primary" data-nav data-act="resume" data-default><span class="btn-ico">${ICON.play}</span><span>Continuar</span></button>
+        <button class="btn btn-sec" data-nav data-act="restart"><span class="btn-ico">${ICON.retry}</span><span>Reiniciar</span></button>
+        <div class="pc-row">
+          <button class="btn btn-sec btn-sm" data-nav data-act="settings"><span class="btn-ico">${ICON.gear}</span><span>Ajustes</span></button>
+          <button class="btn btn-sec btn-sm" data-nav data-act="menu"><span class="btn-ico">${ICON.home}</span><span>Menú</span></button>
+        </div>
+      </div>
+      <div class="miss-box">
+        <h3 class="miss-title">Misiones <small data-bind="rankLine"></small></h3>
+        <ul class="miss" data-bind="missions"></ul>
+      </div>
     </div>
   </div>
 </section>`;
@@ -198,22 +235,28 @@ function overHTML() {
     <div class="oc-head"><h2 data-bind="headline">¡Buena carrera!</h2><span class="oc-mode" data-bind="mode">Clásico</span></div>
     <div class="oc-cols">
       <div class="oc-main">
+        <div class="oc-adv" data-bind="adv"></div>
         <div class="oc-lbl">Distancia</div>
         <div class="oc-dist"><b data-bind="dist">0</b><span>m</span></div>
         <div class="oc-best">${ICON.trophy}<span>Mejor</span><b data-bind="bestO">—</b></div>
+        <ul class="oc-facts" data-bind="facts"></ul>
         <div class="oc-stats">
-          <div class="stat">${ICON.coin}<b data-bind="coins">0</b><small>monedas</small></div>
+          <div class="stat">${ICON.coin}<b data-bind="coins">0</b><small>a la cartera</small></div>
           <div class="stat stat-score"><span class="st-ico">${ICON.sparkle}</span><b data-bind="score">0</b><small>puntos</small></div>
           <div class="stat"><span class="st-ico">${ICON.timetrial}</span><b data-bind="time">0:00</b><small>tiempo</small></div>
         </div>
       </div>
       <div class="oc-side">
-        <h3 class="oc-toptitle">Tus mejores</h3>
-        <ol class="top5" data-bind="top"></ol>
+        <div class="oc-tabs"><button class="oc-tab on" data-tab="miss">Misiones</button><button class="oc-tab" data-tab="top">Tus mejores</button></div>
+        <div class="oc-pane" data-pane="miss"><div class="miss-done" data-bind="missDone"></div><ul class="miss" data-bind="missions"></ul><div class="miss-rank" data-bind="rankLine"></div></div>
+        <div class="oc-pane" data-pane="top" hidden><ol class="top5" data-bind="top"></ol></div>
+        <div class="oc-pane oc-goals" data-pane="goals" hidden></div>
       </div>
     </div>
     <div class="oc-btns">
       <button class="btn btn-primary" data-nav data-act="restart" data-default><span class="btn-ico">${ICON.retry}</span><span>Otra vez</span></button>
+      <button class="btn btn-sec btn-cp" data-nav data-act="checkpoint"><span class="btn-ico">${ICON.play}</span><span>Desde el control</span></button>
+      <button class="btn btn-primary btn-next" data-nav data-act="next"><span class="btn-ico">${ICON.play}</span><span>Siguiente</span></button>
       <button class="btn btn-sec" data-nav data-act="menu"><span class="btn-ico">${ICON.home}</span><span>Menú</span></button>
     </div>
     <div class="oc-hint">Toca en cualquier sitio para reintentar</div>
@@ -234,6 +277,11 @@ function hudHTML() {
     <div class="hud-speed"><b data-hud="speed">0</b> km/h</div>
   </div>
   <div class="hud-count" data-hud="count"></div>
+  <div class="hud-mult" data-hud="mult"><b data-hud="multN">×1</b><small data-hud="pts">0</small></div>
+  <div class="adv-intro" data-hud="advIntro"></div>
+  <div class="adv-bar" data-hud="advBar"><span data-hud="advN">Tramo 1</span><i><b data-hud="advP"></b></i><em data-hud="advPow"></em></div>
+  <div class="pad-hint pad-l" data-hud="padL">${ICON.chevron}<span>placa</span></div>
+  <div class="pad-hint pad-r" data-hud="padR"><span>placa</span>${ICON.chevron}</div>
   <div class="hud-br" data-hud="chevs">
     <span class="chev" data-c="0">${ICON.chevron}</span><span class="chev" data-c="1">${ICON.chevron}</span><span class="chev" data-c="2">${ICON.chevron}</span>
   </div>
@@ -253,7 +301,7 @@ export function createUI(root, handlers = {}) {
     cssLink.addEventListener('load', () => root.classList.remove('htui-loading'), { once: true });
     cssLink.addEventListener('error', () => root.classList.remove('htui-loading'), { once: true });
   }
-  root.innerHTML = titleHTML() + modesHTML() + settingsHTML() + pauseHTML() + overHTML() + hudHTML()
+  root.innerHTML = titleHTML() + modesHTML() + settingsHTML() + shopHTML() + mapHTML() + pauseHTML() + overHTML() + hudHTML()
     + '<div class="toasts" aria-live="polite"></div>';
 
   const $ = (sel, el = root) => el.querySelector(sel);
@@ -264,11 +312,11 @@ export function createUI(root, handlers = {}) {
 
   let current = 'none';
   let settingsFrom = 'title';
-  let lastMode = 'classic';
+  let lastMode = 'arcade';
   let overShownAt = 0;
   let focused = null;
   const records = { classic: 0, survival: 0, timetrial: 0 };
-  const vals = { tilt: true, invert: false, sens: 1, quality: 'alta', reduceFx: false, music: true, sound: true };
+  const vals = { tilt: true, invert: false, sens: 1, quality: 'alta', reduceFx: false, music: true, sound: true, vibe: true };
 
   // ----- pantallas -----
   function show(name) {
@@ -342,6 +390,8 @@ export function createUI(root, handlers = {}) {
   function back() {
     switch (current) {
       case 'modes': snd('menuBack'); show('title'); break;
+      case 'shop': snd('menuBack'); show('title'); break;
+      case 'map': snd('menuBack'); show('modes'); break;
       case 'settings': snd('menuBack'); show(settingsFrom === 'pause' ? 'pause' : 'title'); break;
       case 'pause': snd('menuBack'); call('onResume'); break;
       case 'over': snd('menuBack'); call('onMenu'); break;
@@ -357,7 +407,16 @@ export function createUI(root, handlers = {}) {
     if (el.dataset.set) { setVal(el.dataset.set, !vals[el.dataset.set]); snd('menuOk'); return; }
     if (el.dataset.adjust === 'quality') { adjust('quality', 1, true); return; }
     if (el.dataset.adjust) return;
-    if (el.dataset.mode) { lastMode = el.dataset.mode; snd('menuOk'); call('onPlay', lastMode); return; }
+    if (el.dataset.stage !== undefined) {
+      if (el.classList.contains('locked')) { snd('menuBack'); toast('Supera el tramo anterior para abrirlo', 'info'); return; }
+      lastMode = 'adventure'; snd('menuOk'); call('onPlay', 'adventure', +el.dataset.stage); return;
+    }
+    if (el.dataset.buy) { const [cat, id] = el.dataset.buy.split(':'); call('onShop', cat, id); return; }
+    if (el.dataset.mode) {
+      if (el.classList.contains('locked')) { snd('menuBack'); toast(MODES[el.dataset.mode].lockedDesc || 'Bloqueado', 'info'); return; }
+      if (el.dataset.mode === 'adventure') { snd('menuOk'); call('onMap'); show('map'); return; }
+      lastMode = el.dataset.mode; snd('menuOk'); call('onPlay', lastMode); return;
+    }
     const act = el.dataset.act;
     if (!act) return;
     if (act === 'back') { back(); return; }
@@ -368,9 +427,12 @@ export function createUI(root, handlers = {}) {
     switch (act) {
       case 'play': call('onPlay', lastMode); break;
       case 'modes': show('modes'); break;
+      case 'shop': call('onShopOpen'); show('shop'); break;
       case 'settings': show('settings'); break;
       case 'resume': call('onResume'); break;
       case 'restart': call('onRestart'); break;
+      case 'next': call('onNext'); break;
+      case 'checkpoint': call('onCheckpoint'); break;
       case 'menu': call('onMenu'); break;
       case 'calibrate': call('onCalibrate'); toast('Centro calibrado', 'info'); break;
       default: break;
@@ -469,11 +531,11 @@ export function createUI(root, handlers = {}) {
   function paintRecords() {
     for (const k of MODE_KEYS) {
       const el = $(`[data-rec="${k}"]`);
-      el.textContent = records[k] > 0 ? `${fmtInt(records[k])} m` : 'Sin récord';
+      el.textContent = records[k] > 0 ? `${fmtInt(records[k])} ${MODES[k].unit || 'm'}` : 'Sin récord';
       el.parentElement.classList.toggle('none', !(records[k] > 0));
     }
-    const b = records[lastMode] || records.classic;
-    $('[data-bind="best"]').textContent = b > 0 ? `${fmtInt(b)} m` : '—';
+    const lm = MODES[lastMode] ? lastMode : 'arcade', b = records[lm] || 0;
+    $('[data-bind="best"]').textContent = b > 0 ? `${fmtInt(b)} ${MODES[lm].unit || 'm'}` : '—';
   }
   function setRecords(r = {}) {
     for (const k of MODE_KEYS) if (r[k] != null) records[k] = +r[k] || 0;
@@ -484,7 +546,7 @@ export function createUI(root, handlers = {}) {
   const hudEl = {
     coins: $('[data-hud="coins"]'), timer: $('[data-hud="timer"]'), timerBox: $('[data-hud="timerBox"]'),
     dist: $('[data-hud="dist"]'), speed: $('[data-hud="speed"]'), chevs: $('[data-hud="chevs"]'),
-    chev: $$('.chev'), distBox: $('.hud-dist'),
+    chev: $$('.chev'), distBox: $('.hud-dist'), padL: $('[data-hud="padL"]'), padR: $('[data-hud="padR"]'), advBar: $('[data-hud="advBar"]'), advIntro: $('[data-hud="advIntro"]'), mult: $('[data-hud="mult"]'), multN: $('[data-hud="multN"]'), pts: $('[data-hud="pts"]'), advN: $('[data-hud="advN"]'), advP: $('[data-hud="advP"]'), advPow: $('[data-hud="advPow"]'),
   };
   const last = {};
   function hudReset() {
@@ -501,6 +563,27 @@ export function createUI(root, handlers = {}) {
       const beyond = st.best > 0 && dist > st.best;
       if (beyond !== last.beyond) { last.beyond = beyond; hudEl.distBox.classList.toggle('gold', beyond); }
     }
+    // flecha hacia la placa más cercana tras perder los impulsos (en el borde, nunca en el centro)
+    // Aventura: avance del tramo y poder activo
+    // Arcade: racha y puntos
+    const mu = st.mult | 0;
+    hudEl.mult.classList.toggle('on', mu > 0);
+    if (mu && mu !== last.mu) { last.mu = mu; hudEl.multN.textContent = '×' + mu; hudEl.mult.dataset.m = mu; restart(hudEl.mult, 'bump'); }
+    if (mu) { const pt = st.points | 0; if (pt !== last.pt) { last.pt = pt; hudEl.pts.textContent = fmtInt(pt) + ' pts'; } }
+    // la tarjeta del tramo solo durante la cuenta atrás
+    const introOn = !!st.adv && st.countdown > 0;
+    if (introOn !== last.introOn) { last.introOn = introOn; hudEl.advIntro.classList.toggle('on', introOn); }
+    const av = st.adv;
+    hudEl.advBar.classList.toggle('on', !!av);
+    if (av) {
+      const p = Math.round(av.p * 1000);
+      if (p !== last.advP) { last.advP = p; hudEl.advP.style.width = (p / 10) + '%'; }
+      if (av.n !== last.advN) { last.advN = av.n; hudEl.advN.textContent = 'Tramo ' + av.n; }
+      const pw = av.power ? `${{ magnet: 'Imán', x2: '×2' }[av.power]} ${Math.ceil(av.powerT)}` : av.shield ? 'Escudo' : '';
+      if (pw !== last.advPow) { last.advPow = pw; hudEl.advPow.textContent = pw; hudEl.advPow.classList.toggle('on', !!pw); }
+    }
+    const pd = st.padDir | 0;
+    if (pd !== last.pd) { last.pd = pd; hudEl.padL.classList.toggle('on', pd < 0); hudEl.padR.classList.toggle('on', pd > 0); }
     const spd = Math.round((st.speedMS || 0) * 3.6);
     if (spd !== last.spd) { last.spd = spd; hudEl.speed.textContent = spd; }
     const coins = st.coins | 0;
@@ -571,29 +654,101 @@ export function createUI(root, handlers = {}) {
     scr.dataset.mode = mode;
     scr.classList.toggle('record', !!r.isRecord);
     bind('mode').textContent = MODES[mode].name;
-    bind('headline').textContent = r.isRecord ? '¡Increíble!' : pick(mode === 'timetrial' ? ['¡Se acabó el tiempo!'] : ['¡Buena carrera!', '¡Casi!', '¡Qué viaje!', '¡Uf, por poco!']);
+    bind('headline').textContent = r.headline ? r.headline : r.isRecord ? '¡Increíble!' : pick(mode === 'timetrial' ? ['¡Se acabó el tiempo!'] : ['¡Buena carrera!', '¡Casi!', '¡Qué viaje!', '¡Uf, por poco!']);
     bind('dist').textContent = fmtInt(r.distM);
-    bind('bestO').textContent = r.best > 0 ? `${fmtInt(r.best)} m` : '—';
+    const unit = MODES[mode] && MODES[mode].unit ? ' ' + MODES[mode].unit : ' m';
+    bind('bestO').textContent = r.best > 0 ? `${fmtInt(r.best)}${unit}` : '—';
     bind('coins').textContent = fmtInt(r.coins);
     bind('score').textContent = fmtInt(r.score);
     bind('time').textContent = fmtTime(r.time);
     const top = Array.isArray(r.top) ? r.top.slice(0, 5) : [];
-    const val = (e) => (typeof e === 'number' ? e : +(e && (e.distM ?? e.dist ?? e.score)) || 0);
+    const val = (e) => (typeof e === 'number' ? e : +(e && (mode === 'arcade' ? e.score : (e.distM ?? e.dist ?? e.score))) || 0);
     let marked = false;
     const rows = [];
     for (let i = 0; i < 5; i++) {
       const e = top[i];
       if (e == null) { rows.push(`<li class="empty"><i>${i + 1}</i><b>—</b></li>`); continue; }
       const v = val(e);
-      const me = !marked && (e.current || (Math.round(v) === Math.round(r.distM || -1)));
+      const me = !marked && (e.me || e.current || (Math.round(v) === Math.round((mode === 'arcade' ? r.score : r.distM) || -1)));
       if (me) marked = true;
       const when = e && e.date ? `<small>${esc(typeof e.date === 'number' ? new Date(e.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : e.date)}</small>` : '';
-      rows.push(`<li class="${me ? 'me' : ''} r${i + 1}"><i>${i + 1}</i><b>${fmtInt(v)} m</b>${when}</li>`);
+      rows.push(`<li class="${me ? 'me' : ''} r${i + 1}"><i>${i + 1}</i><b>${fmtInt(v)}${unit}</b>${when}</li>`);
     }
     bind('top').innerHTML = rows.join('');
+    const adv = r.adv;
+    scr.classList.toggle('is-adv', !!adv);
+    scr.classList.toggle('has-next', !!(adv && adv.hasNext));
+    scr.classList.toggle('has-cp', !!(adv && adv.cp));
+    bind('adv').innerHTML = adv ? `<span class="oa-n">Tramo ${adv.n} · ${esc(adv.name)}</span><span class="oa-stars">${[0, 1, 2].map((i) => `<i class="st ${i < adv.stars ? 'on' : ''}" style="--d:${i}">★</i>`).join('')}</span>` : '';
+    bind('facts').innerHTML = (r.facts && r.facts.lines ? r.facts.lines : []).map((t) => `<li>${esc(t)}</li>`).join('');
+    // misiones cumplidas en esta partida (ya sustituidas en la lista por las nuevas)
+    const done = Array.isArray(r.missionsDone) ? r.missionsDone : [];
+    bind('missDone').innerHTML = done.length > 1 ? `<div class="md">✔ ${done.length} misiones cumplidas</div>` : done.map((m) => `<div class="md">✔ ${esc(m.text)}</div>`).join('');
+    // con récord se enseña primero la tabla; si no, las misiones
+    setTab(adv ? 'goals' : r.isRecord ? 'top' : 'miss');
+    if (adv) {
+      const g = (ok, was, txt) => `<li class="${ok ? 'ok' : was ? 'was' : ''}"><i class="st ${ok || was ? 'on' : ''}">★</i><span>${txt}</span>${ok ? '<b>¡Hecho!</b>' : was ? '<small>ya la tenías</small>' : ''}</li>`;
+      const b = adv.bits | 0, m = adv.merged | 0;
+      $('.oc-goals', scr).innerHTML = `<h3 class="oc-toptitle">Estrellas del tramo</h3><ul class="goals">${g(b & 1, m & 1, adv.cleared ? 'Superado' : `Supéralo (llegaste al ${Math.round(adv.prog * 100)} %)`)}${g(b & 2, m & 2, 'Sin chocar ni caer')}${g(b & 4, m & 4, `Monedas: ${adv.coins}/${adv.goal}`)}</ul><div class="miss-rank">Tiempo ${fmtTime(adv.time)}</div>`;
+    }
     show('over');
     // se reinicia la animación de entrada
     restart($('.over-card', scr), 'enter');
+  }
+
+  // ----- mapa de la Aventura -----
+  const starsHTML = (n) => [0, 1, 2].map((i) => `<i class="st ${i < n ? 'on' : ''}">★</i>`).join('');
+  function paintMap(list = []) {
+    const tot = list.reduce((a, s) => a + s.stars, 0);
+    $('[data-bind="mapTotal"]').innerHTML = `<b>${tot}</b>/${list.length * 3} ★`;
+    const firstOpen = list.findIndex((s) => !s.locked && s.stars === 0);
+    $('[data-bind="map"]').innerHTML = list.map((s, i) => `
+      <button class="stage ${s.locked ? 'locked' : ''} ${s.boss ? 'boss' : ''} ${s.stars ? 'done' : ''}" data-nav data-stage="${i}" style="--i:${i}" ${i === (firstOpen < 0 ? 0 : firstOpen) ? 'data-default' : ''}>
+        <span class="sg-n">${s.locked ? '🔒' : i + 1}</span>
+        <span class="sg-name">${esc(s.name)}</span>
+        <span class="sg-stars">${starsHTML(s.stars)}</span>
+        ${!s.stars && s.best > 0 ? `<span class="sg-best">${Math.round(s.best * 100)} %</span>` : ''}
+      </button>`).join('');
+    if (current === 'map') { const d = $('[data-default]', screens.map); if (d) { focused = null; setFocus(d, false); } }
+  }
+
+  // ----- tienda -----
+  // data: { wallet, cats: [{ key, name, desc, items: [{ id, name, price, sw, owned, eq }] }] }
+  function paintShop(data) {
+    $('[data-bind="wallet"]').textContent = fmtInt(data.wallet);
+    const f = focused && focused.dataset.buy;
+    $('[data-bind="shop"]').innerHTML = data.cats.map((c, ci) => `
+      <div class="shop-cat" style="--i:${ci}">
+        <h3 class="panel-title">${esc(c.name)} <small>${esc(c.desc)}</small></h3>
+        <div class="shop-items">${c.items.map((it) => {
+          const bg = it.sw.length > 2 ? `linear-gradient(135deg, ${it.sw.join(', ')})` : `linear-gradient(135deg, ${it.sw[0]}, ${it.sw[1]})`;
+          const st = it.eq ? '<em class="si-eq">Puesto</em>' : it.owned ? '<em class="si-use">Usar</em>' : `<em class="si-price ${data.wallet < it.price ? 'poor' : ''}">${ICON.coin}${fmtInt(it.price)}</em>`;
+          return `<button class="shop-item ${it.eq ? 'eq' : ''}" data-nav data-buy="${c.key}:${it.id}"><span class="si-sw" style="background:${bg}"></span><span class="si-name">${esc(it.name)}</span>${st}</button>`;
+        }).join('')}</div>
+      </div>`).join('');
+    if (f && current === 'shop') { const el = $(`[data-buy="${f}"]`); if (el) { focused = null; setFocus(el, false); } }
+  }
+
+  // ----- misiones -----
+  let missData = { list: [], rank: { level: 1, name: 'Novato', toNext: 3 } };
+  const missRow = (m) => {
+    const p = Math.round(100 * m.got / m.n);
+    const cnt = m.n > 1 ? `<small>${fmtInt(m.got)}/${fmtInt(m.n)}</small>` : '';
+    return `<li class="${m.done ? 'done' : ''}"><span class="mi-ico">${m.done ? '✔' : ''}</span><span class="mi-txt">${esc(m.text)}${cnt}</span><span class="mi-bar"><i style="width:${p}%"></i></span></li>`;
+  };
+  function missions(list = [], rank = missData.rank) {
+    missData = { list, rank };
+    for (const el of $$('[data-bind="missions"]', root)) el.innerHTML = list.map(missRow).join('');
+    const line = `Rango ${rank.level} · ${esc(rank.name)} · ${rank.toNext === 1 ? 'falta 1 misión' : `faltan ${rank.toNext}`} para subir`;
+    for (const el of $$('[data-bind="rankLine"]', root)) el.textContent = line;
+    for (const el of $$('[data-bind="rankName"]', root)) el.textContent = rank.name;
+    for (const el of $$('[data-bind="rankLvl"]', root)) el.textContent = rank.level;
+  }
+  // pestañas de la tarjeta de fin de partida
+  for (const b of $$('.oc-tab', root)) b.addEventListener('click', (ev) => { ev.stopPropagation(); setTab(b.dataset.tab); });
+  function setTab(t) {
+    for (const b of $$('.oc-tab', root)) b.classList.toggle('on', b.dataset.tab === t);
+    for (const p of $$('.oc-pane', root)) p.hidden = p.dataset.pane !== t;
   }
 
   function settings(values = {}) {
@@ -606,7 +761,12 @@ export function createUI(root, handlers = {}) {
   show('none');
 
   return {
-    show, hud, toast, over, settings, tiltMeter, records: setRecords,
+    intro(d) {
+      hudEl.advIntro.innerHTML = `<div class="ai-n">${d.boss && !d.name.startsWith('Jefe') ? 'Jefe · ' : ''}Tramo ${d.n}</div><div class="ai-name">${esc(d.name)}</div>${d.tip ? `<div class="ai-tip">${esc(d.tip)}</div>` : ''}<ul class="ai-goals">${d.goals.map((g) => `<li><i class="st on">★</i>${esc(g)}</li>`).join('')}</ul>`;
+    },
+    show, hud, toast, over, settings, tiltMeter, records: setRecords, missions, shop: paintShop, map: paintMap,
+    // modos bloqueados: { voyage: true } → tarjeta en gris con su descripción de desbloqueo
+    locks(l = {}) { for (const k of MODE_KEYS) { const c = $(`.card-${k}`); if (!c) continue; c.classList.toggle('locked', !!l[k]); const d = $('.card-desc', c); if (d) d.textContent = l[k] && MODES[k].lockedDesc ? MODES[k].lockedDesc : MODES[k].desc; } },
     navigate, confirm, back,
     get screen() { return current; },
     root,

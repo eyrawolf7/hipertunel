@@ -496,6 +496,10 @@ MODELS = {
     'planet': build_planet, 'arch': build_arch,
 }
 
+import jungle  # noqa: E402  (mundo selva y ruinas)
+jungle.ISLAND = island
+MODELS.update(jungle.MODELS)
+
 
 def main():
     argv = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []

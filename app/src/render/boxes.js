@@ -5,9 +5,13 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { LANES, ROW_M, M_PER_UNIT, SHORT_H } from '../sim/game.js';
 import { section, surf, CELL_W, R, makeFrame } from './track.js';
+import { stylize } from './stylize.js';
+import { loadModel, loadTexture } from './assets.js';
 
 const MAX = 40;
 const DEG = Math.PI / 180;
+
+const KIT_SUB = 12;
 
 export class Boxes {
   constructor(scene, envMap) {
@@ -25,6 +29,7 @@ export class Boxes {
         .replace('#include <color_fragment>', '#include <color_fragment>\nfloat gy = clamp(vUpY + 0.5, 0.0, 1.0);\ndiffuseColor.rgb *= mix(vec3(0.62, 0.55, 0.78), vec3(1.1), gy);')
         .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += diffuseColor.rgb * (0.05 + 0.3 * vGlow);\n// luz de borde blanca: separa la caja de un carril de su mismo color\ntotalEmissiveRadiance += vec3(pow(1.0 - saturate(dot(normalize(vNormal), normalize(vViewPosition))), 2.0)) * 0.35;');
     };
+    stylize(this.mat, { rim: 0.45, key: 'box' });
     this.mesh = new THREE.InstancedMesh(this.geo, this.mat, MAX);
     // contorno oscuro (casco invertido): deja las cajas recortadas como en un juego de Switch y
     // las separa del fondo claro
@@ -54,6 +59,8 @@ export class Boxes {
     this.shadow.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     scene.add(this.shadow);
     this.sm = new THREE.Matrix4(); this.sp2 = new THREE.Vector3(); this.ssc = new THREE.Vector3();
+    this.types = new Uint8Array(MAX); this.dims = new Float32Array(MAX * 3); this.cols = []; this._rc = new THREE.Color();
+    this.loadKit(scene);
     this.nShadow = 0;
     this.outline.frustumCulled = false; this.outline.count = 0;
     scene.add(this.outline);
@@ -63,6 +70,60 @@ export class Boxes {
     this.sp = {}; this.col = new THREE.Color();
     this.glowBy = new Map();
     this.positions = new Map();     // id -> Vector3 (para explosiones y cámara de muerte)
+  }
+
+  // Cajas del kit: bloque de piedra teñido del color de la caja con runa luminosa (fijas) y cubo
+  // de cristal tallado (rodantes). Si no cargan, quedan las cajas redondeadas de siempre.
+  async loadKit(scene) {
+    const kit = await loadModel('kit/boxes_kit');
+    if (!kit) return;
+    const tex = async (n, srgb) => { const t = await loadTexture('kit/' + n); if (t) { t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.flipY = false; t.needsUpdate = true; } return t; };
+    const [alb, nrm, orm, cn] = await Promise.all([tex('stone_albedo.jpg', true), tex('stone_normal.png'), tex('stone_orm.jpg'), tex('crystal_normal.png')]);
+    const stoneM = new THREE.MeshStandardMaterial({ map: alb, normalMap: nrm, aoMap: orm, roughnessMap: orm, roughness: 1 });
+    // borde luminoso del color de la caja (fresnel) y núcleo algo más oscuro: se lee como un bloque
+    // con luz dentro, no como plástico macizo, y el bloom recoge el contorno
+    stoneM.onBeforeCompile = (sh) => {
+      // posición local en el cubo unidad (cada bloque de una caja larga tiene la suya): de ahí salen
+      // las aristas, que se encienden con el color de la caja
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vBoxL;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBoxL = position;');
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vBoxL;')
+        .replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb *= 0.8;')
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+  #ifdef USE_INSTANCING_COLOR
+  float boxFres = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 3.0);
+  vec3 bq = abs(vBoxL);
+  float bMid = bq.x + bq.y + bq.z - max(bq.x, max(bq.y, bq.z)) - min(bq.x, min(bq.y, bq.z));
+  float boxEdge = smoothstep(0.34, 0.44, bMid);
+  // núcleo con algo de luz propia, aristas encendidas y borde fresnel: bloque con luz dentro
+  totalEmissiveRadiance += vColor * (0.14 + boxEdge * 1.0 + boxFres * 0.45);
+  #endif`);
+    };
+    const stone = stylize(stoneM, { rim: 0.35, key: 'box-stone2' });
+    const rune = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const crystal = stylize(new THREE.MeshStandardMaterial({ normalMap: cn, roughness: 0.12, envMapIntensity: 1.6, vertexColors: true, emissive: 0x000000 }), { rim: 0.7, key: 'box-crystal' });
+    const make = (name) => {
+      const out = [];
+      kit.updateMatrixWorld(true);
+      kit.traverse((o) => {
+        if (!o.isMesh || !(o.name === name || o.name.startsWith(name + '_') || o.parent?.name === name)) return;
+        const g = o.geometry.clone();
+        const mn = (o.material?.name || '').toLowerCase();
+        const mat = mn.includes('rune') ? rune : mn.includes('crystal') ? crystal : stone;
+        if (mat !== crystal && g.attributes.color) g.deleteAttribute('color');
+        if (g.attributes.uv && !g.attributes.uv1) g.setAttribute('uv1', g.attributes.uv);
+        g.computeBoundingBox(); const bb = g.boundingBox, sz = new THREE.Vector3(); bb.getSize(sz);
+        const im = new THREE.InstancedMesh(g, mat, MAX * KIT_SUB); im.frustumCulled = false; im.count = 0;
+        im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        im.userData.isRune = mat === rune;
+        scene.add(im); out.push(im);
+      });
+      return out;
+    };
+    this.kitBlock = make('box_block'); this.kitCrystal = make('box_crystal');
+    if (this.kitBlock.length) this.mesh.visible = false;
   }
 
   update(game, track, colors, dt, flashId, camPos) {
@@ -121,6 +182,8 @@ export class Boxes {
       this.glow[n] = g1;
       if (flashId === b.id) { this.mesh.setColorAt(n, this.col.setRGB(1, 1, 1)); this.glow[n] = 2; }
       else this.mesh.setColorAt(n, colors[b.color]);
+      this.types[n] = b.fixed ? 0 : 1;
+      this.dims[n * 3] = w; this.dims[n * 3 + 1] = h; this.dims[n * 3 + 2] = len;
       this.positions.set(b.id, p.clone());
       // con invulnerabilidad atraviesas las cajas: la que tienes encima no debe llenar la pantalla
       if (game.invul > 0 && camPos && p.distanceToSquared(camPos) < 9) { this.mesh.setMatrixAt(n, m.makeScale(0, 0, 0)); }
@@ -129,6 +192,31 @@ export class Boxes {
     this.mesh.count = n;
     this.mesh.instanceMatrix.needsUpdate = true;
     this.outline.count = n;
+    if (this.kitBlock && this.kitBlock.length) {
+      let nb = 0, nc = 0;
+      const tm = new THREE.Matrix4(), tc = new THREE.Color(), sub = new THREE.Matrix4(), cm = new THREE.Matrix4();
+      for (let i = 0; i < n; i++) {
+        this.mesh.getMatrixAt(i, tm); this.mesh.getColorAt(i, tc);
+        const list = this.types[i] === 0 ? this.kitBlock : (this.kitCrystal.length ? this.kitCrystal : this.kitBlock);
+        // la pieza del kit es un cubo: una caja alargada (o un pilar) se monta con varios bloques
+        // casi cúbicos apilados, en vez de estirar uno (la runa saldría deformada)
+        const w = this.dims[i * 3], hh = this.dims[i * 3 + 1], ll = this.dims[i * 3 + 2];
+        const nH = Math.max(1, Math.min(4, Math.round(hh / w))), nL = Math.max(1, Math.min(3, Math.round(ll / w)));
+        for (let a = 0; a < nH; a++) for (let c = 0; c < nL; c++) {
+          const j = list === this.kitBlock ? nb++ : nc++;
+          sub.makeScale(1, 1 / nH, 1 / nL).setPosition(0, (a + 0.5) / nH - 0.5, (c + 0.5) / nL - 0.5);
+          cm.multiplyMatrices(tm, sub);
+          for (const im of list) {
+            im.setMatrixAt(j, cm);
+            // la runa brilla con el color de la caja (más cuanto más cerca estás de su carril)
+            if (im.userData.isRune) im.setColorAt(j, this._rc.copy(tc).multiplyScalar(1.9 + this.glow[i] * 1.6));
+            else im.setColorAt(j, tc);
+          }
+        }
+      }
+      for (const im of this.kitBlock) { im.count = nb; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
+      for (const im of this.kitCrystal) { im.count = nc; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
+    }
     this.shadow.count = ns; this.shadow.instanceMatrix.needsUpdate = true;
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
     this.geo.attributes.aGlow.needsUpdate = true;

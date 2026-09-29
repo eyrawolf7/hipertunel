@@ -10,7 +10,7 @@ export function createInput(target) {
     raw: 0, has: false, motionN: 0, listening: false, target: null,
     keys: new Set(), touches: new Map(), holdT: 0, dir: 0,
     pad: { x: 0, dl: false, dr: false, a: false, b: false, start: false, up: false, down: false, prev: {} },
-    onButton: null,
+    onButton: null, onTap: null,
   };
   try { st.cal = +(localStorage.getItem('hipertunel-cal2') || 0) || 0; } catch (e) {}
 
@@ -26,7 +26,10 @@ export function createInput(target) {
     const phi = Math.atan2(g.y, g.x);
     const base = Math.round(phi / Math.PI) * Math.PI;
     const d = Math.atan2(Math.sin(phi - base), Math.cos(phi - base));
-    st.raw = 0.981 * Math.sin(d);
+    // magnitud exacta del original: el valor bruto del acelerómetro en el eje lateral, ×0,1. Ese
+    // valor incluye cuánto reclinas el móvil hacia atrás (la gravedad que cae en el plano de la
+    // pantalla); con solo 0,981·sen(d) girábamos 1,15-1,4 veces más rápido que Boost 2.
+    st.raw = Math.hypot(g.x, g.y) * 0.1 * Math.sin(d);
     st.has = true;
   }
   function listen() {
@@ -52,7 +55,12 @@ export function createInput(target) {
   addEventListener('blur', () => { st.keys.clear(); st.touches.clear(); });
 
   const el = target;
-  el.addEventListener('pointerdown', (e) => { st.touches.set(e.pointerId, { d: e.clientX < innerWidth / 2 ? -1 : 1, t: 0 }); });
+  el.addEventListener('pointerdown', (e) => {
+    // jugando con inclinación (o con ratón) la pantalla no sirve para girar: un toque pausa, por si
+    // hay que parar. Sin sensor, los toques siguen girando (izquierda / derecha).
+    if (e.pointerType === 'mouse' || (st.tiltOn && st.has)) { st.onTap && st.onTap(); return; }
+    st.touches.set(e.pointerId, { d: e.clientX < innerWidth / 2 ? -1 : 1, t: 0 });
+  });
   const end = (e) => st.touches.delete(e.pointerId);
   el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end); el.addEventListener('pointerleave', end);
 
@@ -86,6 +94,7 @@ export function createInput(target) {
     requestTilt,
     get state() { return st; },
     set onButton(fn) { st.onButton = fn; },
+    set onTap(fn) { st.onTap = fn; },
     configure({ tilt, invert, sens }) { if (tilt !== undefined) st.tiltOn = tilt; if (invert !== undefined) st.invert = invert; if (sens !== undefined) st.sens = sens; },
     calibrate() { st.cal = st.raw; try { localStorage.setItem('hipertunel-cal2', String(st.cal)); } catch (e) {} },
     get tiltValue() { return st.raw - st.cal; },
