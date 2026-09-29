@@ -39,6 +39,13 @@ Mundo selva y ruinas (`jungle.py`, registrado en `build_props.py`):
 | `volcano.glb` | volcán con lava y humo, ~120 m | centro de la base | |
 | `ruin_arch.glb` | arco en ruinas con enredaderas, 19 m | suelo, entre los pilares | se atraviesa por Z |
 
+Protagonista del modo en tercera persona (`fox.py`, script aparte:
+`blender --background --python tools/blender/fox.py [-- --no-preview | --static]`):
+
+| Archivo | Qué es | Origen / ejes (glTF) | Notas |
+|---|---|---|---|
+| `fox.glb` | zorro sobre tabla-hoja, 8958 tris, ~750 KB | centro de la tabla, base en y=0 | mira hacia −Z, derecha +X. Zorro de 1,17 m de pie (orejas) sobre la hoja (cara superior en y=0,13). Malla con piel (4 primitivas: fox, gloss, gold, crystal), 34 huesos, clips `ride` `leanL` `leanR` (bucles de 1,2 s, mezclables por peso), `jump` 0,7 s, `land` 0,3 s, `boost` 0,5 s (bucle), `hit` 0,5 s, `smash` 0,37 s. La parábola del salto la pone el juego |
+
 Presupuesto: moneda < 800 triángulos, cada prop < 4000, total < 1,2 MB.
 Comprobar con `npx --yes @gltf-transform/cli inspect app/src/assets/<archivo>.glb`
 (y `validate`).

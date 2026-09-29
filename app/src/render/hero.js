@@ -35,6 +35,7 @@ export class Hero {
   useModel(m) {
     this.group.remove(this.model);
     this.model = m; this.group.add(m);
+    m.scale.setScalar(1.25);           // mide 1,2 m: un poco más grande para que se lea detrás de las cajas (2 m)
     m.traverse((o) => { if (o.isMesh && o.material) { o.material = o.material.clone(); stylize(o.material, { rim: 0.5, key: 'hero-glb' }); o.frustumCulled = false; } });
     const clips = m.userData.animations || m.animations || [];
     if (clips.length) {
@@ -65,8 +66,10 @@ export class Hero {
     this._m.makeBasis(x, up, z);
     this.group.position.copy(pos);
     this.group.quaternion.setFromRotationMatrix(this._m);
-    this.group.rotateZ(this.lean);
-    this.group.rotateY(-this.lean * 0.35);
+    // con el modelo animado, leanL/leanR ya inclinan tabla y cuerpo ~20°: el grupo pone el resto
+    const k = this.mixer ? 0.45 : 1;
+    this.group.rotateZ(this.lean * k);
+    this.group.rotateY(-this.lean * 0.35 * k);
     if (this.mixer) {
       const L = this.actions.leanL, R = this.actions.leanR, B = this.actions.boost;
       if (L) L.weight = Math.max(0, this.lean / 0.56);

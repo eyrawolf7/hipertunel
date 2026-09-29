@@ -93,6 +93,27 @@ console.log('Zorro (salto)');
   }
   ok(jumped > 5, `salta (${jumped} saltos)`);
   ok(hitShort === 0, `saltando a tiempo no choca con las cajas cortas sueltas (a velocidad de juego) (choques cortos: ${hitShort}, pilares: ${hitTall})`);
+
+  // cargas: sin impulso, el salto se gasta y no se puede encadenar sin recargar
+  const { MAX_CHARGES } = await import('../app/src/sim/zorro.js');
+  const z = new Zorro({ seed: 12 });
+  z.disableBoost(); z.boxes = []; z.step({}); z.boxes = [];
+  const jumpNoBoost = () => { z.boostOn = false; z.invul = 0; const e = z.step({ jump: true }); for (let i = 0; i < 60; i++) { z.boxes = []; z.boostOn = false; z.step({}); } return e; };
+  ok(z.charges === 1, 'empieza con 1 carga');
+  const e1 = jumpNoBoost(), e2 = jumpNoBoost();
+  ok(e1.some((e) => e.type === 'jump') && z.charges === 0, 'saltar gasta la carga');
+  ok(e2.some((e) => e.type === 'noJump') && !e2.some((e) => e.type === 'jump'), 'sin cargas no se salta');
+  z.coinsGot += 10; z.boxes = []; z.step({});
+  ok(z.charges === 1, '10 monedas dan una carga');
+  z.coinsGot += 40; z.boxes = []; z.step({});
+  ok(z.charges === MAX_CHARGES, `como mucho ${MAX_CHARGES} cargas`);
+  z.boostOn = true; z.step({ jump: true });
+  ok(z.inAir && z.charges === MAX_CHARGES, 'con impulso saltar no gasta cargas');
+  // en el aire se gira menos que en el suelo
+  const th0 = z.theta; for (let i = 0; i < 20; i++) z.step({ steer: 0.3 }); const dAir = Math.abs(z.theta - th0);
+  for (let i = 0; i < 60; i++) z.step({});
+  const th1 = z.theta; for (let i = 0; i < 20; i++) z.step({ steer: 0.3 }); const dGround = Math.abs(z.theta - th1);
+  ok(dAir < dGround * 0.6, `en el aire se gira menos (${dAir.toFixed(2)} frente a ${dGround.toFixed(2)} rad)`);
 }
 
 console.log('Cámara (fluidez del giro)');

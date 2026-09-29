@@ -279,6 +279,7 @@ function hudHTML() {
   </div>
   <div class="hud-count" data-hud="count"></div>
   <div class="hud-mult" data-hud="mult"><b data-hud="multN">×1</b><small data-hud="pts">0</small></div>
+  <div class="hud-jumps" data-hud="jumps"><span>salto</span><i data-j="0"><b></b></i><i data-j="1"><b></b></i></div>
   <div class="adv-intro" data-hud="advIntro"></div>
   <div class="adv-bar" data-hud="advBar"><span data-hud="advN">Tramo 1</span><i><b data-hud="advP"></b></i><em data-hud="advPow"></em></div>
   <div class="pad-hint pad-l" data-hud="padL">${ICON.chevron}<span>placa</span></div>
@@ -547,7 +548,7 @@ export function createUI(root, handlers = {}) {
   const hudEl = {
     coins: $('[data-hud="coins"]'), timer: $('[data-hud="timer"]'), timerBox: $('[data-hud="timerBox"]'),
     dist: $('[data-hud="dist"]'), speed: $('[data-hud="speed"]'), chevs: $('[data-hud="chevs"]'),
-    chev: $$('.chev'), distBox: $('.hud-dist'), padL: $('[data-hud="padL"]'), padR: $('[data-hud="padR"]'), advBar: $('[data-hud="advBar"]'), advIntro: $('[data-hud="advIntro"]'), mult: $('[data-hud="mult"]'), multN: $('[data-hud="multN"]'), pts: $('[data-hud="pts"]'), advN: $('[data-hud="advN"]'), advP: $('[data-hud="advP"]'), advPow: $('[data-hud="advPow"]'),
+    chev: $$('.chev'), distBox: $('.hud-dist'), padL: $('[data-hud="padL"]'), padR: $('[data-hud="padR"]'), advBar: $('[data-hud="advBar"]'), advIntro: $('[data-hud="advIntro"]'), mult: $('[data-hud="mult"]'), jumps: $('[data-hud="jumps"]'), jumpPips: $$('.hud-jumps i b'), multN: $('[data-hud="multN"]'), pts: $('[data-hud="pts"]'), advN: $('[data-hud="advN"]'), advP: $('[data-hud="advP"]'), advPow: $('[data-hud="advPow"]'),
   };
   const last = {};
   function hudReset() {
@@ -571,6 +572,20 @@ export function createUI(root, handlers = {}) {
     hudEl.mult.classList.toggle('on', mu > 0);
     if (mu && mu !== last.mu) { last.mu = mu; hudEl.multN.textContent = '×' + mu; hudEl.mult.dataset.m = mu; restart(hudEl.mult, 'bump'); }
     if (mu) { const pt = st.points | 0; if (pt !== last.pt) { last.pt = pt; hudEl.pts.textContent = fmtInt(pt) + ' pts'; } }
+    // Zorro: cargas de salto (llenas) y la que se está recargando con monedas (parcial)
+    const jp = st.jumps;
+    hudEl.jumps.classList.toggle('on', !!jp);
+    if (jp) {
+      const key = jp.n + ':' + Math.round(jp.part * 10) + ':' + (jp.free ? 1 : 0);
+      if (key !== last.jp) {
+        const gained = last.jpN != null && jp.n > last.jpN;
+        last.jp = key; last.jpN = jp.n;
+        hudEl.jumpPips.forEach((b, i) => { b.style.height = (i < jp.n ? 100 : i === jp.n ? jp.part * 100 : 0) + '%'; });
+        hudEl.jumps.classList.toggle('free', !!jp.free);
+        hudEl.jumps.classList.toggle('empty', jp.n === 0 && !jp.free);
+        if (gained) restart(hudEl.jumps, 'bump');
+      }
+    }
     // la tarjeta del tramo solo durante la cuenta atrás
     const introOn = !!st.adv && st.countdown > 0;
     if (introOn !== last.introOn) { last.introOn = introOn; hudEl.advIntro.classList.toggle('on', introOn); }
@@ -769,6 +784,7 @@ export function createUI(root, handlers = {}) {
     // modos bloqueados: { voyage: true } → tarjeta en gris con su descripción de desbloqueo
     locks(l = {}) { for (const k of MODE_KEYS) { const c = $(`.card-${k}`); if (!c) continue; c.classList.toggle('locked', !!l[k]); const d = $('.card-desc', c); if (d) d.textContent = l[k] && MODES[k].lockedDesc ? MODES[k].lockedDesc : MODES[k].desc; } },
     navigate, confirm, back,
+    jumpDenied() { restart(hudEl.jumps, 'shake'); },
     get screen() { return current; },
     root,
   };
