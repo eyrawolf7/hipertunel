@@ -7,7 +7,7 @@
 #define HT_SHADERS_H
 
 #define SH_COMMON_FRAG \
-"uniform float uSatAmt;\n" \
+"uniform float uSatAmt; uniform float uLinear;\n" \
 "vec3 neutralTM(vec3 color){\n" \
 "  const float StartCompression = 0.8 - 0.04; const float Desaturation = 0.15;\n" \
 "  float x = min(color.r, min(color.g, color.b));\n" \
@@ -22,10 +22,12 @@
 "  return mix(color, vec3(newPeak), g);\n" \
 "}\n" \
 "vec3 toSRGB(vec3 c){ c = clamp(c, 0.0, 1.0); return mix(c * 12.92, 1.055 * pow(c, vec3(1.0/2.4)) - 0.055, step(vec3(0.0031308), c)); }\n" \
-"vec3 finish(vec3 c){ float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); c = max(mix(vec3(l), c, uSatAmt), 0.0);\n" \
+"vec3 grade(vec3 c){ float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); c = max(mix(vec3(l), c, uSatAmt), 0.0);\n" \
 "  c = max(vec3(0.0), (c - 0.18) * 1.12 + 0.18);\n" \
 "  c *= mix(vec3(0.95, 0.98, 1.07), vec3(1.05, 1.0, 0.93), smoothstep(0.03, 0.5, dot(c, vec3(0.2126, 0.7152, 0.0722))));\n" \
-"  return toSRGB(neutralTM(c)); }\n"
+"  return toSRGB(neutralTM(c)); }\n" \
+"/* con posproceso (uLinear) la escena sale en lineal HDR y la gradación la hace el último pase */\n" \
+"vec3 finish(vec3 c){ return uLinear > 0.5 ? max(c, 0.0) : grade(c); }\n"
 
 /* ---------------------------------------------------------------- túnel (tunnel.js) */
 static const char *VS_TUNNEL =
@@ -272,19 +274,64 @@ static const char *FS_FLASH =
 /* ---------------------------------------------------------------- HUD 2D */
 static const char *VS_HUD =
 "uniform vec2 uScreen;\n"
-"in vec2 aPos; in vec4 aCol; in vec2 aLocal; in vec3 aBox;\n"
-"out vec4 vCol; out vec2 vLocal; out vec3 vBox;\n"
-"void main(){ vCol = aCol; vLocal = aLocal; vBox = aBox;\n"
+"in vec2 aPos; in vec4 aCol; in vec2 aLocal; in vec3 aBox; in vec3 aTex;\n"
+"out vec4 vCol; out vec2 vLocal; out vec3 vBox; out vec3 vTex;\n"
+"void main(){ vCol = aCol; vLocal = aLocal; vBox = aBox; vTex = aTex;\n"
 "  gl_Position = vec4(aPos.x / uScreen.x * 2.0 - 1.0, 1.0 - aPos.y / uScreen.y * 2.0, 0.0, 1.0); }\n";
 
 static const char *FS_HUD =
-"in vec4 vCol; in vec2 vLocal; in vec3 vBox;\n"
+"uniform sampler2D tFont;\n"
+"in vec4 vCol; in vec2 vLocal; in vec3 vBox; in vec3 vTex;\n"
 "out vec4 fragColor;\n"
 "void main(){\n"
+/* texto: campo de distancia de Fredoka; vTex.z es el umbral (más bajo = trazo más gordo, contorno) */
+"  if (vTex.z > 0.0) { float d = texture(tFont, vTex.xy).r; float w = max(fwidth(d) * 0.7, 0.01);\n"
+"    fragColor = vec4(vCol.rgb, vCol.a * smoothstep(vTex.z - w, vTex.z + w, d)); return; }\n"
 "  vec2 q = abs(vLocal) - vBox.xy + vBox.z;\n"
 "  float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - vBox.z;\n"
 "  float a = clamp(0.5 - d, 0.0, 1.0);\n"
 "  fragColor = vec4(vCol.rgb, vCol.a * a);\n"
 "}\n";
+
+/* ---------------------------------------------------------------- posproceso (bloom + gradación) */
+/* pase de brillo (UnrealBloomPass: umbral 1,22 sobre la luminancia) y bajada a media resolución */
+static const char *FS_BRIGHT =
+"uniform sampler2D tSrc; uniform vec2 uTexel; uniform float uThr;\n"
+"in vec2 vNdc;\n"
+"out vec4 fragColor;\n"
+"void main(){ vec2 uv = vNdc * 0.5 + 0.5;\n"
+"  vec3 c = (texture(tSrc, uv + uTexel * vec2(-1.0, -1.0)).rgb + texture(tSrc, uv + uTexel * vec2(1.0, -1.0)).rgb + texture(tSrc, uv + uTexel * vec2(-1.0, 1.0)).rgb + texture(tSrc, uv + uTexel * vec2(1.0, 1.0)).rgb) * 0.25;\n"
+"  float l = dot(c, vec3(0.299, 0.587, 0.114));\n"
+"  fragColor = vec4(c * smoothstep(uThr, uThr + 0.01, l), 1.0); }\n";
+/* bajada con filtro de 13 muestras simplificado (4 bilineales) */
+static const char *FS_DOWN =
+"uniform sampler2D tSrc; uniform vec2 uTexel;\n"
+"in vec2 vNdc;\n"
+"out vec4 fragColor;\n"
+"void main(){ vec2 uv = vNdc * 0.5 + 0.5;\n"
+"  vec3 c = texture(tSrc, uv).rgb * 0.5 + (texture(tSrc, uv + uTexel * vec2(-1.0, -1.0)).rgb + texture(tSrc, uv + uTexel * vec2(1.0, -1.0)).rgb + texture(tSrc, uv + uTexel * vec2(-1.0, 1.0)).rgb + texture(tSrc, uv + uTexel * vec2(1.0, 1.0)).rgb) * 0.125;\n"
+"  fragColor = vec4(c, 1.0); }\n";
+/* subida con filtro tienda, sumando al nivel de arriba (se usa con mezcla aditiva) */
+static const char *FS_UP =
+"uniform sampler2D tSrc; uniform vec2 uTexel; uniform float uK;\n"
+"in vec2 vNdc;\n"
+"out vec4 fragColor;\n"
+"void main(){ vec2 uv = vNdc * 0.5 + 0.5; vec2 t = uTexel * 1.5;\n"
+"  vec3 c = texture(tSrc, uv).rgb * 4.0\n"
+"    + (texture(tSrc, uv + vec2(t.x, 0.0)).rgb + texture(tSrc, uv - vec2(t.x, 0.0)).rgb + texture(tSrc, uv + vec2(0.0, t.y)).rgb + texture(tSrc, uv - vec2(0.0, t.y)).rgb) * 2.0\n"
+"    + texture(tSrc, uv + t).rgb + texture(tSrc, uv - t).rgb + texture(tSrc, uv + vec2(t.x, -t.y)).rgb + texture(tSrc, uv + vec2(-t.x, t.y)).rgb;\n"
+"  fragColor = vec4(c / 16.0 * uK, 1.0); }\n";
+/* composición final: escena + bloom, gradación de la web, viñeta, tono neutro y sRGB */
+static const char *FS_POST = SH_COMMON_FRAG
+"uniform sampler2D tScene; uniform sampler2D tBloom; uniform float uBloomK; uniform float uVig; uniform vec3 uVigCol; uniform float uBlur;\n"
+"in vec2 vNdc;\n"
+"out vec4 fragColor;\n"
+"void main(){ vec2 uv = vNdc * 0.5 + 0.5; vec2 d = uv - vec2(0.5, 0.52); float r = length(d);\n"
+/* desenfoque radial solo en los bordes con la velocidad (el centro, donde miras, nítido) */
+"  float amt = uBlur * smoothstep(0.18, 0.75, r); vec3 acc = vec3(0.0); float tot = 0.0;\n"
+"  for (int i = 0; i < 5; i++) { float t = float(i) / 4.0; float w = 1.0 - t * 0.6; acc += texture(tScene, uv - d * amt * t).rgb * w; tot += w; }\n"
+"  vec3 col = acc / tot + texture(tBloom, uv).rgb * uBloomK;\n"
+"  col = mix(col, col * uVigCol * 1.6, uVig * smoothstep(0.35, 0.95, r * 1.25));\n"
+"  fragColor = vec4(grade(col), 1.0); }\n";
 
 #endif

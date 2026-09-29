@@ -6,6 +6,7 @@ import os
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..', '..'))
 FILES = [
+    ('font_fredoka', 'ports/switch/assets/fredoka700.ttf'),
     ('stone_albedo', 'app/src/assets/kit/stone_albedo.jpg'),
     ('stone_normal', 'app/src/assets/kit/stone_normal.png'),
     ('stone_orm', 'app/src/assets/kit/stone_orm.jpg'),

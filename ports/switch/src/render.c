@@ -15,6 +15,8 @@
 #define STBI_ONLY_PNG
 #define STBI_NO_STDIO
 #include "stb_image.h"
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
 
 #define DEG (M_PI / 180)
 
@@ -244,6 +246,10 @@ static struct {
   struct { int m; M4 x; } props[400]; int nProps;
   struct { int kind, placed; V3 pos, up; double yaw, spin, scale, k, checkT; } dec[24]; int nDec, decTheme;
   V3 camUp, decUp; C3 airCol;
+  Model mCoin; float coinFix[4];
+  GLuint pFx, fxVao, fxVbo;
+  struct { V3 pos; double rot, spin, flut; unsigned col; int live; } life[70];
+  struct { double a, r, z, v; } stk[44]; int stkInit; int lifeKind;
   GLuint tileVbo[4]; int tileN[4];
   C3 rimCol;
   C3 shadowCol, sunCol, inlay, seamGlow, tint; int panoA, panoB; float panoT; V3 sunDir, fwd; double keyFollow, inside;
@@ -277,9 +283,16 @@ static struct {
   Flying flying[16]; int nFlying;
   /* cielo */
   double skyVis, skyTime, seaTime; V3 skyUp; int skyOn, seaOn; float seaAlpha;
-  float satAmt;
+  float satAmt; double sp01;
 } R;
 
+#define NLV 5
+#ifdef __SWITCH__
+#define MSAA_N 2   /* la consola va más justa: suavizado 2× */
+#else
+#define MSAA_N 4
+#endif
+static struct { int ok, w, h; GLuint msFbo, msCol, msDep, resFbo, resTex, lvFbo[NLV], lvTex[NLV]; int lw[NLV], lh[NLV]; GLuint pBright, pDown, pUp, pPost; } PP;
 static double frand(void) { return rand() / (double)RAND_MAX; }
 
 Track *rn_track(void) { return &R.tr; }
@@ -335,7 +348,7 @@ void rn_reset(void) {
 int rn_init(int es) {
   static const char *const aTun[] = { "aPos", "aN", "aUv", "aWarn", "aCell", NULL };
   static const char *const aMesh[] = { "aPos", "aNrm", NULL };
-  static const char *const aHud[] = { "aPos", "aCol", "aLocal", "aBox", NULL };
+  static const char *const aHud[] = { "aPos", "aCol", "aLocal", "aBox", "aTex", NULL };
   int i;
   gles = es;
   memset(&R, 0, sizeof R);
@@ -347,6 +360,7 @@ int rn_init(int es) {
   R.pSky = program(VS_SKY, FS_SKY, aMesh);
   R.pFlash = program(VS_SKY, FS_FLASH, aMesh);
   R.pHud = program(VS_HUD, FS_HUD, aHud);
+  PP.pBright = program(VS_SKY, FS_BRIGHT, aMesh); PP.pDown = program(VS_SKY, FS_DOWN, aMesh); PP.pUp = program(VS_SKY, FS_UP, aMesh); PP.pPost = program(VS_SKY, FS_POST, aMesh);
   if (!R.pTun || !R.pBox || !R.pCoin || !R.pPad || !R.pSky || !R.pFlash || !R.pHud) return 1;
   {
     static const char *P[5] = { "sky_islas", "sky_selva", "sky_noche", "sky_templo", "sky_volcan" };
@@ -372,7 +386,21 @@ int rn_init(int es) {
     {
       static const char *DN[9] = { "glb_island_a", "glb_island_b", "glb_island_c", "glb_island_castle", "glb_cloud", "glb_crystal", "glb_ruin_arch", "glb_volcano", "glb_coin" };
       for (i = 0; i < 9; i++) model_load(&R.mDecor[i], DN[i], NULL);
+      if (!model_load(&R.mCoin, "glb_coin", NULL)) {
+        /* como coins.js: centrada y con 0,9 de lado mayor en su plano */
+        float mn[3] = { 1e9f, 1e9f, 1e9f }, mx[3] = { -1e9f, -1e9f, -1e9f }; int j, k;
+        for (j = 0; j < R.mCoin.n; j++) for (k = 0; k < 3; k++) { if (R.mCoin.p[j].bmin[k] < mn[k]) mn[k] = R.mCoin.p[j].bmin[k]; if (R.mCoin.p[j].bmax[k] > mx[k]) mx[k] = R.mCoin.p[j].bmax[k]; }
+        R.coinFix[0] = 0.9f / ((mx[0] - mn[0]) > (mx[1] - mn[1]) ? (mx[0] - mn[0]) : (mx[1] - mn[1]));
+        R.coinFix[1] = (mn[0] + mx[0]) / 2; R.coinFix[2] = (mn[1] + mx[1]) / 2; R.coinFix[3] = (mn[2] + mx[2]) / 2;
+      }
     }
+    R.pFx = program(VS_FX, FS_FX, aKit);
+    glGenVertexArrays(1, &R.fxVao); glBindVertexArray(R.fxVao);
+    glGenBuffers(1, &R.fxVbo); glBindBuffer(GL_ARRAY_BUFFER, R.fxVbo);
+    glBufferData(GL_ARRAY_BUFFER, 70 * 6 * 16 * 4, NULL, GL_DYNAMIC_DRAW);
+    { int loc, off = 0; static const int sz[5] = { 3, 3, 2, 4, 4 };
+      for (loc = 0; loc < 5; loc++) { glEnableVertexAttribArray((GLuint)loc); glVertexAttribPointer((GLuint)loc, sz[loc], GL_FLOAT, GL_FALSE, 64, (void *)(size_t)(off * 4)); off += sz[loc]; } }
+    glBindVertexArray(0);
     ok &= !model_load(&R.boxBlock, "glb_boxes_kit", "box_block");
     ok &= !model_load(&R.boxCrystal, "glb_boxes_kit", "box_crystal");
     R.kitOk = ok && R.pCell && R.pModel;
@@ -618,6 +646,87 @@ static void decor_update(const Game *g, double dt) {
   }
 }
 
+/* ---------------------------------------------------------------- vida (life.js) y líneas (streaks.js) */
+typedef struct { int dot; unsigned cols[5]; int n; double size; } LifeKind;
+static const LifeKind LK[5] = {
+  { 0, { 0x7fc24a, 0xa8d45a, 0xe6c35a }, 3, 0.32 }, { 0, { 0x4fae4a, 0x8fd060, 0x3f8f3a }, 3, 0.36 },
+  { 1, { 0x9dfff0, 0xd8ff8a }, 2, 0.22 }, { 0, { 0xffb0c8, 0xffd6a0, 0xff9ab8 }, 3, 0.3 }, { 1, { 0xffa050, 0xff6a30 }, 2, 0.18 },
+};
+static float fxV[70 * 6 * 16]; static int fxN;
+static void fx_vert(V3 p, float u, float v, C3 c, float a) {
+  float *o = &fxV[fxN++ * 16]; V3 q = vsub(p, R.origin);
+  memset(o, 0, 64); o[0] = (float)q.x; o[1] = (float)q.y; o[2] = (float)q.z; o[6] = u; o[7] = v; o[12] = c.r; o[13] = c.g; o[14] = c.b; o[15] = a;
+}
+static void life_spawn(int i, V3 look, V3 up, V3 right, int outside, int near) {
+  double a = frand() * 6.283, r = outside ? 3.5 + frand() * 5 : 2.7 + frand() * 0.8, ca = cos(a), sa = sin(a), d;
+  if (outside && sa < -0.2) sa = -sa;
+  d = near ? 4 + frand() * 20 : 18 + frand() * 8;
+  R.life[i].pos = vadd(vadd(vadd(R.pos, vscale(look, d)), vscale(right, ca * r)), vscale(up, sa * r + (outside ? 0.5 : 3.2)));
+  R.life[i].live = 1;
+}
+static void life_update(double dt, int outside) {
+  const LifeKind *K; int i, kind = R.themeIdx % 5;
+  V3 look = vscale(R.camZ, -1), up = R.camY, right = R.camX;
+  if (kind != R.lifeKind || !R.life[0].spin) {
+    R.lifeKind = kind;
+    for (i = 0; i < 70; i++) { R.life[i].col = LK[kind].cols[(int)(frand() * LK[kind].n) % LK[kind].n]; R.life[i].rot = frand() * 6.28; R.life[i].spin = (frand() - 0.5) * 6 + 0.001; R.life[i].flut = frand() * 6.28; }
+  }
+  K = &LK[kind];
+  fxN = 0;
+  if (R.invert > 0.5) { for (i = 0; i < 70; i++) R.life[i].live = 0; return; }
+  for (i = 0; i < 70; i++) {
+    V3 rel; double ahead, lat, s, sy, c, sn; C3 col; V3 ax, ay;
+    if (outside && (i & 1)) continue;
+    if (!R.life[i].live) life_spawn(i, look, up, right, outside, 1);
+    rel = vsub(R.life[i].pos, R.pos); ahead = vdot(rel, look);
+    if (ahead < -1 || vdot(rel, rel) > 8100) life_spawn(i, look, up, right, outside, 0);
+    rel = vsub(R.life[i].pos, R.pos); ahead = vdot(rel, look);
+    lat = sqrt(pow(vdot(rel, right), 2) + pow(vdot(rel, up), 2));
+    if (ahead > 0 && lat < ahead * 0.12 + 0.7) life_spawn(i, look, up, right, outside, 0);
+    R.life[i].flut += dt * 3; R.life[i].rot += R.life[i].spin * dt;
+    R.life[i].pos = vadd(vadd(R.life[i].pos, vscale(up, (K->dot ? 0.15 * sin(R.life[i].flut) : -0.35) * dt)), vscale(right, 0.3 * sin(R.life[i].flut * 0.7) * dt));
+    s = K->size * (outside ? 0.6 : 1) * (0.7 + 0.6 * ((R.life[i].col & 7) / 7.0)) * (K->dot ? 1 : 0.9 + 0.3 * fabs(sin(R.life[i].flut)));
+    sy = K->dot ? s : s * 1.4;
+    col = cscale(hexc(R.life[i].col), K->dot ? 1.8f : 1.0f);
+    c = cos(R.life[i].rot); sn = sin(R.life[i].rot);
+    ax = vadd(vscale(right, c * s * 0.5), vscale(up, sn * s * 0.5));
+    ay = vadd(vscale(right, -sn * sy * 0.5), vscale(up, c * sy * 0.5));
+    {
+      V3 p = R.life[i].pos, p00 = vsub(vsub(p, ax), ay), p10 = vsub(vadd(p, ax), ay), p11 = vadd(vadd(p, ax), ay), p01 = vadd(vsub(p, ax), ay);
+      fx_vert(p00, 0, 0, col, 1); fx_vert(p10, 1, 0, col, 1); fx_vert(p11, 1, 1, col, 1);
+      fx_vert(p00, 0, 0, col, 1); fx_vert(p11, 1, 1, col, 1); fx_vert(p01, 0, 1, col, 1);
+    }
+  }
+}
+static float stV[44 * 2 * 16]; static int stN; static float stOpacity; static int stAdd;
+static void streaks_update(double dt, int outside, double sp01) {
+  double tanV = tan(R.fov * DEG / 2), speed = 60 + sp01 * 120 + R.kick * 120, len = 2 + sp01 * 9 + R.kick * 10, D = 9;
+  C3 fog = R.uFog, c; float bright = (fog.r + fog.g + fog.b) / 3; int light = bright > 0.6f && !outside, i;
+  if (!R.stkInit) { for (i = 0; i < 44; i++) { R.stk[i].a = frand() * 6.283; R.stk[i].r = 0.55 + frand() * 0.5; { double z0 = -D * R.stk[i].r / 0.42; R.stk[i].z = z0 + frand() * (-z0 - 2); } R.stk[i].v = 0.8 + frand() * 0.5; } R.stkInit = 1; }
+  c = hexc(light ? 0x3a3170 : bright > 0.5f ? 0xffffff : 0xfff1c9);
+  if (outside) c = clerp(c, fog, 0.5f);
+  stAdd = !light; stN = 0;
+  for (i = 0; i < 44; i++) {
+    double z0, z1, X, Y, f;
+    R.stk[i].z += speed * R.stk[i].v * dt;
+    if (R.stk[i].z > -2) { R.stk[i].a = frand() * 6.283; R.stk[i].r = 0.55 + frand() * 0.5; R.stk[i].z = -D * R.stk[i].r / 0.42 - frand() * 6; R.stk[i].v = 0.8 + frand() * 0.5; }
+    z0 = R.stk[i].z; z1 = z0 + len < -1 ? z0 + len : -1;
+    X = cos(R.stk[i].a) * R.stk[i].r * R.aspect * D * tanV; Y = sin(R.stk[i].a) * R.stk[i].r * D * tanV;
+    f = (z0 + D * R.stk[i].r / 0.42) / 6; f = f > 1 ? 1 : f;
+    {
+      V3 a = vadd(vadd(vadd(R.pos, vscale(R.camX, X)), vscale(R.camY, Y)), vscale(R.camZ, -z0));
+      V3 b = vadd(vadd(vadd(R.pos, vscale(R.camX, X)), vscale(R.camY, Y)), vscale(R.camZ, -z1));
+      int k; float *o;
+      for (k = 0; k < 2; k++) {
+        V3 q = vsub(k ? b : a, R.origin);
+        o = &stV[stN++ * 16]; memset(o, 0, 64);
+        o[0] = (float)q.x; o[1] = (float)q.y; o[2] = (float)q.z; o[12] = (float)(c.r * f); o[13] = (float)(c.g * f); o[14] = (float)(c.b * f); o[15] = 1;
+      }
+    }
+  }
+  stOpacity = (float)(minf(0.55, (sp01 - 0.25 > 0 ? sp01 - 0.25 : 0) * 0.5 + R.kick * 0.4) * (1 - R.invert * 0.3) * (outside ? 0.5 : 1) * (light ? 0.6 : 1));
+}
+
 /* ---------------------------------------------------------------- cajas */
 static double ease_out(double t) { return 1 - pow(1 - t, 3); }
 
@@ -810,7 +919,7 @@ void rn_update(const Game *g, double s, double theta, double dt, RenderOpts o) {
   if (vlen(xc) < 1e-9) xc = v3(1, 0, 0);
   xc = vnorm(xc); yc = vcross(zc, xc);
   R.pos = pos; R.origin = pos; R.camX = xc; R.camY = yc; R.camZ = zc;
-  sp01 = clamp01((game_speed_ms(g) - 36) / 64);
+  sp01 = clamp01((game_speed_ms(g) - 36) / 64); R.sp01 = sp01;
   fov = R.baseFov + sp01 * 14 + (R.kick <= 0 ? 0 : sin(minf(1, R.kick) * M_PI * 0.5)) * (o.reduceFx ? 4 : 12) * (R.kickAmp ? R.kickAmp : 1)
       + (R.foldFov > 0 ? sin(minf(1, (1.2 - R.foldFov) / 1.2) * M_PI) * 8 : 0);
   if (R.foldFov > 0) R.foldFov -= dt;
@@ -840,6 +949,8 @@ void rn_update(const Game *g, double s, double theta, double dt, RenderOpts o) {
   tunnel_update(g, dt);
   props_update(g);
   decor_update(g, dt);
+  life_update(dt, outside);
+  streaks_update(dt, outside, sp01);
   flashId = !g->alive && R.deathT > 0 && ((int)floor(R.deathT * 10)) % 2 ? g->killer : 0;
   boxes_update(g, dt, flashId);
   R.outside += ((g->fold < 29 ? 1 : 0) - R.outside) * minf(1, dt * 2);
@@ -866,8 +977,9 @@ void rn_update(const Game *g, double s, double theta, double dt, RenderOpts o) {
 }
 
 /* ---------------------------------------------------------------- dibujo */
+static float linearOut;
 static void kit_uniforms(GLuint p, const M4 *vp) {
-  glUseProgram(p); u1(p, "uSatAmt", R.satAmt);
+  glUseProgram(p); u1(p, "uSatAmt", R.satAmt); u1(p, "uLinear", linearOut);
   um(p, "uVP", vp); u3(p, "uCam", 0, 0, 0);
   uc(p, "uFog", R.uFog); u1(p, "uFogNear", (float)R.fogNear); u1(p, "uFogFar", (float)R.fogFar); u1(p, "uUseFog", 1);
   uv(p, "uSunDir", R.sunDir); uc(p, "uSunCol", R.sunCol); uc(p, "uShadowCol", R.shadowCol); uc(p, "uRimCol", R.rimCol);
@@ -878,7 +990,78 @@ static void kit_uniforms(GLuint p, const M4 *vp) {
 }
 static int is_mat(const Prim *pr, const char *m) { return strstr(pr->mat, m) != NULL; }
 
-static void set_common(GLuint p) { u1(p, "uSatAmt", R.satAmt); }
+/* ---------------------------------------------------------------- posproceso: HDR + bloom + gradación */
+static GLuint hdr_tex(int w, int h) {
+  GLuint t; glGenTextures(1, &t); glBindTexture(GL_TEXTURE_2D, t);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, w, h, 0, GL_RGBA, GL_HALF_FLOAT, NULL);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  return t;
+}
+static void post_setup(int w, int h) {
+  int i, ok = 1; GLint prev = 0;
+  if (!PP.pPost || getenv("HIP_NOPOST")) { PP.ok = 0; return; }
+  if (PP.w == w && PP.h == h && PP.ok) return;
+  glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &prev);
+  PP.w = w; PP.h = h;
+  if (!PP.msFbo) { glGenFramebuffers(1, &PP.msFbo); glGenRenderbuffers(1, &PP.msCol); glGenRenderbuffers(1, &PP.msDep); glGenFramebuffers(1, &PP.resFbo); for (i = 0; i < NLV; i++) glGenFramebuffers(1, &PP.lvFbo[i]); }
+  glBindFramebuffer(GL_FRAMEBUFFER, PP.msFbo);
+  glBindRenderbuffer(GL_RENDERBUFFER, PP.msCol); glRenderbufferStorageMultisample(GL_RENDERBUFFER, MSAA_N, GL_RGBA16F, w, h);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, PP.msCol);
+  glBindRenderbuffer(GL_RENDERBUFFER, PP.msDep); glRenderbufferStorageMultisample(GL_RENDERBUFFER, MSAA_N, GL_DEPTH_COMPONENT24, w, h);
+  glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, PP.msDep);
+  ok &= glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+  PP.resTex = hdr_tex(w, h);
+  glBindFramebuffer(GL_FRAMEBUFFER, PP.resFbo); glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, PP.resTex, 0);
+  ok &= glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+  for (i = 0; i < NLV; i++) {
+    PP.lw[i] = (w >> (i + 1)) > 1 ? (w >> (i + 1)) : 1; PP.lh[i] = (h >> (i + 1)) > 1 ? (h >> (i + 1)) : 1;
+    PP.lvTex[i] = hdr_tex(PP.lw[i], PP.lh[i]);
+    glBindFramebuffer(GL_FRAMEBUFFER, PP.lvFbo[i]); glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, PP.lvTex[i], 0);
+    ok &= glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+  }
+  glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)prev);
+  PP.ok = ok;
+  if (!ok) fprintf(stderr, "sin posproceso HDR (FBO incompleto)\n");
+}
+static void fs_draw(GLuint p, GLuint tex, int w, int h, const char *su) {
+  glViewport(0, 0, w, h);
+  glUseProgram(p); bind_tex(p, su, 0, tex);
+  glBindVertexArray(R.full.vao);
+  glDrawElements(GL_TRIANGLES, R.full.nIdx, GL_UNSIGNED_SHORT, 0);
+}
+static void post_finish(GLint outFbo) {
+  int i;
+  glDisable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glDisable(GL_BLEND); glDepthMask(GL_FALSE);
+  glBindFramebuffer(GL_READ_FRAMEBUFFER, PP.msFbo); glBindFramebuffer(GL_DRAW_FRAMEBUFFER, PP.resFbo);
+  glBlitFramebuffer(0, 0, PP.w, PP.h, 0, 0, PP.w, PP.h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+  /* brillo a media resolución y cadena de bajadas */
+  glBindFramebuffer(GL_FRAMEBUFFER, PP.lvFbo[0]);
+  glUseProgram(PP.pBright); u2(PP.pBright, "uTexel", 0.5f / PP.lw[0], 0.5f / PP.lh[0]); u1(PP.pBright, "uThr", 1.22f);
+  fs_draw(PP.pBright, PP.resTex, PP.lw[0], PP.lh[0], "tSrc");
+  for (i = 1; i < NLV; i++) {
+    glBindFramebuffer(GL_FRAMEBUFFER, PP.lvFbo[i]);
+    glUseProgram(PP.pDown); u2(PP.pDown, "uTexel", 1.0f / PP.lw[i - 1], 1.0f / PP.lh[i - 1]);
+    fs_draw(PP.pDown, PP.lvTex[i - 1], PP.lw[i], PP.lh[i], "tSrc");
+  }
+  /* subidas sumando cada nivel al de arriba */
+  glEnable(GL_BLEND); glBlendFunc(GL_ONE, GL_ONE);
+  for (i = NLV - 1; i > 0; i--) {
+    glBindFramebuffer(GL_FRAMEBUFFER, PP.lvFbo[i - 1]);
+    glUseProgram(PP.pUp); u2(PP.pUp, "uTexel", 1.0f / PP.lw[i], 1.0f / PP.lh[i]); u1(PP.pUp, "uK", 0.8f);
+    fs_draw(PP.pUp, PP.lvTex[i], PP.lw[i - 1], PP.lh[i - 1], "tSrc");
+  }
+  glDisable(GL_BLEND);
+  /* composición */
+  glBindFramebuffer(GL_FRAMEBUFFER, (GLuint)outFbo);
+  glUseProgram(PP.pPost); u1(PP.pPost, "uSatAmt", R.satAmt); u1(PP.pPost, "uLinear", 0);
+  bind_tex(PP.pPost, "tBloom", 1, PP.lvTex[0]);
+  u1(PP.pPost, "uBloomK", 0.5f); u1(PP.pPost, "uVig", 0.1f); uc(PP.pPost, "uVigCol", hexc(0x2b2257));
+  u1(PP.pPost, "uBlur", (float)(R.sp01 * 0.016 + (R.kick > 0 ? R.kick : 0) * 0.05));
+  fs_draw(PP.pPost, PP.resTex, R.w, R.h, "tScene");
+  glDepthMask(GL_TRUE);
+}
+static void set_common(GLuint p) { u1(p, "uSatAmt", R.satAmt); u1(p, "uLinear", linearOut); }
 
 void rn_render(void) {
   M4 view, proj, vp;
@@ -892,6 +1075,11 @@ void rn_render(void) {
   proj = m4_perspective(R.fov, R.aspect, 0.05, 900);
   vp = m4_mul(proj, view);
 
+  GLint outFbo = 0;
+  glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &outFbo);
+  post_setup(R.w, R.h);
+  linearOut = PP.ok ? 1.f : 0.f;
+  if (PP.ok) glBindFramebuffer(GL_FRAMEBUFFER, PP.msFbo);
   glViewport(0, 0, R.w, R.h);
   {
     /* fondo = color de la niebla, en pantalla (ya con tono y sRGB, como el resto) */
@@ -912,7 +1100,7 @@ void rn_render(void) {
       }
     }
     for (k = 0; k < 3; k++) { float v = in[k] < 0 ? 0 : in[k] > 1 ? 1 : in[k]; c[k] = v <= 0.0031308f ? v * 12.92f : 1.055f * powf(v, 1 / 2.4f) - 0.055f; }
-    glClearColor(c[0], c[1], c[2], 1);
+    if (PP.ok) glClearColor(f.r, f.g, f.b, 1); else glClearColor(c[0], c[1], c[2], 1);
   }
   glDepthMask(GL_TRUE);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -1080,6 +1268,18 @@ void rn_render(void) {
     glDisable(GL_CULL_FACE);
   }
 
+  /* monedas: el modelo de la web */
+  if (R.kitOk && R.mCoin.n) {
+    GLuint p = R.pModel;
+    M4 fix = m4_basis(v3(R.coinFix[0], 0, 0), v3(0, R.coinFix[0], 0), v3(0, 0, R.coinFix[0]), v3(-R.coinFix[1] * R.coinFix[0], -R.coinFix[2] * R.coinFix[0], -R.coinFix[3] * R.coinFix[0]));
+    kit_uniforms(p, &vp);
+    glUniform1i(U(p, "uMode"), 8); uc(p, "uColor", hexc(0xffd23a)); uc(p, "uEmis", cscale(hexc(0xff9a00), 0.06f));
+    for (i = 0; i < R.nCoinDraw; i++) {
+      M4 mm = m4_mul(R.coinM[i], fix); int j;
+      um(p, "uModel", &mm);
+      for (j = 0; j < R.mCoin.n; j++) { glBindVertexArray(R.mCoin.p[j].vao); glDrawElements(GL_TRIANGLES, R.mCoin.p[j].nIdx, GL_UNSIGNED_INT, 0); }
+    }
+  } else
   /* monedas */
   {
     GLuint p = R.pCoin;
@@ -1112,6 +1312,32 @@ void rn_render(void) {
     glDisable(GL_BLEND);
   }
 
+  /* hojas / pétalos / luciérnagas / brasas y líneas de velocidad */
+  if (R.pFx && (fxN || stN)) {
+    GLuint p = R.pFx;
+    glUseProgram(p); set_common(p); um(p, "uVP", &vp);
+    glBindVertexArray(R.fxVao); glBindBuffer(GL_ARRAY_BUFFER, R.fxVbo);
+    glEnable(GL_BLEND); glDepthMask(GL_FALSE);
+    if (fxN) {
+      int dot = LK[R.lifeKind].dot;
+      glBlendFunc(GL_SRC_ALPHA, dot ? GL_ONE : GL_ONE_MINUS_SRC_ALPHA);
+      glUniform1i(U(p, "uKind"), dot ? 1 : 0);
+      glBufferSubData(GL_ARRAY_BUFFER, 0, fxN * 64, fxV);
+      glDrawArrays(GL_TRIANGLES, 0, fxN);
+    }
+    if (stN && stOpacity > 0.01f) {
+      int k;
+      for (k = 0; k < stN; k++) stV[k * 16 + 15] = stOpacity;
+      glDisable(GL_DEPTH_TEST);
+      glBlendFunc(GL_SRC_ALPHA, stAdd ? GL_ONE : GL_ONE_MINUS_SRC_ALPHA);
+      glUniform1i(U(p, "uKind"), 2);
+      glBufferSubData(GL_ARRAY_BUFFER, 0, stN * 64, stV);
+      glDrawArrays(GL_LINES, 0, stN);
+      glEnable(GL_DEPTH_TEST);
+    }
+    glDisable(GL_BLEND); glDepthMask(GL_TRUE);
+  }
+  if (PP.ok) post_finish(outFbo);
   /* destello y viñeta azul del nivel 3 */
   {
     float fa = (float)R.flash, va = R.blueVig > 0 ? 0.45f : 0;
@@ -1133,8 +1359,49 @@ void rn_render(void) {
 
 /* ---------------------------------------------------------------- HUD 2D */
 #define HUD_MAXV 60000
-static float hudV[HUD_MAXV * 11]; static int hudN, hudW, hudH;
+#define HV 14   /* pos2 col4 local2 box3 tex3 */
+static float hudV[HUD_MAXV * HV]; static int hudN, hudW, hudH;
 static GLuint hudVao, hudVbo;
+
+/* ---- Fredoka (la letra de la web) en un atlas de campos de distancia */
+#define FONT_PX 48.0f          /* tamaño al que se hornea */
+#define FONT_PAD 8
+typedef struct { int ok; float u0, v0, u1, v1, xoff, yoff, w, h, adv; } FGlyph;
+static FGlyph FG[256]; static GLuint fontTex; static float fontAscent;
+static void font_init(void) {
+  int i, cp, W = 1024, H = 512, x = 0, y = 0, rowH = 0;
+  unsigned char *atlas;
+  stbtt_fontinfo f;
+  float sc;
+  int asc, desc, gap;
+  for (i = 0; ASSETS[i].name && strcmp(ASSETS[i].name, "font_fredoka"); i++) {}
+  if (!ASSETS[i].name || !stbtt_InitFont(&f, ASSETS[i].data, 0)) { fprintf(stderr, "sin fuente Fredoka\n"); return; }
+  atlas = calloc((size_t)W * H, 1);
+  sc = stbtt_ScaleForPixelHeight(&f, FONT_PX);
+  stbtt_GetFontVMetrics(&f, &asc, &desc, &gap); fontAscent = asc * sc;
+  for (cp = 32; cp < 256; cp++) {
+    int gw, gh, xo, yo, adv, lsb, r;
+    unsigned char *sd;
+    if (cp >= 127 && cp < 161) continue;
+    sd = stbtt_GetCodepointSDF(&f, sc, cp, FONT_PAD, 128, 128.0f / FONT_PAD, &gw, &gh, &xo, &yo);
+    stbtt_GetCodepointHMetrics(&f, cp, &adv, &lsb);
+    FG[cp].adv = adv * sc; FG[cp].ok = 1;
+    if (!sd) continue;
+    if (x + gw + 1 > W) { x = 0; y += rowH + 1; rowH = 0; }
+    if (y + gh > H) { stbtt_FreeSDF(sd, NULL); break; }
+    for (r = 0; r < gh; r++) memcpy(atlas + (size_t)(y + r) * W + x, sd + (size_t)r * gw, (size_t)gw);
+    FG[cp].u0 = (float)x / W; FG[cp].v0 = (float)y / H; FG[cp].u1 = (float)(x + gw) / W; FG[cp].v1 = (float)(y + gh) / H;
+    FG[cp].xoff = (float)xo; FG[cp].yoff = (float)yo; FG[cp].w = (float)gw; FG[cp].h = (float)gh;
+    x += gw + 1; if (gh > rowH) rowH = gh;
+    stbtt_FreeSDF(sd, NULL);
+  }
+  glGenTextures(1, &fontTex); glBindTexture(GL_TEXTURE_2D, fontTex);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, W, H, 0, GL_RED, GL_UNSIGNED_BYTE, atlas);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  free(atlas);
+}
 
 void hud_begin(int w, int h) {
   hudN = 0; hudW = w; hudH = h;
@@ -1142,20 +1409,23 @@ void hud_begin(int w, int h) {
     glGenVertexArrays(1, &hudVao); glBindVertexArray(hudVao);
     glGenBuffers(1, &hudVbo); glBindBuffer(GL_ARRAY_BUFFER, hudVbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof hudV, NULL, GL_STREAM_DRAW);
-    glEnableVertexAttribArray(0); glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 44, (void *)0);
-    glEnableVertexAttribArray(1); glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 44, (void *)8);
-    glEnableVertexAttribArray(2); glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 44, (void *)24);
-    glEnableVertexAttribArray(3); glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 44, (void *)32);
+    glEnableVertexAttribArray(0); glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, HV * 4, (void *)0);
+    glEnableVertexAttribArray(1); glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, HV * 4, (void *)8);
+    glEnableVertexAttribArray(2); glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, HV * 4, (void *)24);
+    glEnableVertexAttribArray(3); glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, HV * 4, (void *)32);
+    glEnableVertexAttribArray(4); glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, HV * 4, (void *)44);
     glBindVertexArray(0);
+    font_init();
   }
 }
-static void hv(float x, float y, unsigned rgb, float a, float lx, float ly, float hw, float hh, float rad) {
+static void hvt(float x, float y, unsigned rgb, float a, float lx, float ly, float hw, float hh, float rad, float tu, float tv, float th) {
   float *o;
   if (hudN >= HUD_MAXV) return;
-  o = &hudV[hudN++ * 11];
+  o = &hudV[hudN++ * HV];
   o[0] = x; o[1] = y; o[2] = ((rgb >> 16) & 255) / 255.f; o[3] = ((rgb >> 8) & 255) / 255.f; o[4] = (rgb & 255) / 255.f; o[5] = a;
-  o[6] = lx; o[7] = ly; o[8] = hw; o[9] = hh; o[10] = rad;
+  o[6] = lx; o[7] = ly; o[8] = hw; o[9] = hh; o[10] = rad; o[11] = tu; o[12] = tv; o[13] = th;
 }
+static void hv(float x, float y, unsigned rgb, float a, float lx, float ly, float hw, float hh, float rad) { hvt(x, y, rgb, a, lx, ly, hw, hh, rad, 0, 0, 0); }
 void hud_rect(float x, float y, float w, float h, float rad, unsigned rgb, float a) {
   float hw = w / 2, hh = h / 2, e = 1;   /* 1 px de margen para el suavizado */
   float x0 = x - e, y0 = y - e, x1 = x + w + e, y1 = y + h + e;
@@ -1169,66 +1439,33 @@ void hud_quad(const float *q, unsigned rgb, float a) {
   hv(q[0], q[1], rgb, a, 0, 0, 1e5f, 1e5f, 0); hv(q[2], q[3], rgb, a, 0, 0, 1e5f, 1e5f, 0); hv(q[4], q[5], rgb, a, 0, 0, 1e5f, 1e5f, 0);
   hv(q[0], q[1], rgb, a, 0, 0, 1e5f, 1e5f, 0); hv(q[4], q[5], rgb, a, 0, 0, 1e5f, 1e5f, 0); hv(q[6], q[7], rgb, a, 0, 0, 1e5f, 1e5f, 0);
 }
-
-/* fuente de 5x7 (la clásica glcdfont), por columnas, bit 0 arriba; ASCII 32..90 */
-static const unsigned char FONT[59][5] = {
-  {0x00,0x00,0x00,0x00,0x00},{0x00,0x00,0x5F,0x00,0x00},{0x00,0x07,0x00,0x07,0x00},{0x14,0x7F,0x14,0x7F,0x14},
-  {0x24,0x2A,0x7F,0x2A,0x12},{0x23,0x13,0x08,0x64,0x62},{0x36,0x49,0x55,0x22,0x50},{0x00,0x05,0x03,0x00,0x00},
-  {0x00,0x1C,0x22,0x41,0x00},{0x00,0x41,0x22,0x1C,0x00},{0x08,0x2A,0x1C,0x2A,0x08},{0x08,0x08,0x3E,0x08,0x08},
-  {0x00,0x50,0x30,0x00,0x00},{0x08,0x08,0x08,0x08,0x08},{0x00,0x60,0x60,0x00,0x00},{0x20,0x10,0x08,0x04,0x02},
-  {0x3E,0x51,0x49,0x45,0x3E},{0x00,0x42,0x7F,0x40,0x00},{0x42,0x61,0x51,0x49,0x46},{0x21,0x41,0x45,0x4B,0x31},
-  {0x18,0x14,0x12,0x7F,0x10},{0x27,0x45,0x45,0x45,0x39},{0x3C,0x4A,0x49,0x49,0x30},{0x01,0x71,0x09,0x05,0x03},
-  {0x36,0x49,0x49,0x49,0x36},{0x06,0x49,0x49,0x29,0x1E},{0x00,0x36,0x36,0x00,0x00},{0x00,0x56,0x36,0x00,0x00},
-  {0x00,0x08,0x14,0x22,0x41},{0x14,0x14,0x14,0x14,0x14},{0x41,0x22,0x14,0x08,0x00},{0x02,0x01,0x51,0x09,0x06},
-  {0x32,0x49,0x79,0x41,0x3E},{0x7E,0x11,0x11,0x11,0x7E},{0x7F,0x49,0x49,0x49,0x36},{0x3E,0x41,0x41,0x41,0x22},
-  {0x7F,0x41,0x41,0x22,0x1C},{0x7F,0x49,0x49,0x49,0x41},{0x7F,0x09,0x09,0x01,0x01},{0x3E,0x41,0x41,0x51,0x32},
-  {0x7F,0x08,0x08,0x08,0x7F},{0x00,0x41,0x7F,0x41,0x00},{0x20,0x40,0x41,0x3F,0x01},{0x7F,0x08,0x14,0x22,0x41},
-  {0x7F,0x40,0x40,0x40,0x40},{0x7F,0x02,0x04,0x02,0x7F},{0x7F,0x04,0x08,0x10,0x7F},{0x3E,0x41,0x41,0x41,0x3E},
-  {0x7F,0x09,0x09,0x09,0x06},{0x3E,0x41,0x51,0x21,0x5E},{0x7F,0x09,0x19,0x29,0x46},{0x46,0x49,0x49,0x49,0x31},
-  {0x01,0x01,0x7F,0x01,0x01},{0x3F,0x40,0x40,0x40,0x3F},{0x1F,0x20,0x40,0x20,0x1F},{0x7F,0x20,0x18,0x20,0x7F},
-  {0x63,0x14,0x08,0x14,0x63},{0x03,0x04,0x78,0x04,0x03},{0x61,0x51,0x49,0x45,0x43} };
-static const unsigned char GLYPH_IEXCL[5] = { 0x00, 0x00, 0x7D, 0x00, 0x00 };   /* ¡ */
-static const unsigned char GLYPH_IQUES[5] = { 0x30, 0x48, 0x45, 0x40, 0x20 };   /* ¿ */
-
-/* decodifica un carácter (UTF-8 mínimo: tildes a su vocal, ¡ y ¿) */
-static const unsigned char *glyph(const char **ps) {
-  const unsigned char *s = (const unsigned char *)*ps;
-  int c = *s++;
-  if (c == 0xC2 && *s == 0xA1) { s++; *ps = (const char *)s; return GLYPH_IEXCL; }
-  if (c == 0xC2 && *s == 0xBF) { s++; *ps = (const char *)s; return GLYPH_IQUES; }
-  if (c == 0xC3) {
-    int d = *s++;
-    switch (d) { case 0x81: case 0xA1: c = 'A'; break; case 0x89: case 0xA9: c = 'E'; break; case 0x8D: case 0xAD: c = 'I'; break;
-                 case 0x93: case 0xB3: c = 'O'; break; case 0x9A: case 0xBA: case 0x9C: case 0xBC: c = 'U'; break; case 0x91: case 0xB1: c = 'N'; break; default: c = '?'; }
-  }
+/* UTF-8 → código (hasta 2 bytes: el latín de "¡Récord!") */
+static int utf8(const char **ps) {
+  const unsigned char *s = (const unsigned char *)*ps; int c = *s++;
+  if (c >= 0xC0 && c < 0xE0 && *s) { c = ((c & 31) << 6) | (*s++ & 63); }
+  else if (c >= 0xE0) { while (*s >= 0x80 && *s < 0xC0) s++; c = '?'; }
   *ps = (const char *)s;
-  if (c >= 'a' && c <= 'z') c -= 32;
-  if (c < 32 || c > 90) c = '?';
-  return FONT[c - 32];
+  return c < 256 && FG[c].ok ? c : '?';
 }
-float hud_text_w(float px, const char *s) { float w = 0; while (*s) { glyph(&s); w += 6 * px; } return w > 0 ? w - px : 0; }
-/* cada letra se dibuja como trazos redondeados: tramos seguidos de píxeles en vertical y en
-   horizontal. "grow" engorda los trazos (para el contorno oscuro). */
+/* "px" es la unidad de siempre del HUD (la letra de 5×7 medía 7 px): 10 px de cuerpo por unidad */
+#define EM(px) ((px) * 10.0f)
+float hud_text_w(float px, const char *s) { float w = 0, k = EM(px) / FONT_PX; while (*s) w += FG[utf8(&s)].adv * k; return w; }
 float hud_text_ex(float x, float y, float px, const char *s, unsigned rgb, float a, float grow) {
-  float x0 = x, r = px * 0.5f + grow;
+  float k = EM(px) / FONT_PX, x0 = x, base = y + fontAscent * k * 0.86f;
+  /* umbral del campo de distancia: 0,5 es el borde; grow (en px de pantalla) lo engorda */
+  float th = 0.5f - grow / k * (128.0f / FONT_PAD) / 255.0f;
+  if (th < 0.08f) th = 0.08f;
   while (*s) {
-    const unsigned char *gl = glyph(&s);
-    int cx, cy;
-    for (cx = 0; cx < 5; cx++) for (cy = 0; cy < 7; cy++) {
-      int on = gl[cx] >> cy & 1, up = cy > 0 && (gl[cx] >> (cy - 1) & 1), left = cx > 0 && (gl[cx - 1] >> cy & 1);
-      if (!on) continue;
-      if (!up) {   /* tramo vertical que empieza aquí */
-        int n = 1; while (cy + n < 7 && (gl[cx] >> (cy + n) & 1)) n++;
-        hud_rect(x + cx * px - grow, y + cy * px - grow, px + 2 * grow, n * px + 2 * grow, r, rgb, a);
-      }
-      if (!left) {  /* tramo horizontal que empieza aquí */
-        int n = 1; while (cx + n < 5 && (gl[cx + n] >> cy & 1)) n++;
-        if (n > 1) hud_rect(x + cx * px - grow, y + cy * px - grow, n * px + 2 * grow, px + 2 * grow, r, rgb, a);
-      }
+    int c = utf8(&s);
+    const FGlyph *g = &FG[c];
+    if (g->w > 0) {
+      float gx0 = x + g->xoff * k, gy0 = base + g->yoff * k, gx1 = gx0 + g->w * k, gy1 = gy0 + g->h * k;
+      hvt(gx0, gy0, rgb, a, 0, 0, 1e5f, 1e5f, 0, g->u0, g->v0, th); hvt(gx1, gy0, rgb, a, 0, 0, 1e5f, 1e5f, 0, g->u1, g->v0, th); hvt(gx1, gy1, rgb, a, 0, 0, 1e5f, 1e5f, 0, g->u1, g->v1, th);
+      hvt(gx0, gy0, rgb, a, 0, 0, 1e5f, 1e5f, 0, g->u0, g->v0, th); hvt(gx1, gy1, rgb, a, 0, 0, 1e5f, 1e5f, 0, g->u1, g->v1, th); hvt(gx0, gy1, rgb, a, 0, 0, 1e5f, 1e5f, 0, g->u0, g->v1, th);
     }
-    x += 6 * px;
+    x += g->adv * k;
   }
-  return x - x0 - px;
+  return x - x0;
 }
 float hud_text(float x, float y, float px, const char *s, unsigned rgb, float a) { return hud_text_ex(x, y, px, s, rgb, a, 0); }
 void hud_end(void) {
@@ -1238,9 +1475,10 @@ void hud_end(void) {
   glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
   glUseProgram(p);
   u2(p, "uScreen", (float)hudW, (float)hudH);
+  bind_tex(p, "tFont", 0, fontTex);
   glBindVertexArray(hudVao);
   glBindBuffer(GL_ARRAY_BUFFER, hudVbo);
-  glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)(hudN * 11 * sizeof(float)), hudV);
+  glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)(hudN * HV * sizeof(float)), hudV);
   glDrawArrays(GL_TRIANGLES, 0, hudN);
   glBindVertexArray(0);
   glDisable(GL_BLEND);

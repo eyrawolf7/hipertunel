@@ -24,6 +24,7 @@ typedef ptrdiff_t GLintptr;
 #define GL_DEPTH_BUFFER_BIT 0x00000100
 #define GL_COLOR_BUFFER_BIT 0x00004000
 #define GL_TRIANGLES 0x0004
+#define GL_LINES 0x0001
 #define GL_TRIANGLE_STRIP 0x0005
 #define GL_LEQUAL 0x0203
 #define GL_LESS 0x0201
@@ -59,6 +60,12 @@ typedef ptrdiff_t GLintptr;
 #define GL_SRGB8 0x8C41
 #define GL_SRGB8_ALPHA8 0x8C43
 #define GL_UNPACK_ALIGNMENT 0x0CF5
+#define GL_RGBA16F 0x881A
+#define GL_R8 0x8229
+#define GL_RED 0x1903
+#define GL_HALF_FLOAT 0x140B
+#define GL_DRAW_FRAMEBUFFER_BINDING 0x8CA6
+#define GL_READ_FRAMEBUFFER_BINDING 0x8CAA
 #define GL_VENDOR 0x1F00
 #define GL_RENDERER 0x1F01
 #define GL_VERSION 0x1F02
@@ -146,6 +153,8 @@ typedef ptrdiff_t GLintptr;
   X(void, glGenerateMipmap, (GLenum t)) \
   X(void, glUniform1i, (GLint l, GLint v)) \
   X(void, glVertexAttribDivisor, (GLuint i, GLuint d)) \
+  X(void, glFramebufferTexture2D, (GLenum t, GLenum a, GLenum tt, GLuint tex, GLint l)) \
+  X(void, glGetIntegerv, (GLenum p, GLint *v)) \
   X(void, glDrawElementsInstanced, (GLenum m, GLsizei n, GLenum t, const void *i, GLsizei c)) \
   X(void, glBlitFramebuffer, (GLint a, GLint b, GLint c, GLint d, GLint e, GLint f, GLint g, GLint h, GLbitfield m, GLenum fl))
 
@@ -164,6 +173,8 @@ HT_GL_FUNCS(HT_GL_DECL)
 #define glGenerateMipmap ht_glGenerateMipmap
 #define glUniform1i ht_glUniform1i
 #define glVertexAttribDivisor ht_glVertexAttribDivisor
+#define glFramebufferTexture2D ht_glFramebufferTexture2D
+#define glGetIntegerv ht_glGetIntegerv
 #define glDrawElementsInstanced ht_glDrawElementsInstanced
 #define glClearColor ht_glClearColor
 #define glClear ht_glClear

@@ -102,6 +102,10 @@ static const char *FS_KIT = SH_COMMON_FRAG
 "      vec3 base = vCol.rgb * uColor;\n"
 "      col = styl(base, Np, V, 1.0, 0.7) + uColor * 0.12;\n"
 "    }\n"
+"  } else if (uMode == 8) {\n"
+"    /* moneda de oro (coins.js): metal pulido con reflejo */\n"
+"    vec3 gold = uColor; vec3 H = normalize(uSunDir + V); float nv = abs(dot(N, V));\n"
+"    col = styl(gold * 0.8, N, V, 1.0, 0.4) + gold * pow(1.0 - nv, 2.0) * 0.6 + vec3(1.0, 0.85, 0.5) * pow(max(dot(N, H), 0.0), 40.0) * 1.2 + uEmis;\n"
 "  } else if (uMode == 3) {\n"
 "    col = uColor * (1.9 + uGlow * 1.6);\n"
 "  } else {\n"
@@ -124,6 +128,24 @@ static const char *FS_KIT = SH_COMMON_FRAG
 "  if (uUseFog > 0.5) col = mix(col, uFog, smoothstep(uFogNear, uFogFar, length(uCam - vW)));\n"
 "  if (alpha < 0.01) discard;\n"
 "  fragColor = vec4(finish(col), alpha);\n"
+"}\n";
+
+/* partículas (life.js) y líneas de velocidad (streaks.js): posición ya calculada, color por vértice */
+static const char *VS_FX =
+"uniform mat4 uVP;\n"
+"in vec3 aPos; in vec3 aNrm; in vec2 aUv; in vec4 aTan; in vec4 aCol;\n"
+"out vec2 vUv; out vec4 vCol;\n"
+"void main(){ vUv = aUv; vCol = aCol; gl_Position = uVP * vec4(aPos, 1.0); }\n";
+static const char *FS_FX = SH_COMMON_FRAG
+"uniform int uKind;   /* 0 hoja, 1 punto luminoso, 2 línea */\n"
+"in vec2 vUv; in vec4 vCol;\n"
+"out vec4 fragColor;\n"
+"void main(){\n"
+"  float a = vCol.a;\n"
+"  if (uKind == 0) { vec2 q = vUv * 2.0 - 1.0; float w = 1.0 - q.y * q.y; if (abs(q.x) > w * 0.95 || abs(q.x) < 0.04 * w) discard; }\n"
+"  else if (uKind == 1) { float r = length(vUv * 2.0 - 1.0); a *= smoothstep(1.0, 0.0, r) * (0.5 + 0.5 * smoothstep(0.4, 0.0, r)); }\n"
+"  if (a < 0.02) discard;\n"
+"  fragColor = vec4(finish(vCol.rgb), a);\n"
 "}\n";
 
 #endif

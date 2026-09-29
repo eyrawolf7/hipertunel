@@ -39,7 +39,6 @@ static int coins, lastScore, isRecord, lastDist, W = 1280, H = 720;
 /* modos del menú: 0 = Arcade (el de la web por defecto), 1 = Clásico (Boost 2 tal cual) */
 static int modeSel, playMode, best2[2];
 #define best best2[playMode]
-static const char *MODE_NAME[2] = { "ARCADE", "CLÁSICO" };
 /* Arcade: racha ×1…×5 (sube al pasar rozando y cada 500 m sin chocar) y puntos = metros × racha */
 static int mult = 1, maxMult = 1; static double multDist, points, prevDistM, nearT;
 /* vibración: pulsos que se apagan solos, encima del zumbido del motor */
@@ -170,158 +169,245 @@ static void step_sim(void) {
   if (state == ST_ATTRACT && (!game.alive || game.s > 4000)) attract_game((uint32_t)rand());
 }
 
-/* ---------------------------------------------------------------- HUD */
-#define INK 0x2a1f4f
-static float S = 1;   /* escala del HUD (alto / 720) */
-static void text_shadow(float x, float y, float px, const char *s, unsigned col) {
-  hud_text_ex(x, y + px * 0.45f, px, s, INK, 0.9f, px * 0.42f);   /* contorno y sombra */
-  hud_text(x, y, px, s, col, 1);
+/* ---------------------------------------------------------------- HUD (el diseño de app/src/ui/ui.css) */
+#define INK 0x2b2257
+#define PAPER 0xfffaf2
+#define PAPER2 0xf3ead9
+#define RED 0xff4b4b
+#define YEL 0xffd23f
+#define BLUE 0x19a8ff
+#define MINT 0x3fe0a0
+#define GREEN 0x5cf06a
+#define PURPLE 0x32228c
+static float S = 1;   /* escala del HUD: 1 = 720 px de alto */
+/* texto con contorno de tinta (text-stroke) y sombra hacia abajo */
+static float txt(float x, float y, float px, const char *s, unsigned col, float outline, float a) {
+  if (outline > 0) { hud_text_ex(x, y + outline * 0.6f, px, s, INK, a * 0.9f, outline); hud_text_ex(x, y, px, s, INK, a, outline); }
+  return hud_text_ex(x, y, px, s, col, a, 0);
 }
-static void text_center(float cx, float y, float px, const char *s, unsigned col) { text_shadow(cx - hud_text_w(px, s) / 2, y, px, s, col); }
-static void text_right(float rx, float y, float px, const char *s, unsigned col) { text_shadow(rx - hud_text_w(px, s), y, px, s, col); }
-
-static void chevron(float cx, float cy, float sz, float th, unsigned col, float a) {
-  /* dos trazos gruesos en forma de ">" */
-  float x0 = cx - sz * 0.35f, x1 = cx + sz * 0.35f, yt = cy - sz * 0.5f, yb = cy + sz * 0.5f;
-  float q1[8] = { x0, yt, x0 + th, yt, x1 + th, cy, x1, cy };
-  float q2[8] = { x1, cy, x1 + th, cy, x0 + th, yb, x0, yb };
-  hud_quad(q1, col, a); hud_quad(q2, col, a);
+static void txt_c(float cx, float y, float px, const char *s, unsigned col, float outline, float a) { txt(cx - hud_text_w(px, s) / 2, y, px, s, col, outline, a); }
+static void txt_r(float rx, float y, float px, const char *s, unsigned col, float outline, float a) { txt(rx - hud_text_w(px, s), y, px, s, col, outline, a); }
+/* píldora translúcida del HUD (--hudbg) */
+static void pill(float x, float y, float w, float h, float a) { hud_rect(x, y, w, h, h / 2, PURPLE, 0.62f * a); }
+/* botón de la web: borde de tinta, sombra sólida debajo y brillo arriba */
+static void button(float cx, float cy, float w, float h, const char *label, unsigned bg, unsigned fg, int focus, float a, int icon) {
+  float x = cx - w / 2, y = cy - h / 2, r = h * 0.43f, b = 3.2f * S, px = h / 34.0f * 1.62f;
+  float tw = hud_text_w(px, label), ix = icon ? h * 0.42f : 0, tx = cx - (tw + ix) / 2 + ix;
+  if (focus) hud_rect(x - 9 * S, y - 9 * S, w + 18 * S, h + 18 * S, r + 9 * S, INK, a), hud_rect(x - 7 * S, y - 7 * S, w + 14 * S, h + 14 * S, r + 7 * S, YEL, a);
+  hud_rect(x, y + 6 * S, w, h, r, INK, a);                                 /* sombra sólida */
+  hud_rect(x, y, w, h, r, INK, a);
+  hud_rect(x + b, y + b, w - 2 * b, h - 2 * b, r - b, bg, a);
+  hud_rect(x + h * 0.25f, y + b + 2 * S, w - h * 0.5f, (h - 2 * b) * 0.36f, (h - 2 * b) * 0.18f, 0xffffff, 0.28f * a);   /* brillo */
+  if (icon == 1) { float s = h * 0.2f, ix0 = tx - ix + 2 * S, iy = cy; float q[8] = { ix0, iy - s, ix0 + s * 1.5f, iy, ix0 + s * 1.5f, iy, ix0, iy + s }; hud_quad(q, fg, a); }
+  if (fg == 0xffffff) hud_text_ex(tx, cy - px * 6.1f + 2.5f * S, px, label, 0x781420, 0.45f * a, 0);
+  hud_text_ex(tx, cy - px * 6.1f, px, label, fg, a, 0);
+}
+static void coin_icon(float cx, float cy, float r) {
+  hud_rect(cx - r, cy - r, 2 * r, 2 * r, r, INK, 1);
+  hud_rect(cx - r * 0.82f, cy - r * 0.82f, 1.64f * r, 1.64f * r, r * 0.82f, 0xe3a008, 1);
+  hud_rect(cx - r * 0.55f, cy - r * 0.55f, 1.1f * r, 1.1f * r, r * 0.55f, 0xffd23f, 1);
+}
+/* chevrón de la web (M7 5h11.5L33 22 18.5 39H7l14.5-17z, caja 40×44) */
+static void chevron(float x, float y, float sz, unsigned fill, float fa, unsigned stroke, float sa, float grow) {
+  float k = sz / 44, g = grow;
+#define CX(v) (x + (v) * k)
+#define CY(v) (y + (v) * k)
+  float q1[8] = { CX(7) - g, CY(5) - g, CX(18.5) + g * 0.3f, CY(5) - g, CX(33) + g, CY(22), CX(21.5) - g, CY(22) };
+  float q2[8] = { CX(21.5) - g, CY(22), CX(33) + g, CY(22), CX(18.5) + g * 0.3f, CY(39) + g, CX(7) - g, CY(39) + g };
+  if (sa > 0) { float o1[8], o2[8]; int i; float gg = 2.4f * S; for (i = 0; i < 8; i++) { o1[i] = q1[i]; o2[i] = q2[i]; }
+    o1[0] -= gg; o1[1] -= gg; o1[3] -= gg; o1[4] += gg; o1[6] -= gg; o2[0] -= gg; o2[2] += gg; o2[5] += gg; o2[6] -= gg; o2[7] += gg;
+    hud_quad(o1, stroke, sa); hud_quad(o2, stroke, sa); }
+  hud_quad(q1, fill, fa); hud_quad(q2, fill, fa);
+#undef CX
+#undef CY
+}
+/* tarjeta de papel con cabecera morada a rayas (pop-card) */
+static void card(float x, float y, float w, float h, float headH, unsigned head, float a) {
+  float r = 30 * S, b = 4 * S;
+  int i;
+  hud_rect(x, y + 10 * S, w, h, r, INK, 0.9f * a);
+  hud_rect(x, y, w, h, r, INK, a);
+  hud_rect(x + b, y + b, w - 2 * b, h - 2 * b, r - b, PAPER, a);
+  if (headH > 0) {
+    hud_rect(x + b, y + b, w - 2 * b, headH, r - b, head, a);
+    hud_rect(x + b, y + b + headH - r, w - 2 * b, r, 0, head, a);
+    for (i = 0; i < 30; i++) {   /* rayas diagonales claras */
+      float sx = x + b + i * 34 * S - headH;
+      float q[8] = { sx, y + b + headH, sx + 14 * S, y + b + headH, sx + 14 * S + headH, y + b, sx + headH, y + b };
+      if (sx + headH < x + b + r * 0.6f || sx > x + w - b - r * 0.6f) continue;
+      hud_quad(q, 0xffffff, 0.12f * a);
+    }
+    hud_rect(x + b, y + b + headH, w - 2 * b, 3.5f * S, 0, INK, a);
+  }
 }
 
 static void draw_hud(void) {
-  char buf[64];
+  char buf[96];
   float cx = W / 2.0f;
   S = H / 720.0f;
   hud_begin(W, H);
   if (state == ST_ATTRACT) {
-    float blink = 0.55f + 0.45f * (float)sin(titleT * 4);
-    hud_rect(0, 0, (float)W, (float)H, 0, 0x1b1440, 0.28f);
-    text_center(cx, 150 * S, 13 * S, "HIPERTÚNEL", 0xffffff);
-    text_center(cx, 290 * S, 3 * S, "VERSIÓN NATIVA " VERSION, 0xfff1c9);
-#ifdef __SWITCH__
-    const char *prompt = "PULSA A PARA JUGAR";
-#else
-    const char *prompt = "PULSA ENTER PARA JUGAR";
-#endif
-    {
-      float pw = hud_text_w(4.4f * S, prompt) + 70 * S, sc = 1 + 0.04f * (float)sin(titleT * 4);
-      float bw = pw * sc, bh = 76 * S * sc;
-      hud_rect(cx - bw / 2 + 6 * S, 400 * S - bh / 2 + 7 * S, bw, bh, bh / 2, INK, 0.9f);
-      hud_rect(cx - bw / 2, 400 * S - bh / 2, bw, bh, bh / 2, 0x22d08a, 1);
-      hud_text(cx - hud_text_w(4.4f * S, prompt) / 2, 400 * S - 15.4f * S, 4.4f * S, prompt, 0xffffff, 1);
-      (void)blink;
+    /* logo: relieve de colores, contorno de tinta y relleno blanco, letra a letra */
+    static const char *LOGO[] = { "H", "i", "p", "e", "r", "t", "ú", "n", "e", "l" };
+    static const unsigned TINT[4] = { RED, YEL, BLUE, MINT };
+    float px = 13.5f * S, lw = 0, lx, ly = 150 * S, st = px * 0.85f;
+    int i;
+    hud_rect(0, 0, (float)W, (float)H, 0, 0x1b1440, 0.22f);
+    for (i = 0; i < 10; i++) lw += hud_text_w(px, LOGO[i]);
+    lx = cx - lw / 2;
+    for (i = 0; i < 10; i++) {
+      float bob = (float)sin(titleT * 2.2 - i * 0.45) * 3 * S, x = lx;
+      hud_text_ex(x, ly + bob + px * 1.75f, px, LOGO[i], INK, 0.85f, st);            /* sombra del relieve */
+      hud_text_ex(x, ly + bob + px * 1.0f, px, LOGO[i], TINT[i % 4], 1, st);       /* relieve de color */
+      hud_text_ex(x, ly + bob, px, LOGO[i], INK, 1, st);                            /* tinta */
+      hud_text_ex(x, ly + bob, px, LOGO[i], 0xffffff, 1, 0);                         /* relleno */
+      lx += hud_text_w(px, LOGO[i]);
     }
-#ifdef __SWITCH__
-    text_center(cx, 615 * S, 2.6f * S, "INCLINA EL MANDO, PALANCA O CRUCETA PARA GIRAR", 0xffffff);
-    text_center(cx, 648 * S, 2.4f * S, "R: CENTRAR   -: GIROSCOPIO SÍ/NO   X: INVERTIR GIRO   Y: VIBRACIÓN   +: SALIR", 0xffffff);
-#else
-    text_center(cx, 630 * S, 2.6f * S, "FLECHAS O A/D PARA GIRAR   P/ESC: PAUSA   V: VIBRACIÓN   Q: SALIR", 0xffffff);
-#endif
-    /* modo: ◀ ARCADE ▶ (cruceta o palanca para cambiar) */
+    /* pegatina "¡Inclina y vuela!" */
     {
-      int m;
-      for (m = 0; m < 2; m++) {
-        float bx = cx + (m == 0 ? -170 : 170) * S, on = m == modeSel;
-        float tw = hud_text_w(3.4f * S, MODE_NAME[m]), bw = tw + 50 * S;
-        hud_rect(bx - bw / 2, 482 * S, bw, 50 * S, 25 * S, on ? 0xffd24a : 0x3b2a6b, on ? 1 : 0.7f);
-        hud_text(bx - tw / 2, 495 * S, 3.4f * S, MODE_NAME[m], on ? INK : 0xffffff, 1);
-      }
-      text_center(cx, 497 * S, 3.4f * S, "< >", 0xffffff);
-      if (best2[modeSel] > 0) { snprintf(buf, sizeof buf, modeSel == 0 ? "RÉCORD %d PUNTOS" : "RÉCORD %d", best2[modeSel]); text_center(cx, 548 * S, 2.8f * S, buf, 0xffd24a); }
-      else text_center(cx, 548 * S, 2.6f * S, modeSel == 0 ? "MÁS RÁPIDO, SIN ACAMPAR Y RACHA X5" : "BOOST 2 TAL CUAL", 0xfff1c9);
+      const char *sk = "¡Inclina y vuela!";
+      float spx = 2.5f * S, sw = hud_text_w(spx, sk) + 40 * S, sh = 46 * S, sx = cx + lw / 2 - sw + 30 * S, sy = ly + 118 * S + (float)sin(titleT * 2.8) * 3 * S;
+      hud_rect(sx, sy + 5 * S, sw, sh, sh * 0.45f, INK, 1); hud_rect(sx, sy, sw, sh, sh * 0.45f, INK, 1);
+      hud_rect(sx + 3.5f * S, sy + 3.5f * S, sw - 7 * S, sh - 7 * S, sh * 0.4f, YEL, 1);
+      hud_text(sx + 20 * S, sy + 8 * S, spx, sk, INK, 1);
     }
-    /* inclinación: barra con el punto donde está ahora (para ver el sentido del giroscopio) */
+    /* botón Jugar y modos */
+    {
+      float pulse = 1 + 0.035f * (float)sin(titleT * 4);
+      button(cx, 400 * S, 270 * S * pulse, 76 * S * pulse, "Jugar", RED, 0xffffff, 1, 1, 1);
+      button(cx - 130 * S, 505 * S, 230 * S, 60 * S, "Arcade", modeSel == 0 ? YEL : PAPER, INK, 0, 1, 0);
+      button(cx + 130 * S, 505 * S, 230 * S, 60 * S, "Clásico", modeSel == 1 ? YEL : PAPER, INK, 0, 1, 0);
+      txt_c(cx, 548 * S, 2.1f * S, modeSel == 0 ? "Más rápido, sin acampar y racha ×5" : "Boost 2 tal cual", 0xffffff, 3 * S, 1);
+    }
+    /* medidor de inclinación (para ver el sentido del giroscopio) */
     if (input.hasTilt && input.tiltOn) {
       double v = (input.tiltRaw - input.cal) * (input.invert ? -1 : 1) * 2.5;
-      float bw = 300 * S, bx = cx - bw / 2, y = 585 * S;
+      float bw = 260 * S, bx = cx - bw / 2, y = 592 * S;
       v = v > 1 ? 1 : v < -1 ? -1 : v;
-      hud_rect(bx, y, bw, 10 * S, 5 * S, 0x3b2a6b, 0.8f);
+      hud_rect(bx, y, bw, 10 * S, 5 * S, PURPLE, 0.7f);
       hud_rect(cx - 2 * S, y - 4 * S, 4 * S, 18 * S, 0, 0xffffff, 0.8f);
-      hud_rect(cx + (float)v * bw / 2 - 9 * S, y - 4 * S, 18 * S, 18 * S, 9 * S, 0x22d08a, 1);
+      hud_rect(cx + (float)v * bw / 2 - 9 * S, y - 4 * S, 18 * S, 18 * S, 9 * S, GREEN, 1);
+    }
+    /* pie: récord, "pulsa para jugar" y versión */
+    {
+      float fy = H - 58 * S, blink = 0.6f + 0.4f * (float)sin(titleT * 3);
+      if (best2[modeSel] > 0) snprintf(buf, sizeof buf, "Récord  %d%s", best2[modeSel], modeSel == 0 ? " pts" : " m"); else snprintf(buf, sizeof buf, "Récord  -");
+      pill(28 * S, fy, hud_text_w(2.3f * S, buf) + 44 * S, 40 * S, 1);
+      hud_text(50 * S, fy + 7 * S, 2.3f * S, buf, 0xffffff, 1);
+#ifdef __SWITCH__
+      txt_c(cx, fy + 6 * S, 2.4f * S, "Pulsa A para jugar", 0xffffff, 3 * S, blink);
+      txt_c(cx, fy - 40 * S, 1.8f * S, "Palanca, cruceta o inclina el mando · R centrar · − giroscopio · X invertir · Y vibración · + salir", 0xffffff, 2.5f * S, 0.9f);
+#else
+      txt_c(cx, fy + 6 * S, 2.4f * S, "Pulsa Enter para jugar", 0xffffff, 3 * S, blink);
+      txt_c(cx, fy - 40 * S, 1.8f * S, "Flechas: girar o cambiar de modo · P pausa · V vibración · Q salir", 0xffffff, 2.5f * S, 0.9f);
+#endif
+      pill(W - 110 * S, fy, 82 * S, 40 * S, 0.7f);
+      hud_text(W - 94 * S, fy + 7 * S, 2.3f * S, "v" VERSION, 0xffffff, 0.9f);
     }
   } else {
-    /* monedas (arriba a la izquierda) */
+    /* arriba a la izquierda: pausa y monedas */
+    pill(26 * S, 24 * S, 58 * S, 58 * S, 1);
+    hud_rect(26 * S, 24 * S, 58 * S, 58 * S, 16 * S, PURPLE, 0.1f);
+    hud_rect(44 * S, 40 * S, 8 * S, 26 * S, 3 * S, 0xffffff, 1); hud_rect(58 * S, 40 * S, 8 * S, 26 * S, 3 * S, 0xffffff, 1);
     snprintf(buf, sizeof buf, "%d", coins);
-    hud_rect(90 * S, 23 * S, (60 + hud_text_w(3.4f * S, buf) / S) * S, 43 * S, 21 * S, 0x3b2a6b, 0.78f);
-    hud_rect(98 * S, 30 * S, 29 * S, 29 * S, 14.5f * S, 0xb86a00, 1);
-    hud_rect(100 * S, 32 * S, 25 * S, 25 * S, 12.5f * S, 0xffc21a, 1);
-    hud_text(136 * S, 33 * S, 3.4f * S, buf, 0xffffff, 1);
-    /* distancia y velocidad (arriba a la derecha) */
+    pill(96 * S, 28 * S, hud_text_w(3.2f * S, buf) + 86 * S, 50 * S, 1);
+    coin_icon(124 * S, 53 * S, 17 * S);
+    txt(152 * S, 32 * S, 3.2f * S, buf, 0xffffff, 3 * S, 1);
+    /* arriba a la derecha: distancia, velocidad (y racha del Arcade) */
     snprintf(buf, sizeof buf, "%d", (int)game_distance_m(&game));
     {
-      float mw = hud_text_w(4 * S, "M");
-      text_right(W - 22 * S - mw - 6 * S, 16 * S, 6.2f * S, buf, 0xffffff);
-      text_shadow(W - 22 * S - mw, 31 * S, 4 * S, "M", 0xffffff);
+      float mw = hud_text_w(3.2f * S, "m");
+      int beyond = best > 0 && playMode == 1 && (int)game_distance_m(&game) > best;
+      txt_r(W - 28 * S - mw - 4 * S, 12 * S, 6.2f * S, buf, beyond ? YEL : 0xffffff, 4.5f * S, 1);
+      txt(W - 28 * S - mw, 40 * S, 3.2f * S, "m", 0xffffff, 3.5f * S, 1);
     }
-    snprintf(buf, sizeof buf, "%d KM/H", (int)floor(game_speed_ms(&game) * 3.6 + 0.5));
-    {
-      float tw = hud_text_w(2.6f * S, buf);
-      hud_rect(W - 22 * S - tw - 20 * S, 69 * S, tw + 20 * S, 26 * S, 13 * S, 0x3b2a6b, 0.78f);
-      hud_text(W - 22 * S - tw - 10 * S, 73 * S, 2.6f * S, buf, 0xffffff, 1);
-    }
+    snprintf(buf, sizeof buf, "%d km/h", (int)floor(game_speed_ms(&game) * 3.6 + 0.5));
+    { float tw = hud_text_w(2.3f * S, buf); pill(W - 28 * S - tw - 28 * S, 86 * S, tw + 28 * S, 34 * S, 1); hud_text(W - 28 * S - tw - 14 * S, 90 * S, 2.3f * S, buf, 0xffffff, 1); }
     if (playMode == 0) {
-      static const unsigned mc[6] = { 0, 0x3b2a6b, 0xe0600f, 0xd6307f, 0x8a3fe0, 0xff3d57 };
-      snprintf(buf, sizeof buf, "X%d", mult);
-      { float tw = hud_text_w(4.6f * S, buf); hud_rect(W - 22 * S - tw - 24 * S, 104 * S, tw + 24 * S, 46 * S, 14 * S, mc[mult], 0.92f); hud_text(W - 22 * S - tw - 12 * S, 113 * S, 4.6f * S, buf, 0xffffff, 1); }
-      snprintf(buf, sizeof buf, "%d PTS", (int)(points + coins * 10));
-      text_right(W - 22 * S, 158 * S, 2.6f * S, buf, 0xffffff);
+      static const unsigned mc[6] = { 0, PURPLE, 0xe0600f, 0xd6307f, 0x8a3fe0, 0xff3d57 };
+      float tw;
+      snprintf(buf, sizeof buf, "×%d", mult);
+      tw = hud_text_w(4.2f * S, buf);
+      hud_rect(W - 28 * S - tw - 24 * S, 132 * S, tw + 24 * S, 50 * S, 14 * S, mc[mult], mult > 1 ? 1 : 0.62f);
+      txt(W - 28 * S - tw - 12 * S, 132 * S, 4.2f * S, buf, 0xffffff, 3 * S, 1);
+      snprintf(buf, sizeof buf, "%d pts", (int)(points + coins * 10));
+      txt_r(W - 28 * S, 188 * S, 2.3f * S, buf, 0xffffff, 3 * S, 1);
     }
-    /* impulsos: 3 chevrones (abajo a la derecha) */
+    /* abajo a la derecha: los tres chevrones de impulso */
     {
       int i;
-      static const unsigned full[3] = { 0x7ee06a, 0x4fe0a0, 0x49d6ff };
       for (i = 0; i < 3; i++) {
-        float x = W - (180 - i * 50) * S, y = H - 52 * S;
+        float x = W - (206 - i * 58) * S, y = H - 90 * S;
         int on = i < game.level;
-        chevron(x + 3 * S, y + 4 * S, 46 * S, 16 * S, INK, on ? 0.9f : 0.35f);
-        chevron(x, y, 46 * S, 16 * S, on ? full[game.level - 1] : 0xc9c6d8, on ? 1 : 0.75f);
+        if (on) chevron(x, y, 66 * S, GREEN, 1, INK, 1, 0);
+        else chevron(x, y, 66 * S, 0x1c1540, 0.35f, 0xffffff, 0.6f, 0);
       }
     }
     if (state == ST_COUNTDOWN) {
       int n = (int)ceil(countdown);
+      float k = (float)(countdown - floor(countdown)), sc = 1 + 0.25f * k * k;
       snprintf(buf, sizeof buf, "%d", n);
-      text_center(cx, 260 * S, 22 * S, buf, 0xffffff);
+      txt_c(cx, H * 0.38f - 70 * S * sc, 15 * S * sc, buf, 0xffffff, 7 * S, 1);
     }
     if (state == ST_PAUSED) {
-      hud_rect(0, 0, (float)W, (float)H, 0, 0x1b1440, 0.45f);
-      text_center(cx, 250 * S, 10 * S, "PAUSA", 0xffffff);
+      float w = 520 * S, h = 330 * S, x = cx - w / 2, y = H / 2 - h / 2;
+      hud_rect(0, 0, (float)W, (float)H, 0, 0x1b1440, 0.5f);
+      card(x, y, w, h, 76 * S, 0x6a5ae0, 1);
+      txt_c(cx, y + 16 * S, 4.2f * S, "Pausa", 0xffffff, 3 * S, 1);
 #ifdef __SWITCH__
-      text_center(cx, 400 * S, 3.5f * S, "+: SEGUIR    B: MENÚ", 0xffffff);
+      button(cx, y + 150 * S, 360 * S, 64 * S, "A  Continuar", RED, 0xffffff, 1, 1, 0);
+      button(cx, y + 250 * S, 360 * S, 56 * S, "B  Menú", PAPER, INK, 0, 1, 0);
 #else
-      text_center(cx, 400 * S, 3.5f * S, "P/ESC: SEGUIR    Q: MENÚ", 0xffffff);
+      button(cx, y + 150 * S, 360 * S, 64 * S, "Enter  Continuar", RED, 0xffffff, 1, 1, 0);
+      button(cx, y + 250 * S, 360 * S, 56 * S, "Esc  Menú", PAPER, INK, 0, 1, 0);
 #endif
     }
     if (state == ST_OVER) {
-      float pw = 660 * S, ph = 380 * S, px = cx - pw / 2, py = 150 * S;
-      hud_rect(0, 0, (float)W, (float)H, 0, 0x1b1440, 0.35f * (float)(overT * 3 < 1 ? overT * 3 : 1));
-      hud_rect(px + 8 * S, py + 8 * S, pw, ph, 36 * S, INK, 0.9f);
-      hud_rect(px, py, pw, ph, 36 * S, 0xfffaf2, 1);
-      hud_text(cx - hud_text_w(7 * S, "¡CATAPUM!") / 2, py + 34 * S, 7 * S, "¡CATAPUM!", 0xff3d57, 1);
-      snprintf(buf, sizeof buf, "%d M", lastDist);
-      hud_text(cx - hud_text_w(8 * S, buf) / 2, py + 110 * S, 8 * S, buf, INK, 1);
-      if (playMode == 0) snprintf(buf, sizeof buf, "ARCADE   PUNTOS %d   RACHA MÁX X%d", lastScore, maxMult);
-      else snprintf(buf, sizeof buf, "CLÁSICO   MONEDAS %d   PUNTOS %d", coins, lastScore);
-      hud_text(cx - hud_text_w(3.2f * S, buf) / 2, py + 196 * S, 3.2f * S, buf, 0x6a4a78, 1);
-      if (isRecord) snprintf(buf, sizeof buf, "¡NUEVO RÉCORD!");
-      else snprintf(buf, sizeof buf, playMode == 0 ? "RÉCORD %d PUNTOS" : "RÉCORD %d", best);
-      hud_text(cx - hud_text_w(3.6f * S, buf) / 2, py + 240 * S, 3.6f * S, buf, isRecord ? 0xff8a1a : 0x6a4a78, 1);
-#ifdef __SWITCH__
-      snprintf(buf, sizeof buf, "A: OTRA VEZ    B: MENÚ");
-#else
-      snprintf(buf, sizeof buf, "ENTER: OTRA VEZ    ESC: MENÚ");
-#endif
+      float a = (float)(overT * 4 < 1 ? overT * 4 : 1), w = 700 * S, h = 440 * S, x = cx - w / 2, y = 130 * S;
+      const char *head = isRecord ? "¡Increíble!" : lastDist < 300 ? "¡Arranque complicado!" : "¡Buena carrera!";
+      hud_rect(0, 0, (float)W, (float)H, 0, 0x1b1440, 0.45f * a);
+      card(x, y, w, h, 82 * S, isRecord ? 0xff6a5e : 0x6a5ae0, a);
+      txt(x + 40 * S, y + 18 * S, 4.4f * S, head, 0xffffff, 3 * S, a);
+      { const char *mn = playMode == 0 ? "ARCADE" : "CLÁSICO"; float tw = hud_text_w(2.2f * S, mn);
+        hud_rect(x + w - tw - 80 * S, y + 22 * S, tw + 40 * S, 40 * S, 20 * S, INK, a); hud_rect(x + w - tw - 78 * S, y + 24 * S, tw + 36 * S, 36 * S, 18 * S, 0x0b6fc0, a);
+        hud_text(x + w - tw - 60 * S, y + 28 * S, 2.2f * S, mn, 0xffffff, a); }
+      if (isRecord) {
+        float rw = 300 * S, rx = cx - rw / 2, ry = y - 26 * S;
+        hud_rect(rx, ry + 5 * S, rw, 50 * S, 12 * S, INK, a); hud_rect(rx, ry, rw, 50 * S, 12 * S, INK, a);
+        hud_rect(rx + 3.5f * S, ry + 3.5f * S, rw - 7 * S, 43 * S, 10 * S, YEL, a);
+        txt_c(cx, ry + 6 * S, 3.0f * S, "¡Nuevo récord!", INK, 0, a);
+      }
+      hud_text(x + 48 * S, y + 110 * S, 2.4f * S, "Distancia", 0x6b6394, a);
+      snprintf(buf, sizeof buf, "%d", lastDist);
+      { float nw = hud_text_w(9 * S, buf);
+        hud_text_ex(x + 48 * S, y + 150 * S + 6 * S, 9 * S, buf, playMode == 0 ? RED : YEL, a, 0);
+        hud_text_ex(x + 48 * S, y + 150 * S, 9 * S, buf, INK, a, 0);
+        hud_text(x + 56 * S + nw, y + 196 * S, 4 * S, "m", 0x6b6394, a); }
+      if (playMode == 0) snprintf(buf, sizeof buf, "%d puntos  ·  racha máx ×%d  ·  %d monedas", lastScore, maxMult, coins);
+      else snprintf(buf, sizeof buf, "%d monedas  ·  %d puntos", coins, lastScore);
+      hud_rect(x + 40 * S, y + 262 * S, w - 80 * S, 58 * S, 18 * S, PAPER2, a);
+      txt_c(cx, y + 276 * S, 2.6f * S, buf, INK, 0, a);
+      snprintf(buf, sizeof buf, playMode == 0 ? "Mejor  %d pts" : "Mejor  %d", best);
+      hud_text(x + w - 48 * S - hud_text_w(2.4f * S, buf), y + 118 * S, 2.4f * S, buf, INK, a);
       if (overT > 0.6) {
-        float tw = hud_text_w(3.2f * S, buf), bw = tw + 60 * S;
-        hud_rect(cx - bw / 2, py + 296 * S, bw, 56 * S, 28 * S, 0x22d08a, 1);
-        hud_text(cx - tw / 2, py + 313 * S, 3.2f * S, buf, 0xffffff, 1);
+#ifdef __SWITCH__
+        button(cx - 120 * S, y + h - 64 * S, 230 * S, 64 * S, "A  Otra vez", RED, 0xffffff, 1, a, 0);
+        button(cx + 140 * S, y + h - 64 * S, 190 * S, 56 * S, "B  Menú", PAPER, INK, 0, a, 0);
+#else
+        button(cx - 120 * S, y + h - 64 * S, 230 * S, 64 * S, "Enter  Otra vez", RED, 0xffffff, 1, a, 0);
+        button(cx + 140 * S, y + h - 64 * S, 190 * S, 56 * S, "Esc  Menú", PAPER, INK, 0, a, 0);
+#endif
       }
     }
   }
+  /* avisos: abajo a la izquierda, como en la web */
   if (toastT > 0 && state != ST_ATTRACT) {
-    float px = 3.2f * S, tw = hud_text_w(px, toastText), a = (float)(toastT < 0.3 ? toastT / 0.3 : 1);
-    hud_rect(cx - tw / 2 - 20 * S + 4 * S, 110 * S + 4 * S, tw + 40 * S, 44 * S, 22 * S, INK, 0.8f * a);
-    hud_rect(cx - tw / 2 - 20 * S, 110 * S, tw + 40 * S, 44 * S, 22 * S, 0xfffaf2, 0.95f * a);
-    hud_text(cx - tw / 2, 122 * S, px, toastText, toastCol == 0xffffff ? INK : 0x2f5fff, a);
+    float px = 2.6f * S, tw = hud_text_w(px, toastText), a = (float)(toastT < 0.3 ? toastT / 0.3 : 1), th = 50 * S;
+    float x = 28 * S, y = H - 40 * S - th;
+    unsigned bg = toastCol == 0x6fd8ff ? BLUE : toastCol == 0xffd24a ? YEL : PAPER, fg = toastCol == 0x6fd8ff ? 0xffffff : INK;
+    hud_rect(x, y + 5 * S, tw + 44 * S, th, th / 2, INK, a); hud_rect(x, y, tw + 44 * S, th, th / 2, INK, a);
+    hud_rect(x + 3.2f * S, y + 3.2f * S, tw + 44 * S - 6.4f * S, th - 6.4f * S, th / 2 - 3.2f * S, bg, a);
+    hud_text(x + 22 * S, y + 10 * S, px, toastText, fg, a);
   }
   hud_end();
 }
