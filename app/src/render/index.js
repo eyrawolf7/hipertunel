@@ -22,7 +22,6 @@ import { TunnelProps } from './tunnelprops.js';
 import { Life } from './life.js';
 import { AdvView } from './advview.js';
 import { Hero } from './hero.js';
-import { BoardTip } from './boardtip.js';
 import { styleUniforms } from './stylize.js';
 import { THEMES, BOX_COLORS } from './worlds.js';
 
@@ -78,7 +77,7 @@ export class Renderer {
     this.tunnel = new Tunnel(this.scene);
     this.kit = new TunnelKit(this.scene);
     this.kit.onReady = () => this.warmup();
-    this.props = new TunnelProps(this.scene); this.life = new Life(this.scene); this.adv = new AdvView(this.scene); this.hero = new Hero(this.scene); this.boardTip = new BoardTip(this.scene); this.hero.onModel = (m) => this.boardTip.fromModel(m); this.third = false; this._hp = new THREE.Vector3(); this._hu = new THREE.Vector3(); this._hf = new THREE.Vector3(); this.introT = -1; this.deadT = 0; this.heroPos = new THREE.Vector3(); this.ghostGame = null;
+    this.props = new TunnelProps(this.scene); this.life = new Life(this.scene); this.adv = new AdvView(this.scene); this.hero = new Hero(this.scene); this.third = false; this._hp = new THREE.Vector3(); this._hu = new THREE.Vector3(); this._hf = new THREE.Vector3(); this.introT = -1; this.deadT = 0; this.heroPos = new THREE.Vector3(); this.ghostGame = null;
     this.scene.fog = new THREE.Fog(0xffffff, 40, 120);
     this.stoneTint = new THREE.Color(1, 1, 1);
     this.boxes = new Boxes(this.scene);
@@ -380,8 +379,6 @@ export class Renderer {
     c.kick = Math.max(0, c.kick - dt * 1.8);
     if (Math.abs(cam.fov - fovF) > 0.01) { cam.fov = fovF; cam.updateProjectionMatrix(); }
 
-    // punta de la tabla en primera persona (no en el título, ni con la cámara fuera, ni muerto)
-    this.boardTip.update(!this.third && !mascot && game.alive && !(V && V.e > 0.02), cam, this.upS, game.omega, sp01, dt);
     // ---- el zorro: en tercera persona, en la vista de fuera y de mascota en el título
     if (this.third) this.hero.update(true, heroAt, heroN, this.look, game.alive ? game.omega : 0, game.jumpAt(s) > 0.15, game.level, dt);
     else if (V && V.e > 0.25) {
