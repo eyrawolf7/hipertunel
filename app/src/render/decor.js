@@ -101,8 +101,9 @@ export class Decor {
     const side3 = this._side || (this._side = new THREE.Vector3());
     side3.copy(r.F).cross(up); if (side3.lengthSq() < 1e-4) side3.copy(r.X); side3.normalize();
     it.obj.position.copy(r.P).addScaledVector(r.F, ahead).addScaledVector(side3, lateral).addScaledVector(up, vertical);
+    it.yaw = Math.random() * Math.PI * 2;
     it.obj.quaternion.setFromUnitVectors(this._y || (this._y = new THREE.Vector3(0, 1, 0)), up);
-    it.obj.rotateY(Math.random() * Math.PI * 2);
+    it.obj.rotateY(it.yaw);
     it.k = k + ahead / 4;
     it.placed = true;
   }
@@ -111,10 +112,19 @@ export class Decor {
     this.group.visible = outside;
     if (!outside) { for (const it of this.items) it.placed = false; return; }
     if (camera) this.camUp.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
+    // vertical de referencia suavizada: las islas se van enderezando despacio hacia la vista si la
+    // cámara gira con el carril, para no acabar viéndolas desde abajo (parecen conchas)
+    const upS = this.upS || (this.upS = this.camUp.clone());
+    upS.lerp(this.camUp, Math.min(1, dt * 0.8)).normalize();
+    const qT = this._qT || (this._qT = new THREE.Quaternion()), qY = this._qY || (this._qY = new THREE.Quaternion());
+    const Y = this._y || (this._y = new THREE.Vector3(0, 1, 0));
+    const kq = Math.min(1, dt * 0.6);
     for (const it of this.items) {
       if (!it.placed) this.place(it, game, track, false);
       else if (it.k < game.s - 30) this.place(it, game, track, true);
-      it.obj.rotateY(it.spin * dt);
+      it.yaw = (it.yaw || 0) + it.spin * dt;
+      qT.setFromUnitVectors(Y, upS).multiply(qY.setFromAxisAngle(Y, it.yaw));
+      it.obj.quaternion.slerp(qT, kq);
       // la pista curva: si algo se ha quedado cerca de ella, se lleva a otro sitio
       if (!it.checkT || (it.checkT -= dt) <= 0) {
         it.checkT = 0.25;
