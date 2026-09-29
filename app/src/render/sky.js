@@ -8,11 +8,14 @@ const PANOS = import.meta.glob('../assets/sky/*.jpg', { query: '?url', import: '
 const panoUrl = (name) => { for (const [p, u] of Object.entries(PANOS)) if (p.endsWith('/' + name + '.jpg')) return u; return null; };
 const loader = new THREE.TextureLoader();
 const texCache = {};
+// se suben a la GPU nada más cargar (sin tirón la primera vez que se ve cada mundo)
+let gpu = null;
+export function setPanoRenderer(r) { gpu = r; for (const t of Object.values(texCache)) if (t && t.image) r.initTexture(t); }
 function panoTex(name) {
   if (!name) return null;
   if (texCache[name] !== undefined) return texCache[name];
   const u = panoUrl(name); if (!u) return (texCache[name] = null);
-  const t = loader.load(u); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
+  const t = loader.load(u, (tt) => { if (gpu) gpu.initTexture(tt); }); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; t.minFilter = THREE.LinearFilter; t.generateMipmaps = false;
   return (texCache[name] = t);
 }
 
@@ -87,6 +90,8 @@ export class Sky {
     scene.add(this.sea);
     this.vis = 0;
     this._c = new THREE.Color();
+    // se cargan todos al empezar: sin tirones al cambiar de mundo y memoria estable
+    for (const p of Object.keys(PANOS)) panoTex(p.split('/').pop().replace('.jpg', ''));
   }
 
   setTheme(A, B, t) {

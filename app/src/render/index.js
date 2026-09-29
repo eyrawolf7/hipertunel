@@ -12,7 +12,7 @@ import { Track, makeFrame, section, surf } from './track.js';
 import { Tunnel } from './tunnel.js';
 import { Boxes } from './boxes.js';
 import { Pads } from './pads.js';
-import { Sky } from './sky.js';
+import { Sky, setPanoRenderer } from './sky.js';
 import { Decor } from './decor.js';
 import { Fx } from './fx.js';
 import { Coins } from './coins.js';
@@ -175,6 +175,7 @@ export class Renderer {
     this.scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
     try { this.renderer.compile(this.scene, this.camera); } catch (e) {}
     for (const o of hidden) o.visible = false;
+    setPanoRenderer(this.renderer);
   }
 
   // posición en pantalla (px) de una moneda recogida

@@ -41,6 +41,8 @@ async function open(viewport = DESKTOP, url = URL0, { clearStorage = true } = {}
   if (clearStorage) await page.evaluateOnNewDocument(() => { if (!sessionStorage.getItem('qa-keep')) { try { localStorage.clear(); } catch (e) {} sessionStorage.setItem('qa-keep', '1'); } });
   page.__qaReload = true;
   for (let tries = 0; ; tries++) {
+    // los errores de un intento fallido (peticiones canceladas al reintentar) no cuentan
+    errors.length = 0;
     try { await page.goto(url, { waitUntil: 'networkidle0' }); await page.waitForFunction(() => window.__hip && window.__hip.game, { timeout: 15000 }); break; }
     catch (e) { if (tries >= 2) throw e; await sleep(2000); }
   }
