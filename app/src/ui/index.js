@@ -11,17 +11,18 @@
 // El CSS se enlaza con new URL('./ui.css', import.meta.url): funciona igual en Vite (lo emite
 // como recurso) que en un servidor estático cualquiera.
 
-import { ICON } from './icons.js';
+import { ICON, DECO } from './icons.js';
+import { applySkin } from './skin.js';
 
 const MODES = {
   zorro: { name: 'Zorro', desc: 'Nuevo: el Arcade en tercera persona, con el zorro en su tabla de hoja.', tag: 'Prototipo', unit: 'pts' },
   arcade: { name: 'Arcade', desc: 'Boost a tope: más cajas, mundos antes y racha ×5 si arriesgas.', tag: 'Recomendado', unit: 'pts' },
   adventure: { name: 'Aventura', desc: '10 tramos: el tubo se rompe, el suelo se hunde, poderes y jefes.', tag: 'Nuevo' },
   classic: { name: 'Clásico', desc: 'Boost 2 tal cual: sin límite, llega lo más lejos que puedas.', tag: 'El original' },
-  survival: { name: 'Supervivencia', desc: 'Sin impulsos y la velocidad no para de subir.', tag: 'Para valientes' },
-  timetrial: { name: 'Contrarreloj', desc: '60 s. Cada impulso suma tiempo, cada choque resta.', tag: 'A toda prisa' },
-  daily: { name: 'Reto diario', desc: 'El mismo túnel para todos hoy. ¿Hasta dónde llegas?', tag: 'Hoy' },
-  voyage: { name: 'Viaje', desc: 'Empieza en el último mundo al que llegaste.', tag: 'Mundos', lockedDesc: 'Llega al mundo 2 para desbloquearlo.' },
+  survival: { name: 'Supervivencia', desc: 'Sin impulsos y la velocidad no para de subir.', tag: 'Desafío' },
+  timetrial: { name: 'Contrarreloj', desc: '60 s. Cada impulso suma tiempo, cada choque resta.', tag: 'Precisión' },
+  daily: { name: 'Reto diario', desc: 'El mismo túnel para todos hoy. ¿Hasta dónde llegas?', tag: 'Diario' },
+  voyage: { name: 'Viaje', desc: 'Empieza en el último mundo al que llegaste.', tag: 'Exploración', lockedDesc: 'Llega al mundo 2 para desbloquearlo.' },
 };
 const MODE_KEYS = Object.keys(MODES);
 const MENU_SCREENS = new Set(['title', 'modes', 'settings', 'pause', 'over', 'shop', 'map']);
@@ -70,8 +71,24 @@ function logoHTML() {
   // contorno de una letra nunca pise el relleno de la vecina.
   const row = (cls) => `<span class="lg-row ${cls}" aria-hidden="true">${[...LOGO].map((ch, i) =>
     `<span class="lg t-${LOGO_TINTS[i % 4]}" style="--i:${i}">${ch}</span>`).join('')}</span>`;
-  return `<h1 class="logo" aria-label="${LOGO}">${row('l-ext')}${row('l-ink')}${row('l-fill')}</h1>`;
+  return `<h1 class="logo" aria-label="${LOGO}">${logoStone()}${row('l-ext')}${row('l-ink')}${row('l-fill')}</h1>`;
 }
+
+// Marco de piedra tallada detrás del logo: bloques, gemas en sus huecos, grabados, hojas y el filo
+// turquesa de abajo. Todo decorativo y estático (no se anima nada caro).
+function logoStone() {
+  const gems = [9, 30, 50, 70, 91].map((x, i) => `<span class="ls-gem${i === 2 ? ' big' : ''}" style="left:${x}%">${DECO.gemSocket}</span>`).join('');
+  return `<span class="logo-stone" aria-hidden="true">
+    <span class="ls-slab"></span>
+    <span class="ls-glyph ls-gl">${DECO.glyph}</span><span class="ls-glyph ls-gr">${DECO.glyph}</span>
+    ${gems}
+    <span class="ls-glow"></span>
+    <span class="ls-lf ls-lf1">${DECO.leaves}</span><span class="ls-lf ls-lf2">${DECO.leaves}</span>
+    <span class="ls-lf ls-lf3">${DECO.leaf}</span><span class="ls-lf ls-lf4">${DECO.leaf}</span><span class="ls-lf ls-lf5">${DECO.leaves}</span>
+  </span>`;
+}
+const stoneLeaves = `<span class="bs-lf bs-lf-tl" aria-hidden="true">${DECO.leaf}</span><span class="bs-lf bs-lf-br" aria-hidden="true">${DECO.leaf}</span>`;
+const stoneDeco = `<span class="bs-lf bs-lf-tl" aria-hidden="true">${DECO.leaf}</span><span class="bs-lf bs-lf-br" aria-hidden="true">${DECO.leaf}</span><span class="bs-glow" aria-hidden="true"></span>`;
 
 function titleHTML() {
   return `
@@ -79,13 +96,17 @@ function titleHTML() {
   <div class="vig vig-title"></div>
   <div class="title-main">
     <div class="logo-wrap">${logoHTML()}<div class="sticker">¡Inclina y vuela!</div></div>
-    <button class="btn btn-play" data-nav data-act="play" data-default>
-      <span class="btn-ico">${ICON.play}</span><span>Jugar</span>
-    </button>
+    <div class="play-frame">
+      <span class="pf-gem pf-gem-l" aria-hidden="true">${DECO.gem}</span><span class="pf-gem pf-gem-r" aria-hidden="true">${DECO.gem}</span>
+      <span class="pf-lf pf-lf1" aria-hidden="true">${DECO.leaves}</span><span class="pf-lf pf-lf2" aria-hidden="true">${DECO.leaf}</span>
+      <button class="btn btn-play" data-nav data-act="play" data-default>
+        <span class="btn-ico">${ICON.play}</span><span>Jugar</span>
+      </button>
+    </div>
     <div class="title-row">
-      <button class="btn btn-sec" data-nav data-act="modes"><span class="btn-ico">${ICON.grid}</span><span>Modos</span></button>
-      <button class="btn btn-sec" data-nav data-act="shop"><span class="btn-ico">${ICON.coin}</span><span>Tienda</span></button>
-      <button class="btn btn-sec" data-nav data-act="settings"><span class="btn-ico">${ICON.gear}</span><span>Ajustes</span></button>
+      <button class="btn btn-stone" data-nav data-act="modes">${stoneDeco}<span class="btn-ico">${ICON.flag}</span><span>Modos</span></button>
+      <button class="btn btn-stone" data-nav data-act="shop">${stoneDeco}<span class="btn-ico">${ICON.coin}</span><span>Tienda</span></button>
+      <button class="btn btn-stone" data-nav data-act="settings">${stoneDeco}<span class="btn-ico">${ICON.gearTeal}</span><span>Ajustes</span></button>
     </div>
   </div>
   <div class="title-foot">
@@ -94,16 +115,18 @@ function titleHTML() {
       <div class="chip chip-rank">${ICON.sparkle}<span data-bind="rankName">Novato</span><b data-bind="rankLvl">1</b></div>
     </div>
     <div class="press">Pulsa para jugar</div>
-    <div class="chip chip-ver">v0.50</div>
+    <div class="chip chip-ver">v0.60</div>
   </div>
 </section>`;
 }
 
-function headerHTML(title) {
+// Cabecera de los menús: Atrás en placa de piedra, título grande con su marco (o la pieza
+// pintada titulo-<clave> si existe) y, a la derecha, «Esc volver» (o el marcador de la pantalla).
+function headerHTML(title, key = '') {
   return `<header class="head">
-    <button class="btn btn-back" data-nav data-act="back" aria-label="Atrás"><span class="btn-ico">${ICON.back}</span><span class="back-txt">Atrás</span></button>
-    <h2 class="head-title">${title}</h2>
-    <div class="head-hint"><kbd>Esc</kbd> volver</div>
+    <button class="btn btn-stone btn-back" data-nav data-act="back" aria-label="Atrás">${stoneDeco}<span class="btn-ico">${ICON.back}</span><span class="back-txt">Atrás</span></button>
+    <h2 class="head-title ht-${key}"><span class="ht-plate" aria-hidden="true"><span class="ht-gem ht-gem-l">${DECO.gem}</span><span class="ht-gem ht-gem-r">${DECO.gem}</span><span class="ht-lf ht-lf-l">${DECO.leaves}</span><span class="ht-lf ht-lf-r">${DECO.leaves}</span><span class="ht-glow"></span></span><span class="ht-txt">${title}</span></h2>
+    <div class="head-hint stone-chip">${stoneLeaves}<kbd>Esc</kbd> volver</div>
   </header>`;
 }
 
@@ -111,10 +134,11 @@ function modesHTML() {
   return `
 <section class="scr scr-menu scr-modes" data-screen="modes">
   <div class="vig vig-menu"></div>
-  ${headerHTML('Elige modo')}
+  ${headerHTML('Elige modo', 'elige-modo')}
   <div class="cards">
     ${MODE_KEYS.map((k, i) => `
     <button class="card card-${k}" data-nav data-mode="${k}" style="--i:${i}" ${i === 0 ? 'data-default' : ''}>
+      <span class="card-gem" aria-hidden="true">${DECO.gem}</span>
       <span class="card-head">
         <span class="card-tag">${MODES[k].tag}</span>
         <span class="card-ico">${ICON[k]}</span>
@@ -133,8 +157,8 @@ function mapHTML() {
   return `
 <section class="scr scr-menu scr-map" data-screen="map">
   <div class="vig vig-menu"></div>
-  ${headerHTML('Aventura')}
-  <div class="map-total" data-bind="mapTotal"></div>
+  ${headerHTML('Aventura', 'aventura')}
+  <div class="map-total stone-chip">${stoneLeaves}<span class="mt-star">★</span><span data-bind="mapTotal"></span></div>
   <div class="map-path" data-bind="map"></div>
 </section>`;
 }
@@ -143,11 +167,13 @@ function shopHTML() {
   return `
 <section class="scr scr-menu scr-shop" data-screen="shop">
   <div class="vig vig-menu"></div>
-  ${headerHTML('Tienda')}
-  <div class="shop-wallet">${ICON.coin}<b data-bind="wallet">0</b><small>monedas</small></div>
+  ${headerHTML('Tienda', 'tienda')}
+  <div class="shop-wallet stone-chip">${stoneLeaves}${ICON.coin}<b data-bind="wallet">0</b><small>monedas</small></div>
   <div class="shop-cats" data-bind="shop"></div>
 </section>`;
 }
+
+const panelDeco = `<span class="pn-deco" aria-hidden="true"><span class="pn-gem pn-gem-l">${DECO.gem}</span><span class="pn-gem pn-gem-r">${DECO.gem}</span><span class="pn-gem pn-gem-b">${DECO.gem}</span><span class="pn-lf pn-lf-tl">${DECO.leaves}</span><span class="pn-lf pn-lf-tr">${DECO.leaves}</span><span class="pn-lf pn-lf-bl">${DECO.leaves}</span><span class="pn-lf pn-lf-br">${DECO.leaves}</span></span>`;
 
 function toggleRow(key, icon, label, sub) {
   return `<div class="set-row">
@@ -161,10 +187,10 @@ function settingsHTML() {
   return `
 <section class="scr scr-menu scr-settings" data-screen="settings">
   <div class="vig vig-menu"></div>
-  ${headerHTML('Ajustes')}
+  ${headerHTML('Ajustes', 'ajustes')}
   <div class="panels">
     <div class="panel" style="--i:0">
-      <h3 class="panel-title"><span class="dot dot-b"></span>Control</h3>
+      ${panelDeco}<h3 class="panel-title plate-title"><span>Control</span></h3>
       ${toggleRow('tilt', 'phone', 'Inclinación', 'Gira inclinando el móvil')}
       ${toggleRow('invert', 'swap', 'Invertir giro')}
       <div class="set-row">
@@ -176,7 +202,7 @@ function settingsHTML() {
         </div>
       </div>
       <div class="set-row set-cal">
-        <button class="btn btn-cal" data-nav data-act="calibrate"><span class="btn-ico">${ICON.target}</span><span>Calibrar el centro</span></button>
+        <button class="btn btn-cal btn-teal" data-nav data-act="calibrate"><span class="btn-ico">${ICON.target}</span><span>Calibrar el centro</span></button>
         <div id="tiltMeter" class="tilt-meter" style="--v:0">
           <div class="tm-track"><i class="tm-mid"></i><b class="tm-dot"></b></div>
           <span class="tm-status">Sin datos del sensor</span>
@@ -184,7 +210,7 @@ function settingsHTML() {
       </div>
     </div>
     <div class="panel" style="--i:1">
-      <h3 class="panel-title"><span class="dot dot-m"></span>Imagen y sonido</h3>
+      ${panelDeco}<h3 class="panel-title plate-title"><span>Imagen y sonido</span></h3>
       <div class="set-row">
         <span class="set-ico">${ICON.sparkle}</span>
         <span class="set-lbl">Calidad</span>
@@ -207,19 +233,24 @@ function pauseHTML() {
 <section class="scr scr-pause" data-screen="pause">
   <div class="vig vig-dim"></div>
   <div class="pop-card pause-card">
+    ${panelDeco}
     <div class="pc-stripe"></div>
+    <h2 class="pc-title"><span class="pc-plate">${ICON.pause}<span>Pausa</span></span></h2>
     <div class="pc-cols">
       <div class="pc-btns">
-        <h2 class="pc-title">${ICON.pause}Pausa</h2>
-        <button class="btn btn-primary" data-nav data-act="resume" data-default><span class="btn-ico">${ICON.play}</span><span>Continuar</span></button>
-        <button class="btn btn-sec" data-nav data-act="restart"><span class="btn-ico">${ICON.retry}</span><span>Reiniciar</span></button>
+        <div class="play-frame pf-sm">
+          <span class="pf-gem pf-gem-l" aria-hidden="true">${DECO.gem}</span><span class="pf-gem pf-gem-r" aria-hidden="true">${DECO.gem}</span>
+          <span class="pf-lf pf-lf1" aria-hidden="true">${DECO.leaves}</span>
+          <button class="btn btn-primary" data-nav data-act="resume" data-default><span class="btn-ico">${ICON.play}</span><span>Continuar</span></button>
+        </div>
+        <button class="btn btn-stone" data-nav data-act="restart">${stoneDeco}<span class="btn-ico">${ICON.retry}</span><span>Reiniciar</span></button>
         <div class="pc-row">
-          <button class="btn btn-sec btn-sm" data-nav data-act="settings"><span class="btn-ico">${ICON.gear}</span><span>Ajustes</span></button>
-          <button class="btn btn-sec btn-sm" data-nav data-act="menu"><span class="btn-ico">${ICON.home}</span><span>Menú</span></button>
+          <button class="btn btn-stone btn-sm" data-nav data-act="settings">${stoneDeco}<span class="btn-ico">${ICON.gear}</span><span>Ajustes</span></button>
+          <button class="btn btn-stone btn-sm" data-nav data-act="menu">${stoneDeco}<span class="btn-ico">${ICON.home}</span><span>Menú</span></button>
         </div>
       </div>
       <div class="miss-box">
-        <h3 class="miss-title">Misiones <small data-bind="rankLine"></small></h3>
+        <h3 class="miss-title"><span class="mt-band">Misiones<span class="oc-glyph" aria-hidden="true">${DECO.glyph}</span></span><small data-bind="rankLine"></small></h3>
         <ul class="miss" data-bind="missions"></ul>
       </div>
     </div>
@@ -232,13 +263,19 @@ function overHTML() {
 <section class="scr scr-over" data-screen="over">
   <div class="vig vig-dim"></div>
   <div class="pop-card over-card">
+    <div class="oc-deco" aria-hidden="true">
+      <span class="od od-cr od-cr-tl">${DECO.crystals}</span><span class="od od-cr od-cr-tr">${DECO.crystals}</span>
+      <span class="od od-cr od-cr-br">${DECO.crystals}</span>
+      <span class="od od-lf od-lf-tl">${DECO.leaves}</span><span class="od od-lf od-lf-tr">${DECO.leaves}</span>
+      <span class="od od-lf od-lf-ml">${DECO.leaf}</span><span class="od od-lf od-lf-mr">${DECO.leaf}</span>
+    </div>
     <div class="ribbon" data-bind="ribbon"><span>¡Nuevo récord!</span></div>
-    <div class="oc-head"><h2 data-bind="headline">¡Buena carrera!</h2><span class="oc-mode" data-bind="mode">Clásico</span></div>
+    <div class="oc-head"><h2 data-bind="headline">¡Buena carrera!</h2><span class="oc-glyph" aria-hidden="true">${DECO.glyph}</span><span class="oc-mode" data-bind="mode">Clásico</span></div>
     <div class="oc-cols">
       <div class="oc-main">
         <div class="oc-adv" data-bind="adv"></div>
         <div class="oc-lbl">Distancia</div>
-        <div class="oc-dist"><b data-bind="dist">0</b><span>m</span></div>
+        <div class="oc-dist"><i class="oc-spark l" aria-hidden="true">${DECO.spark}</i><b data-bind="dist">0</b><span>m</span><i class="oc-spark r" aria-hidden="true">${DECO.spark}</i></div>
         <div class="oc-best">${ICON.trophy}<span>Mejor</span><b data-bind="bestO">—</b></div>
         <ul class="oc-facts" data-bind="facts"></ul>
         <div class="oc-stats">
@@ -255,37 +292,40 @@ function overHTML() {
       </div>
     </div>
     <div class="oc-btns">
+      <span class="ob-lf ob-lf-l" aria-hidden="true">${DECO.leaves}</span><span class="ob-lf ob-lf-r" aria-hidden="true">${DECO.leaves}</span>
+      <span class="ob-cr ob-cr-l" aria-hidden="true">${DECO.crystals}</span><span class="ob-cr ob-cr-r" aria-hidden="true">${DECO.crystals}</span>
       <button class="btn btn-primary" data-nav data-act="restart" data-default><span class="btn-ico">${ICON.retry}</span><span>Otra vez</span></button>
       <button class="btn btn-sec btn-cp" data-nav data-act="checkpoint"><span class="btn-ico">${ICON.play}</span><span>Desde el control</span></button>
       <button class="btn btn-primary btn-next" data-nav data-act="next"><span class="btn-ico">${ICON.play}</span><span>Siguiente</span></button>
-      <button class="btn btn-sec" data-nav data-act="menu"><span class="btn-ico">${ICON.home}</span><span>Menú</span></button>
+      <button class="btn btn-sec btn-cream" data-nav data-act="menu"><span class="btn-ico">${ICON.home}</span><span>Menú</span></button>
     </div>
     <div class="oc-hint">Toca en cualquier sitio para reintentar</div>
   </div>
 </section>`;
 }
 
+const hudLeaves = `<span class="hc-lf hc-lf-tl" aria-hidden="true">${DECO.leaf}</span><span class="hc-lf hc-lf-br" aria-hidden="true">${DECO.leaf}</span><span class="hc-glow" aria-hidden="true"></span>`;
 function hudHTML() {
   return `
 <section class="scr scr-hud" data-screen="hud">
   <div class="hud-tl">
-    <button class="hud-pause" data-act="pause" aria-label="Pausa">${ICON.pause}</button>
-    <div class="hud-coins">${ICON.coin}<b data-hud="coins">0</b></div>
+    <button class="hud-pause hud-chip" data-act="pause" aria-label="Pausa">${hudLeaves}${ICON.pause}</button>
+    <div class="hud-coins hud-chip">${hudLeaves}${ICON.coin}<b data-hud="coins">0</b></div>
   </div>
   <div class="hud-timer" data-hud="timerBox"><b data-hud="timer">60</b><small>s</small></div>
   <div class="hud-tr">
-    <div class="hud-dist"><b data-hud="dist">0</b><span>m</span></div>
-    <div class="hud-speed"><b data-hud="speed">0</b> km/h</div>
+    <div class="hud-dist hud-chip">${hudLeaves}<b data-hud="dist">0</b><span>m</span></div>
+    <div class="hud-speed hud-chip">${hudLeaves}${ICON.speed}<b data-hud="speed">0</b> km/h</div>
+    <div class="hud-mult hud-chip" data-hud="mult">${hudLeaves}<b data-hud="multN">×1</b><small data-hud="pts">0</small></div>
   </div>
   <div class="hud-count" data-hud="count"></div>
-  <div class="hud-mult" data-hud="mult"><b data-hud="multN">×1</b><small data-hud="pts">0</small></div>
   <div class="hud-jumps" data-hud="jumps"><span>salto</span><i data-j="0"><b></b></i><i data-j="1"><b></b></i></div>
   <div class="adv-intro" data-hud="advIntro"></div>
   <div class="adv-bar" data-hud="advBar"><span data-hud="advN">Tramo 1</span><i><b data-hud="advP"></b></i><em data-hud="advPow"></em></div>
   <div class="pad-hint pad-l" data-hud="padL">${ICON.chevron}<span>placa</span></div>
   <div class="pad-hint pad-r" data-hud="padR"><span>placa</span>${ICON.chevron}</div>
   <div class="hud-br" data-hud="chevs">
-    <span class="chev" data-c="0">${ICON.chevron}</span><span class="chev" data-c="1">${ICON.chevron}</span><span class="chev" data-c="2">${ICON.chevron}</span>
+    ${[0, 1, 2].map((i) => `<span class="chev" data-c="${i}"><i class="chev-fr" aria-hidden="true"></i>${ICON.chevron}${ICON.chevron}</span>`).join('')}
   </div>
 </section>`;
 }
@@ -298,6 +338,7 @@ export function createUI(root, handlers = {}) {
 
   const cssLink = injectAssets();
   root.classList.add('htui');
+  applySkin(root);
   if (cssLink && !cssLink.sheet) {
     root.classList.add('htui-loading');
     cssLink.addEventListener('load', () => root.classList.remove('htui-loading'), { once: true });
@@ -652,7 +693,8 @@ export function createUI(root, handlers = {}) {
 
   // ----- avisos -----
   function toast(text, kind = 'info') {
-    const t = h(`<div class="toast toast-${esc(kind)}"><span>${esc(text)}</span></div>`);
+    const ico = kind === 'boost' ? ICON.boost : /^¡Impulsos perdidos|^Racha perdida|^¡Al vacío|^¡Tropiezo/.test(text) ? '<i class="t-alert" aria-hidden="true"></i>' : '';
+    const t = h(`<div class="toast toast-${esc(kind)}">${kind === 'boost' ? hudLeaves : ''}${ico}<span>${esc(text)}</span></div>`);
     toasts.appendChild(t);
     while (toasts.children.length > 3) toasts.firstElementChild.remove();
     const life = kind === 'info' ? 2800 : 1600;
@@ -716,11 +758,12 @@ export function createUI(root, handlers = {}) {
   const starsHTML = (n) => [0, 1, 2].map((i) => `<i class="st ${i < n ? 'on' : ''}">★</i>`).join('');
   function paintMap(list = []) {
     const tot = list.reduce((a, s) => a + s.stars, 0);
-    $('[data-bind="mapTotal"]').innerHTML = `<b>${tot}</b>/${list.length * 3} ★`;
+    $('[data-bind="mapTotal"]').innerHTML = `<b>${tot}</b>/${list.length * 3}`;
     const firstOpen = list.findIndex((s) => !s.locked && s.stars === 0);
     $('[data-bind="map"]').innerHTML = list.map((s, i) => `
       <button class="stage ${s.locked ? 'locked' : ''} ${s.boss ? 'boss' : ''} ${s.stars ? 'done' : ''}" data-nav data-stage="${i}" style="--i:${i}" ${i === (firstOpen < 0 ? 0 : firstOpen) ? 'data-default' : ''}>
-        <span class="sg-n">${s.locked ? '🔒' : i + 1}</span>
+        <span class="sg-gem" aria-hidden="true">${DECO.gem}</span>
+        <span class="sg-n">${s.locked ? ICON.lock : `<i class="oc-spark l" aria-hidden="true">${DECO.spark}</i>${i + 1}<i class="oc-spark r" aria-hidden="true">${DECO.spark}</i>`}</span>
         <span class="sg-name">${esc(s.name)}</span>
         <span class="sg-stars">${starsHTML(s.stars)}</span>
         ${!s.stars && s.best > 0 ? `<span class="sg-best">${Math.round(s.best * 100)} %</span>` : ''}
@@ -735,7 +778,8 @@ export function createUI(root, handlers = {}) {
     const f = focused && focused.dataset.buy;
     $('[data-bind="shop"]').innerHTML = data.cats.map((c, ci) => `
       <div class="shop-cat" style="--i:${ci}">
-        <h3 class="panel-title">${esc(c.name)} <small>${esc(c.desc)}</small></h3>
+        <span class="pn-lf pn-lf-tr" aria-hidden="true">${DECO.leaves}</span><span class="sc-gem" aria-hidden="true">${DECO.gem}</span>
+        <h3 class="panel-title sc-head"><span class="sc-name">${esc(c.name)}</span><small>${esc(c.desc)}</small></h3>
         <div class="shop-items">${c.items.map((it) => {
           const bg = it.sw.length > 2 ? `linear-gradient(135deg, ${it.sw.join(', ')})` : `linear-gradient(135deg, ${it.sw[0]}, ${it.sw[1]})`;
           const st = it.eq ? '<em class="si-eq">Puesto</em>' : it.owned ? '<em class="si-use">Usar</em>' : `<em class="si-price ${data.wallet < it.price ? 'poor' : ''}">${ICON.coin}${fmtInt(it.price)}</em>`;

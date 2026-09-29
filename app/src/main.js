@@ -13,7 +13,7 @@ import { Adventure, STAGES, packGhost, unpackGhost, quantSteer } from './sim/adv
 import { Arcade } from './sim/arcade.js';
 import { Zorro } from './sim/zorro.js';
 
-const VERSION = '0.50';
+const VERSION = '0.60';
 const STEP = 1 / 60;
 const $ = (id) => document.getElementById(id);
 const QS = new URLSearchParams(location.search);

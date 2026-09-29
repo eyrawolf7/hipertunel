@@ -6,7 +6,7 @@ Juego de runner en túnel, en primera persona, con **la jugabilidad exacta de Bo
 te pasará capturas y opiniones. Si queda muy pulido, quiere sacarlo para **Android** y como
 homebrew para su **Switch**: la arquitectura tiene que seguir siendo portable.
 
-Estado actual: versión 0.50 (modos Arcade —el de «Jugar»—, Clásico = Boost 2 exacto, Aventura, Reto diario, Viaje, Supervivencia y Contrarreloj; misiones, tienda, estilo limpio de piedra y selva). La v0.32 está en `legacy/`.
+Estado actual: versión 0.60 (modos Arcade —el de «Jugar», con piruetas en el salto entre mundos y muro de cartón—, Clásico = Boost 2 exacto, Aventura, Reto diario, Viaje, Supervivencia y Contrarreloj; misiones, tienda; el zorro solo fuera de la primera persona: arranque, muerte, título; menús con piezas pintadas de ChatGPT en `app/src/assets/ui/`, recortadas con `tools/ui/recortar.mjs`; maquetas en `referencias/estilo-visual/maquetas-ui/`). La v0.32 está en `legacy/`.
 
 Publicado en https://eyrawolf7.github.io/hipertunel/ (repo `eyrawolf7/hipertunel`, cuenta
 personal de Víctor, **no** la del trabajo). GitHub Pages sirve el `index.html` de la raíz, que es

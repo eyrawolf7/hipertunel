@@ -33,3 +33,31 @@ export const ICON = {
   sparkle: s('<path d="M12 2.5l2.3 6.4 6.7 2.1-6.7 2.2L12 20l-2.3-6.8L3 11l6.7-2.1z" fill="currentColor"/>'),
   eye: s('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linejoin="round"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/>'),
 };
+
+// ---------- adornos de piedra y selva (portada y fin de partida) ----------
+// Solo colores planos (sin degradados con id: fallan si el primer SVG está en una pantalla oculta).
+const INK = '#3a2a22';
+const leafPath = (x, y, r, s = 1, c = '#6cc644', h = '#9be062') =>
+  `<g transform="translate(${x} ${y}) rotate(${r}) scale(${s})"><path d="M0 0C6-8 22-9 32 0 22 9 6 8 0 0z" fill="${c}" stroke="#23451d" stroke-width="2.2" stroke-linejoin="round"/><path d="M3-1C10-6 21-7 29-1z" fill="${h}"/><path d="M2 0H27" stroke="#3a7d27" stroke-width="1.5" stroke-linecap="round"/></g>`;
+export const DECO = {
+  // gema turquesa tallada
+  gem: s(`<path d="M20 2l14 10v16L20 38 6 28V12z" fill="#22c3cc" stroke="#173848" stroke-width="3" stroke-linejoin="round"/><path d="M20 2L6 12l14 5 14-5z" fill="#8ff5f1"/><path d="M13 14l7-4 7 4v11l-7 4-7-4z" fill="#4fe6e6"/><path d="M15 15l5-3v7l-5 2z" fill="#e8fffd"/><path d="M6 28l14 10 14-10-14 1z" fill="#1597a8"/>`, '0 0 40 40', 'deco-gem'),
+  // gema en su hueco de piedra
+  gemSocket: s(`<rect x="3" y="5" width="42" height="40" rx="10" fill="#e8cf9a" stroke="${INK}" stroke-width="3"/><rect x="9" y="10" width="30" height="30" rx="7" fill="#b28b54"/><g transform="translate(8 7) scale(.8)"><path d="M20 2l14 10v16L20 38 6 28V12z" fill="#22c3cc" stroke="#173848" stroke-width="3.4" stroke-linejoin="round"/><path d="M20 2L6 12l14 5 14-5z" fill="#8ff5f1"/><path d="M13 14l7-4 7 4v11l-7 4-7-4z" fill="#4fe6e6"/><path d="M15 15l5-3v7l-5 2z" fill="#e8fffd"/><path d="M6 28l14 10 14-10-14 1z" fill="#1597a8"/></g>`, '0 0 48 48', 'deco-socket'),
+  // racimo de cristales sobre una roca lila
+  crystals: s(`<path d="M9 24l7 7v21H6l-4-20z" fill="#3fd9e0" stroke="#173848" stroke-width="2.6" stroke-linejoin="round"/><path d="M9 24l-7 8 4 20h4z" fill="#a6faf6"/><path d="M40 18l7 10-4 24H33l1-24z" fill="#3fd9e0" stroke="#173848" stroke-width="2.6" stroke-linejoin="round"/><path d="M40 18l-6 10-1 24h4z" fill="#a6faf6"/><path d="M24 2l10 13-2 37H16l-2-37z" fill="#45e3e6" stroke="#173848" stroke-width="2.8" stroke-linejoin="round"/><path d="M24 2L14 15l2 37h8z" fill="#b8fffb"/><path d="M19 16l4-6v14z" fill="#fff" opacity=".8"/><path d="M2 50c8-5 36-6 46 0l-3 6H5z" fill="#7d6cae" stroke="#2e2448" stroke-width="2.6" stroke-linejoin="round"/>`, '0 0 50 58', 'deco-crystals'),
+  // hojas
+  leaf: s(leafPath(3, 14, 0), '0 0 38 28', 'deco-leaf'),
+  leaves: s(leafPath(6, 34, -80, .8, '#58b43a', '#86d253') + leafPath(4, 32, -40) + leafPath(8, 36, 10, .95, '#58b43a', '#86d253') + leafPath(10, 34, -12, .7, '#7ad04c', '#a8e870') + leafPath(6, 38, 40, .7), '0 0 48 56', 'deco-leaves'),
+  // grabado: espiral cuadrada
+  glyph: s('<path d="M3 3h18v18H7V7h10v10h-6v-6h2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>', '0 0 24 24', 'deco-glyph'),
+  // destellos turquesa (tres rayitas)
+  spark: s('<path d="M4 7l8 3M5 17l7-2M8 26l5-5" stroke="#173848" stroke-width="6" stroke-linecap="round"/><path d="M4 7l8 3M5 17l7-2M8 26l5-5" stroke="#44e6e6" stroke-width="3.2" stroke-linecap="round"/>', '0 0 16 30', 'deco-spark'),
+};
+// iconos a color de la portada
+ICON.flag = s(`<path d="M6 3v18.5" stroke="${'#2b2257'}" stroke-width="2.6" stroke-linecap="round"/><path d="M7 4.2c3.6-2 6.4 1.6 12.4-.4v9.6c-6 2-8.8-1.6-12.4.4z" fill="#ff5a4e" stroke="#2b2257" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 5.6c2-.6 3.4.3 5 .6" stroke="#ffd1c9" stroke-width="1.4" stroke-linecap="round" fill="none"/>`, '0 0 24 24', 'ico-flag');
+ICON.gearTeal = s('<path d="M12 2.8l1.6 2.3 2.7-.7.6 2.7 2.6 1-.9 2.6 1.9 2-2 2 .9 2.6-2.6 1-.6 2.7-2.7-.7L12 21.2l-1.6-2.3-2.7.7-.6-2.7-2.6-1 .9-2.6-1.9-2 1.9-2-.9-2.6 2.6-1 .6-2.7 2.7.7z" fill="#22c1c8" stroke="#173848" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="12" r="3.6" fill="#fff4dc" stroke="#173848" stroke-width="1.6"/>', '0 0 24 24', 'ico-gear2');
+ICON.lock = s('<rect x="5" y="10.5" width="14" height="10" rx="2.4" fill="currentColor"/><path d="M8.2 10.5V8a3.8 3.8 0 0 1 7.6 0v2.5" fill="none" stroke="currentColor" stroke-width="2.4"/><circle cx="12" cy="15.2" r="1.6" fill="var(--hole, #6d6a78)"/>', '0 0 24 24', 'ico-lock');
+ICON.boost = s('<path d="M3.5 5.5h4.5l6 6.5-6 6.5H3.5l6-6.5zM11 5.5h4.5l6 6.5-6 6.5H11l6-6.5z" fill="currentColor" stroke="#173848" stroke-width="1.5" stroke-linejoin="round"/>', '0 0 24 24', 'ico-boost');
+// clases para poder cambiar estos iconos por las piezas pintadas desde el CSS
+for (const [k, c] of [['home', 'ico-home'], ['back', 'ico-back'], ['retry', 'ico-retry'], ['gear', 'ico-gear']]) ICON[k] = ICON[k].replace('class="ico ', `class="ico ${c} `);

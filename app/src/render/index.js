@@ -270,8 +270,10 @@ export class Renderer {
       // la cámara se desliza hasta dejarlo en la franja izquierda (x ≈ −0,64 en pantalla)
       // y girando hasta verlo de tres cuartos de frente
       const g0 = Math.min(1, Math.max(0, (t - 0.95) / 0.6)), g = g0 * g0 * (3 - 2 * g0);
-      const dist = 4.4 + 0.8 * g, side = dist * 0.72 * Math.tan(29 * DEG) * this.camera.aspect;
-      const shift = 1.25 + (side - 1.25) * g;
+      const dist = 4.4 + 0.8 * g, side = dist * 1.12 * Math.tan(29 * DEG) * this.camera.aspect;
+      // (visto de frente la derecha de la pista queda a la izquierda de la pantalla: el desplazamiento
+      // cambia de signo para que el zorro acabe igualmente en la franja izquierda)
+      const shift = 1.25 + (-side - 1.25) * g;
       const arc = hitBox ? 1.7 * Math.sin(Math.PI * a) : 0;
       return { e, yaw: (26 + 124 * g) * DEG, dist, h: 1.9, aim: 0.7 + arc * 0.7, shift, fov: 58, arc, spin: hitBox ? -Math.PI * 2 * (1 - (1 - a) * (1 - a)) : 0 };
     }
