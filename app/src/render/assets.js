@@ -14,7 +14,7 @@ const cache = {}, tcache = {};
 export function loadModel(name) {
   if (!cache[name]) {
     const url = byName[name + '.glb'];
-    cache[name] = url ? new Promise((res) => loader.load(url, (g) => res(g.scene), undefined, () => res(null))) : Promise.resolve(null);
+    cache[name] = url ? new Promise((res) => loader.load(url, (g) => { g.scene.animations = g.animations; res(g.scene); }, undefined, () => res(null))) : Promise.resolve(null);
   }
   return cache[name];
 }

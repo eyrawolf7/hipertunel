@@ -14,6 +14,7 @@
 import { ICON } from './icons.js';
 
 const MODES = {
+  zorro: { name: 'Zorro', desc: 'Nuevo: el Arcade en tercera persona, con el zorro en su tabla de hoja.', tag: 'Prototipo', unit: 'pts' },
   arcade: { name: 'Arcade', desc: 'Boost a tope: más cajas, mundos antes y racha ×5 si arriesgas.', tag: 'Recomendado', unit: 'pts' },
   adventure: { name: 'Aventura', desc: '10 tramos: el tubo se rompe, el suelo se hunde, poderes y jefes.', tag: 'Nuevo' },
   classic: { name: 'Clásico', desc: 'Boost 2 tal cual: sin límite, llega lo más lejos que puedas.', tag: 'El original' },
@@ -662,14 +663,14 @@ export function createUI(root, handlers = {}) {
     bind('score').textContent = fmtInt(r.score);
     bind('time').textContent = fmtTime(r.time);
     const top = Array.isArray(r.top) ? r.top.slice(0, 5) : [];
-    const val = (e) => (typeof e === 'number' ? e : +(e && (mode === 'arcade' ? e.score : (e.distM ?? e.dist ?? e.score))) || 0);
+    const val = (e) => (typeof e === 'number' ? e : +(e && (MODES[mode] && MODES[mode].unit === 'pts' ? e.score : (e.distM ?? e.dist ?? e.score))) || 0);
     let marked = false;
     const rows = [];
     for (let i = 0; i < 5; i++) {
       const e = top[i];
       if (e == null) { rows.push(`<li class="empty"><i>${i + 1}</i><b>—</b></li>`); continue; }
       const v = val(e);
-      const me = !marked && (e.me || e.current || (Math.round(v) === Math.round((mode === 'arcade' ? r.score : r.distM) || -1)));
+      const me = !marked && (e.me || e.current || (Math.round(v) === Math.round((MODES[mode] && MODES[mode].unit === 'pts' ? r.score : r.distM) || -1)));
       if (me) marked = true;
       const when = e && e.date ? `<small>${esc(typeof e.date === 'number' ? new Date(e.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : e.date)}</small>` : '';
       rows.push(`<li class="${me ? 'me' : ''} r${i + 1}"><i>${i + 1}</i><b>${fmtInt(v)}${unit}</b>${when}</li>`);

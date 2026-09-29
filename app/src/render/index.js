@@ -21,6 +21,7 @@ import { TunnelKit, kitU } from './tunnelkit.js';
 import { TunnelProps } from './tunnelprops.js';
 import { Life } from './life.js';
 import { AdvView } from './advview.js';
+import { Hero } from './hero.js';
 import { styleUniforms } from './stylize.js';
 import { THEMES, BOX_COLORS } from './worlds.js';
 
@@ -76,7 +77,7 @@ export class Renderer {
     this.tunnel = new Tunnel(this.scene);
     this.kit = new TunnelKit(this.scene);
     this.kit.onReady = () => this.warmup();
-    this.props = new TunnelProps(this.scene); this.life = new Life(this.scene); this.adv = new AdvView(this.scene); this.ghostGame = null;
+    this.props = new TunnelProps(this.scene); this.life = new Life(this.scene); this.adv = new AdvView(this.scene); this.hero = new Hero(this.scene); this.third = false; this.heroPos = new THREE.Vector3(); this.ghostGame = null;
     this.scene.fog = new THREE.Fog(0xffffff, 40, 120);
     this.stoneTint = new THREE.Color(1, 1, 1);
     this.boxes = new Boxes(this.scene);
@@ -160,6 +161,7 @@ export class Renderer {
       // el empujón crece con cada nivel: +9°, +12°, +16° de campo de visión
       if (e.type === 'boost') { this.cam.kick = 1; this.cam.kickAmp = [0, 0.75, 1, 1.35][e.level] || 1; this.cam.rollAmp = (Math.random() * 2 - 1) * 0.127; this.cam.roll = 1; this.streakKick = [0, 0.6, 0.8, 1][e.level] || 1; if (e.level === 3) this.cam.blueVig = 0.15; }
       if (e.type === 'crash') {
+        if (this.third) this.hero.hit();
         const p = this.boxes.positions.get(e.id);
         const bc = this.colors[(game.boxes.find((b) => b.id === e.id) || { color: 0 }).color];
         if (p) this.fx.explode(p, bc, 80, this.look, 60, 1.5);
@@ -242,11 +244,24 @@ export class Renderer {
     const sp = this.sp, fr = this.fr;
     const N = new THREE.Vector3().copy(fr.X).multiplyScalar(sp.nx).addScaledVector(fr.U, sp.ny);
     const jump = game.jumpAt(camS);
-    const pos = new THREE.Vector3().copy(fr.P).addScaledVector(fr.X, sp.x).addScaledVector(fr.U, sp.y).addScaledVector(N, 0.62 + jump);
+    let pos = new THREE.Vector3().copy(fr.P).addScaledVector(fr.X, sp.x).addScaledVector(fr.U, sp.y).addScaledVector(N, 0.62 + jump);
+    let heroN = N, heroAt = null;
+    if (this.third) {
+      // tercera persona: el zorro va donde iría la cámara (en s), y la cámara detrás y por encima
+      tr.frameAt(s, this.frH || (this.frH = makeFrame()));
+      const spH = surfSmooth(sec, u, closed, this.spH || (this.spH = {}));
+      heroN = new THREE.Vector3().copy(this.frH.X).multiplyScalar(spH.nx).addScaledVector(this.frH.U, spH.ny);
+      heroAt = this.heroPos.copy(this.frH.P).addScaledVector(this.frH.X, spH.x).addScaledVector(this.frH.U, spH.y).addScaledVector(heroN, 0.02 + game.jumpAt(s));
+    }
     tr.frameAt(Math.min(s + 10, game.kLast), this.fr2);
     const kLook = this.firstFrame ? 1 : Math.min(1, dt * 60 * 0.06);
     this.look.lerp(this.fr2.F, kLook).normalize();
-    this.upS.lerp(N, this.firstFrame ? 1 : Math.min(1, dt * 18)).normalize();
+    // en tercera persona la cámara gira con el tubo con algo más de retraso (sensación de inercia)
+    this.upS.lerp(N, this.firstFrame ? 1 : Math.min(1, dt * (this.third ? 12 : 18))).normalize();
+    if (this.third) {
+      pos = new THREE.Vector3().copy(heroAt).addScaledVector(this.look, -3.1).addScaledVector(this.upS, 1.45);
+      this.hero.update(true, heroAt, heroN, this.look, game.alive ? game.omega : 0, game.jumpAt(s) > 0.15, game.level, dt);
+    } else this.hero.update(false);
     this.firstFrame = false;
 
     const c = this.cam;
@@ -261,7 +276,7 @@ export class Renderer {
       c.shake = Math.max(0, c.shake - c.shakeDecay * dt);
     }
     // muerte: la cámara se gira hacia la caja que te ha dado
-    const target = new THREE.Vector3().copy(pos).add(this.look);
+    const target = this.third ? new THREE.Vector3().copy(heroAt).addScaledVector(this.look, 7).addScaledVector(this.upS, 0.55) : new THREE.Vector3().copy(pos).add(this.look);
     if (!game.alive && this.deathFocus) { this.deathT = (this.deathT || 0) + dt; target.lerp(this.deathFocus, Math.min(1, this.deathT * 2) * 0.6); } else this.deathT = 0;
     cam.up.copy(this.upS);
     // giro del impulso (Camera::boostEffect): ±0,127 rad que se apaga
@@ -275,7 +290,7 @@ export class Renderer {
     if (c.rollShake > 0) { cam.rotateZ((Math.random() * 2 - 1) * 0.08 * (c.rollShake / 0.25) * (reduceFx ? 0.3 : 1)); c.rollShake -= dt; }
     // campo de visión: base del original, con un empujón al impulsar
     const sp01 = Math.min(1, Math.max(0, (game.speedMS - 36) / 64));
-    const fov = this.baseFov + iq * 18 + sp01 * 14 + easeKick(c.kick) * (reduceFx ? 4 : 12) * (c.kickAmp || 1) + (c.foldFov > 0 ? Math.sin(Math.min(1, (1.2 - c.foldFov) / 1.2) * Math.PI) * 8 : 0);
+    const fov = this.baseFov + (this.third ? 6 : 0) + iq * 18 + sp01 * 14 + easeKick(c.kick) * (reduceFx ? 4 : 12) * (c.kickAmp || 1) + (c.foldFov > 0 ? Math.sin(Math.min(1, (1.2 - c.foldFov) / 1.2) * Math.PI) * 8 : 0);
     if (c.foldFov > 0) c.foldFov -= dt;
     if (!reduceFx && sp01 > 0) cam.rotateZ((Math.random() * 2 - 1) * 0.003 * sp01 * sp01);
     c.kick = Math.max(0, c.kick - dt * 1.8);

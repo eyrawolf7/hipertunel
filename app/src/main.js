@@ -32,6 +32,8 @@ const saveTop = (mode, list) => { try { localStorage.setItem('hipertunel-top-' +
 const simMode = (m) => (m === 'daily' || m === 'voyage' ? 'classic' : m);
 const dayKey = () => { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; };
 const daySeed = (k) => { let h = 2166136261; for (const c of 'hipertunel-' + k) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
+// el modo del zorro es el Arcade en tercera persona: comparte sus reglas y su racha
+const isArcade = (m) => m === 'arcade' || m === 'zorro';
 const topKey = (m) => (m === 'daily' ? 'daily-' + dayKey() : m);
 const maxWorld = () => { try { return +(localStorage.getItem('hipertunel-mundo-max') || 0) || 0; } catch (e) { return 0; } };
 // récord en metros (marca dorada del túnel y marcador); el Arcade ordena por puntos
@@ -97,7 +99,7 @@ const ui = createUI($('ui'), {
   keyboard: false,
 });
 const pushMissions = () => ui.missions?.(missions.list(), missions.rank());
-const pushRecords = () => { ui.records?.({ arcade: bestScore('arcade'), classic: bestOf('classic'), survival: bestOf('survival'), timetrial: bestOf('timetrial'), daily: bestOf('daily'), voyage: bestOf('voyage') }); ui.locks?.({ voyage: maxWorld() < 1 }); };
+const pushRecords = () => { ui.records?.({ zorro: bestScore('zorro'), arcade: bestScore('arcade'), classic: bestOf('classic'), survival: bestOf('survival'), timetrial: bestOf('timetrial'), daily: bestOf('daily'), voyage: bestOf('voyage') }); ui.locks?.({ voyage: maxWorld() < 1 }); };
 pushRecords();
 pushMissions();
 applyCosmetics();
@@ -148,9 +150,10 @@ function newGame(m, seed, fromCp = false) {
       for (let i = 0; i < cpPrefix.length && game.alive; i++) { game.step({ steer: cpPrefix[i] }); if (ghostGame && ghostGame.alive) ghostGame.step({ steer: ghostSteers[ghostGame.frame] ?? 0 }); }
       advRec = Array.from(cpPrefix); game.fromCheckpoint = true; game.events = [];
     } else { cpFrame = -1; cpPrefix = null; }
-  } else if (m === 'arcade') { game = new Arcade({ seed: seed ?? ((Math.random() * 1e9) | 0) }); ghostGame = null; ghostSteers = null; }
+  } else if (m === 'arcade' || m === 'zorro') { game = new Arcade({ seed: seed ?? ((Math.random() * 1e9) | 0) }); ghostGame = null; ghostSteers = null; }
   else { game = new Game({ mode: simMode(m), seed: seed ?? ((Math.random() * 1e9) | 0) }); ghostGame = null; ghostSteers = null; }
   renderer.ghostGame = ghostGame;
+  renderer.third = m === 'zorro';
   worldBase = m === 'voyage' ? maxWorld() : m === 'adventure' ? STAGES[advStage].world : 0;
   renderer.themeBase = worldBase;
   renderer.reset();
@@ -209,16 +212,16 @@ function finish() {
   const list = loadTop(mode);
   const me = { score, distM, coins, time: +game.time.toFixed(1), date: Date.now() };
   list.push(me);
-  if (mode === 'arcade') list.sort((a, b) => b.score - a.score); else list.sort((a, b) => (b.distM ?? b.score) - (a.distM ?? a.score));
+  if (isArcade(mode)) list.sort((a, b) => b.score - a.score); else list.sort((a, b) => (b.distM ?? b.score) - (a.distM ?? a.score));
   const top = list.slice(0, 5); saveTop(mode, top);
   const isRecord = top[0] === me && list.length > 1;
   try { const w = worldBase + visWorld - 1; if (w > maxWorld()) localStorage.setItem('hipertunel-mundo-max', String(Math.min(w, 4))); } catch (e) {}
   shop.add(game.coinsGot);
   const mr = missions.finish();
-  const facts = mode === 'arcade' ? endFacts(score, bestScoreAtStart, isRecord, ' puntos') : endFacts(distM, bestAtStart[mode] || 0, isRecord);
-  if (mode === 'arcade') facts.lines.unshift(`Racha máxima ×${maxMult} · ${fmtN(Math.round(distM))} m`); facts.lines = facts.lines.slice(0, 2);
+  const facts = isArcade(mode) ? endFacts(score, bestScoreAtStart, isRecord, ' puntos') : endFacts(distM, bestAtStart[mode] || 0, isRecord);
+  if (isArcade(mode)) facts.lines.unshift(`Racha máxima ×${maxMult} · ${fmtN(Math.round(distM))} m`); facts.lines = facts.lines.slice(0, 2);
   pushMissions();
-  ui.over({ mode, distM, coins, score, best: mode === 'arcade' ? top[0].score : (top[0].distM ?? top[0].score), isRecord, time: game.time, maxBoostTime: mode === 'classic' ? game.boostTotal : game.maxBoostTime, top: top.map((e) => ({ ...e, me: e === me })), missionsDone: mr.completed, facts, headline: facts.headline, rankUp: mr.rankUp, rank: missions.rank() });
+  ui.over({ mode, distM, coins, score, best: isArcade(mode) ? top[0].score : (top[0].distM ?? top[0].score), isRecord, time: game.time, maxBoostTime: mode === 'classic' ? game.boostTotal : game.maxBoostTime, top: top.map((e) => ({ ...e, me: e === me })), missionsDone: mr.completed, facts, headline: facts.headline, rankUp: mr.rankUp, rank: missions.rank() });
   if (mr.rankUp) setTimeout(() => { audio.play('record'); ui.toast(`¡Rango ${missions.rank().level}: ${missions.rank().name}!`, 'mission'); }, 700);
   ui.show('over');
   if (isRecord) audio.play('record');
