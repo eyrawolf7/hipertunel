@@ -200,6 +200,8 @@ export class Renderer {
   }
 
   setRecordRow(k) { this.kit.recordRow = k; }
+  // cosméticos de la tienda
+  setCosmetics({ trail, life }) { this.streaks.style = trail || null; this.life.skin = life || null; this.life.kind = -1; }
 
   consumeLanding() { const l = !!this.landed; this.landed = false; return l; }
 

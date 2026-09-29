@@ -8,6 +8,7 @@ import { createAudio } from './audio/index.js';
 import { createUI } from './ui/index.js';
 import { createInput } from './input/index.js';
 import { createMissions } from './missions.js';
+import { createShop, SHOP } from './shop.js';
 
 const VERSION = '0.40';
 const STEP = 1 / 60;
@@ -41,6 +42,7 @@ catch (e) { document.body.classList.add('sin-webgl'); $('fatal').hidden = false;
 const audio = createAudio();
 const input = createInput(canvas);
 const missions = createMissions();
+const shop = createShop();
 let missDist = 0;
 input.configure(settings);
 
@@ -68,12 +70,20 @@ const ui = createUI($('ui'), {
   onCalibrate: () => { input.requestTilt(); input.calibrate(); },
   onSound: (n) => audio.play(n),
   onPause: () => pause(),
+  onShopOpen: () => paintShop(),
+  onShop: (cat, id) => {
+    const r = shop.choose(cat, id);
+    if (r === 'poor') { audio.play('menuBack'); ui.toast('Te faltan monedas', 'info'); }
+    else { audio.play(r === 'buy' ? 'record' : 'menuOk'); if (r === 'buy') ui.toast('¡Comprado!', 'mission'); applyCosmetics(); }
+    paintShop();
+  },
   keyboard: false,
 });
 const pushMissions = () => ui.missions?.(missions.list(), missions.rank());
 const pushRecords = () => { ui.records?.({ classic: bestOf('classic'), survival: bestOf('survival'), timetrial: bestOf('timetrial'), daily: bestOf('daily'), voyage: bestOf('voyage') }); ui.locks?.({ voyage: maxWorld() < 1 }); };
 pushRecords();
 pushMissions();
+applyCosmetics();
 ui.settings(settings);
 audio.setMusic(settings.music); audio.setMuted(!settings.sound);
 
@@ -169,6 +179,7 @@ function finish() {
   const top = list.slice(0, 5); saveTop(mode, top);
   const isRecord = top[0] === me && list.length > 1;
   try { const w = worldBase + visWorld - 1; if (w > maxWorld()) localStorage.setItem('hipertunel-mundo-max', String(Math.min(w, 4))); } catch (e) {}
+  shop.add(game.coinsGot);
   const mr = missions.finish();
   const facts = endFacts(distM, bestAtStart[mode] || 0, isRecord);
   pushMissions();
@@ -203,6 +214,17 @@ function endFacts(distM, best, isRecord) {
   return { headline, lines: out.slice(0, 2) };
 }
 const fmtN = (n) => n.toLocaleString('es-ES');
+
+// tienda: pinta los artículos y aplica lo equipado (estela, ambiente, marcador)
+function paintShop() {
+  ui.shop?.({ wallet: shop.wallet, cats: Object.entries(SHOP).map(([key, c]) => ({ key, name: c.name, desc: c.desc, items: c.items.map((it) => ({ ...it, owned: shop.owns(key, it.id), eq: shop.equipped(key).id === it.id })) })) });
+}
+function applyCosmetics() {
+  const t = shop.equipped('trail'), l = shop.equipped('life'), h = shop.equipped('hud');
+  renderer.setCosmetics({ trail: t.price ? t : null, life: l.kind || null });
+  const r = document.getElementById('ui');
+  for (const it of SHOP.hud.items) r.classList.toggle('hud-' + it.id, it.id === h.id && it.price > 0);
+}
 
 // sin impulsos: hacia qué lado queda la placa más cercana por delante (−1, 0, 1). Solo es una
 // pista en pantalla; no cambia nada de la partida.
@@ -344,7 +366,7 @@ requestAnimationFrame(frame);
 // Gancho para pruebas automáticas (capturas, bots).
 window.__hip = {
   VERSION,
-  get game() { return game; }, get state() { return state; }, renderer, ui, audio, input, missions,
+  get game() { return game; }, get state() { return state; }, renderer, ui, audio, input, missions, shop,
   start: (m = 'classic', seed) => { startGame(m); if (seed !== undefined) newGame(m, seed); state = 'play'; },
   skipTo(rows) { while (game.s < rows && game.alive) { game.step({ steer: botSteer(game) }); renderer.track.sync(game); } prev = { s: game.s, theta: game.theta }; },
   step(n = 1, steer = null) { for (let i = 0; i < n; i++) { prev.s = game.s; prev.theta = game.theta; const ev = game.step({ steer: steer ?? botSteer(game) }); renderer.onEvents(ev, game); renderer.track.sync(game); } },

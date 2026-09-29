@@ -21,7 +21,7 @@ const MODES = {
   voyage: { name: 'Viaje', desc: 'Empieza en el último mundo al que llegaste.', tag: 'Mundos', lockedDesc: 'Llega al mundo 2 para desbloquearlo.' },
 };
 const MODE_KEYS = Object.keys(MODES);
-const MENU_SCREENS = new Set(['title', 'modes', 'settings', 'pause', 'over']);
+const MENU_SCREENS = new Set(['title', 'modes', 'settings', 'pause', 'over', 'shop']);
 const LOGO = 'Hipertúnel';
 const LOGO_TINTS = ['r', 'y', 'b', 'm'];
 
@@ -81,6 +81,7 @@ function titleHTML() {
     </button>
     <div class="title-row">
       <button class="btn btn-sec" data-nav data-act="modes"><span class="btn-ico">${ICON.grid}</span><span>Modos</span></button>
+      <button class="btn btn-sec" data-nav data-act="shop"><span class="btn-ico">${ICON.coin}</span><span>Tienda</span></button>
       <button class="btn btn-sec" data-nav data-act="settings"><span class="btn-ico">${ICON.gear}</span><span>Ajustes</span></button>
     </div>
   </div>
@@ -122,6 +123,16 @@ function modesHTML() {
       </span>
     </button>`).join('')}
   </div>
+</section>`;
+}
+
+function shopHTML() {
+  return `
+<section class="scr scr-menu scr-shop" data-screen="shop">
+  <div class="vig vig-menu"></div>
+  ${headerHTML('Tienda')}
+  <div class="shop-wallet">${ICON.coin}<b data-bind="wallet">0</b><small>monedas</small></div>
+  <div class="shop-cats" data-bind="shop"></div>
 </section>`;
 }
 
@@ -216,7 +227,7 @@ function overHTML() {
         <div class="oc-best">${ICON.trophy}<span>Mejor</span><b data-bind="bestO">—</b></div>
         <ul class="oc-facts" data-bind="facts"></ul>
         <div class="oc-stats">
-          <div class="stat">${ICON.coin}<b data-bind="coins">0</b><small>monedas</small></div>
+          <div class="stat">${ICON.coin}<b data-bind="coins">0</b><small>a la cartera</small></div>
           <div class="stat stat-score"><span class="st-ico">${ICON.sparkle}</span><b data-bind="score">0</b><small>puntos</small></div>
           <div class="stat"><span class="st-ico">${ICON.timetrial}</span><b data-bind="time">0:00</b><small>tiempo</small></div>
         </div>
@@ -270,7 +281,7 @@ export function createUI(root, handlers = {}) {
     cssLink.addEventListener('load', () => root.classList.remove('htui-loading'), { once: true });
     cssLink.addEventListener('error', () => root.classList.remove('htui-loading'), { once: true });
   }
-  root.innerHTML = titleHTML() + modesHTML() + settingsHTML() + pauseHTML() + overHTML() + hudHTML()
+  root.innerHTML = titleHTML() + modesHTML() + settingsHTML() + shopHTML() + pauseHTML() + overHTML() + hudHTML()
     + '<div class="toasts" aria-live="polite"></div>';
 
   const $ = (sel, el = root) => el.querySelector(sel);
@@ -359,6 +370,7 @@ export function createUI(root, handlers = {}) {
   function back() {
     switch (current) {
       case 'modes': snd('menuBack'); show('title'); break;
+      case 'shop': snd('menuBack'); show('title'); break;
       case 'settings': snd('menuBack'); show(settingsFrom === 'pause' ? 'pause' : 'title'); break;
       case 'pause': snd('menuBack'); call('onResume'); break;
       case 'over': snd('menuBack'); call('onMenu'); break;
@@ -374,6 +386,7 @@ export function createUI(root, handlers = {}) {
     if (el.dataset.set) { setVal(el.dataset.set, !vals[el.dataset.set]); snd('menuOk'); return; }
     if (el.dataset.adjust === 'quality') { adjust('quality', 1, true); return; }
     if (el.dataset.adjust) return;
+    if (el.dataset.buy) { const [cat, id] = el.dataset.buy.split(':'); call('onShop', cat, id); return; }
     if (el.dataset.mode) {
       if (el.classList.contains('locked')) { snd('menuBack'); toast(MODES[el.dataset.mode].lockedDesc || 'Bloqueado', 'info'); return; }
       lastMode = el.dataset.mode; snd('menuOk'); call('onPlay', lastMode); return;
@@ -388,6 +401,7 @@ export function createUI(root, handlers = {}) {
     switch (act) {
       case 'play': call('onPlay', lastMode); break;
       case 'modes': show('modes'); break;
+      case 'shop': call('onShopOpen'); show('shop'); break;
       case 'settings': show('settings'); break;
       case 'resume': call('onResume'); break;
       case 'restart': call('onRestart'); break;
@@ -625,6 +639,23 @@ export function createUI(root, handlers = {}) {
     restart($('.over-card', scr), 'enter');
   }
 
+  // ----- tienda -----
+  // data: { wallet, cats: [{ key, name, desc, items: [{ id, name, price, sw, owned, eq }] }] }
+  function paintShop(data) {
+    $('[data-bind="wallet"]').textContent = fmtInt(data.wallet);
+    const f = focused && focused.dataset.buy;
+    $('[data-bind="shop"]').innerHTML = data.cats.map((c, ci) => `
+      <div class="shop-cat" style="--i:${ci}">
+        <h3 class="panel-title">${esc(c.name)} <small>${esc(c.desc)}</small></h3>
+        <div class="shop-items">${c.items.map((it) => {
+          const bg = it.sw.length > 2 ? `linear-gradient(135deg, ${it.sw.join(', ')})` : `linear-gradient(135deg, ${it.sw[0]}, ${it.sw[1]})`;
+          const st = it.eq ? '<em class="si-eq">Puesto</em>' : it.owned ? '<em class="si-use">Usar</em>' : `<em class="si-price ${data.wallet < it.price ? 'poor' : ''}">${ICON.coin}${fmtInt(it.price)}</em>`;
+          return `<button class="shop-item ${it.eq ? 'eq' : ''}" data-nav data-buy="${c.key}:${it.id}"><span class="si-sw" style="background:${bg}"></span><span class="si-name">${esc(it.name)}</span>${st}</button>`;
+        }).join('')}</div>
+      </div>`).join('');
+    if (f && current === 'shop') { const el = $(`[data-buy="${f}"]`); if (el) { focused = null; setFocus(el, false); } }
+  }
+
   // ----- misiones -----
   let missData = { list: [], rank: { level: 1, name: 'Novato', toNext: 3 } };
   const missRow = (m) => {
@@ -657,7 +688,7 @@ export function createUI(root, handlers = {}) {
   show('none');
 
   return {
-    show, hud, toast, over, settings, tiltMeter, records: setRecords, missions,
+    show, hud, toast, over, settings, tiltMeter, records: setRecords, missions, shop: paintShop,
     // modos bloqueados: { voyage: true } → tarjeta en gris con su descripción de desbloqueo
     locks(l = {}) { for (const k of MODE_KEYS) { const c = $(`.card-${k}`); if (!c) continue; c.classList.toggle('locked', !!l[k]); const d = $('.card-desc', c); if (d) d.textContent = l[k] && MODES[k].lockedDesc ? MODES[k].lockedDesc : MODES[k].desc; } },
     navigate, confirm, back,

@@ -50,9 +50,9 @@ export class Life {
   }
 
   setWorld(i) {
-    const k = ((i % KIND.length) + KIND.length) % KIND.length;
+    const k = this.skin ? 99 : ((i % KIND.length) + KIND.length) % KIND.length;
     if (k === this.kind) return;
-    this.kind = k; const K = KIND[k];
+    this.kind = k; const K = this.K = this.skin || KIND[k];
     this.mat.map = this.tex[K.tex];
     this.mat.blending = K.glow ? THREE.AdditiveBlending : THREE.NormalBlending;
     this.mat.needsUpdate = true;
@@ -76,7 +76,7 @@ export class Life {
     this.mesh.visible = on && invert < 0.5;
     if (!this.mesh.visible) { for (const p of this.p) p.live = false; return; }
     this.setWorld(world);
-    const K = KIND[this.kind];
+    const K = this.K;
     const { m, q, sc, c } = this;
     const right = this._r.crossVectors(look, up).normalize();
     let n = 0;
