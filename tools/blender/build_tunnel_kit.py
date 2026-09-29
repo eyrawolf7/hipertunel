@@ -52,10 +52,10 @@ JE = [-HW, -0.345, 0.345, HW]     # juntas hiladas pares
 JO = [-HW, -0.69, 0.0, 0.69, HW]  # juntas hiladas impares (aparejo a soga)
 # sillería de la textura: losas grandes, una por carril y hilada (el concepto C·3); a ladrillitos
 # se leía recargado a toda velocidad. La geometría sigue usando CL (ventanas y cristales).
-TNC = 4
-TCL = L / TNC                     # 1 m por hilada
-TJE = [-HW, 0.0, HW]              # dos sillares por carril, a soga
-TJO = [-HW, -0.52, 0.52, HW]
+TNC = 2
+TCL = L / TNC                     # 2 m por losa (stone_top_formas; también recortes de las cajas)
+TJE = [-HW, HW]                   # una losa por carril
+TJO = [-HW, HW]
 G = 0.024                         # media llaga (referencia)
 GI, GS = 0.011, 0.022             # media llaga interior / en la costura de carril
 
@@ -408,6 +408,67 @@ def stone_top(seed=11):
     return A, N, AO, R
 
 
+def stone_top_formas(seed=11):
+    """Cara superior en "formas grandes" (dirección de arte limpia, a lo Alto / Mario Kart): una
+    losa por carril y hilada de 2 m, bisel ancho y redondo que pilla la luz, degradado suave en
+    cada losa, junta honda con oclusión marcada y musgo en manchas grandes pegadas a las juntas.
+    Sin grietas, desconchones ni ruido fino: a 100 m/s el detalle menudo solo se ve borroso o
+    hace ruido. Misma disposición del atlas que stone_top()."""
+    NX, NZr = RES, NZ
+    dx, dz = W / NX, L / NZr
+    X = -HW + (np.arange(NX) + 0.5) * dx
+    Z = (np.arange(NZr) + 0.5) * dz
+    XX, ZZ = np.meshgrid(X, Z)
+    XX = XX.astype(np.float32)
+    ZZ = ZZ.astype(np.float32)
+    rng = np.random.default_rng(seed)
+    shape = XX.shape
+    FL = L / 2                                        # 2 m por losa
+    course = np.floor(ZZ / FL).astype(np.int32) % 2
+    cz = (course + 0.5) * FL
+    lx, lz = XX, ZZ - cz
+    ax, az = HW - GS, FL / 2 - GI * 1.6
+    e = -rrect(lx, lz, ax, az, 0.11)                  # distancia al borde (m), > 0 dentro
+    bw = 0.10                                         # bisel ancho
+    t = np.clip(e / bw, 0, 1)
+    prof = np.sqrt(1 - (1 - t) ** 2)                  # canto redondo
+    tilt = rng.uniform(-0.004, 0.004, 2)
+    top = 0.014 + 0.006 * (1 - (lx / ax) ** 2) * (1 - (lz / az) ** 2) + tilt[course] * lz
+    GR = -0.03
+    H = np.where(e > 0, GR + (top - GR) * prof, GR).astype(np.float32)
+
+    # musgo: manchas grandes que nacen en las juntas y lamen un poco la losa
+    nm = pnoise(shape, dx, dz, 0.9, seed + 5)
+    nm2 = pnoise(shape, dx, dz, 0.35, seed + 6)
+    F = 0.9 * nm + 0.35 * nm2 - 0.2
+    # bordes nítidos (forma gráfica, no mancha borrosa)
+    moss = sstep(0.8, 0.84, F) * sstep(0.2, 0.17, e)
+    moss = np.maximum(moss, sstep(1.25, 1.3, nm) * sstep(0.42, 0.39, e))   # alguna lengua más larga
+    H = lerp(H, np.maximum(H, GR + 0.02), moss).astype(np.float32)
+
+    # albedo: arenisca clara, cada losa con su tono y un degradado suave; canto más claro
+    pal = np.stack([srgb(c) for c in ('#e3cf9f', '#dcc796', '#e6d4a8')])
+    pidx = rng.integers(0, len(pal), 2)
+    base = pal[pidx[course]]
+    grad = 1 + 0.07 * (lz / az) + 0.025 * (lx / ax)
+    A = base * grad[..., None]
+    edge = sstep(0.0, 0.03, e) * sstep(bw + 0.02, 0.02, e)
+    A = A * (1 + 0.10 * edge)[..., None]
+    grout = srgb('#6b5a41')
+    A = lerp(A, grout, sstep(0.004, -0.004, e)[..., None])
+    moss_c = lerp(srgb('#6f8a3a'), srgb('#8fa650'), np.clip(0.5 + 0.35 * nm2, 0, 1)[..., None])
+    moss_c = lerp(moss_c, srgb('#55702c'), sstep(0.02, -0.01, e)[..., None] * 0.6)
+    A = lerp(A, moss_c, moss[..., None])
+    R = np.where(e < 0, 0.95, 0.78).astype(np.float32)
+    R = lerp(R, 0.92, moss)
+
+    N = normals_from_height(H, dx, dz)
+    AO = horizon_ao(H, dx, dz, radius=0.14)
+    AO = np.clip(AO * (0.75 + 0.25 * sstep(-0.01, 0.06, e)), 0, 1)       # junta honda y oscura
+    A = A * (0.7 + 0.3 * AO)[..., None]
+    return A.astype(np.float32), N, AO, R
+
+
 def stone_strip(seed=23):
     """Franja de jambas/laterales: s a lo largo de la vía (4 m), p por el perfil de la jamba."""
     NXs = int(round(STRIP_U * RES))
@@ -490,7 +551,7 @@ def build_stone_textures():
     AO = np.full((RES, RES), 0.6, np.float32)
     R = np.full((RES, RES), 0.92, np.float32)
     A[:] = srgb('#6f6443')
-    a, n, ao, r = stone_top()
+    a, n, ao, r = stone_top_formas()
     A[:NZ], N[:NZ], AO[:NZ], R[:NZ] = a, n, ao, r
     a, n, ao, r, nxs, rows = stone_strip()
     r0 = NZ + PAD
@@ -1124,7 +1185,7 @@ def join_into(target, others):
 
 
 # ------------------------------------------------------------------ cajas
-BOX_BLOCKS = [(0, 0), (0, 1), (2, 0), (2, 1), (0, 1), (2, 0)]   # hiladas sin hiedra   # (hilada, bloque) de la textura
+BOX_BLOCKS = [(0, 0), (1, 0), (0, 0), (1, 0), (0, 0), (1, 0)]   # (hilada, bloque) de la textura
 
 
 def block_rect(course, k):

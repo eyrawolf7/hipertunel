@@ -10,7 +10,7 @@ export const styleUniforms = {
   uSunCol: { value: new THREE.Color(1.15, 1.0, 0.8) },    // sol dorado (concepto C·3)
   uShadowCol: { value: new THREE.Color(0x6d5fc4) },
   uRimCol: { value: new THREE.Color(0xbfe8ff) },
-  uStyl: { value: 0.8 },
+  uStyl: { value: 0.9 },
 };
 
 // Encadena con un onBeforeCompile previo (si lo hay).
@@ -26,9 +26,13 @@ export function stylize(mat, { rim = 0.35, key = 'st' } = {}) {
   vec3 Nv = normalize(normal); vec3 Vv = normalize(vViewPosition);
   float ndl = dot(Nv, normalize(uSunDirV));
   // en un túnel el techo recibe mucha luz rebotada: la sombra no llega nunca al tono puro
-  float sh = smoothstep(0.3, -0.45, ndl) * 0.7;
+  float sh = smoothstep(0.35, -0.35, ndl) * 0.85;
   vec3 base = diffuseColor.rgb;
-  vec3 st = mix(base * uSunCol, base * uShadowCol, sh);
+  // cara al sol: cálida y algo más brillante cuanto más de frente (da volumen a biseles y losas)
+  // sombra con color propio (no solo más oscura): el tono frío del mundo tiñe también la luz
+  // ambiente, como en la ilustración estilizada
+  vec3 shade = base * uShadowCol * 1.02 + uShadowCol * 0.09;
+  vec3 st = mix(base * uSunCol * (0.9 + 0.3 * max(ndl, 0.0)), shade, sh);
   #ifdef USE_AOMAP
   st *= mix(1.0, ambientOcclusion, 0.85);
   #endif

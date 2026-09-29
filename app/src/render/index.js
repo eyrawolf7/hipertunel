@@ -26,10 +26,10 @@ const DEG = Math.PI / 180;
 const INV_FOG = new THREE.Color(0x0b0822);
 const BOOST_BLUE = new THREE.Color(0x3fb6ff).multiplyScalar(2);
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, uBlur: { value: 0 }, uFlash: { value: new THREE.Vector4(1, 1, 1, 0) }, uVig: { value: 0.1 }, uCA: { value: 0.0 }, uVigCol: { value: new THREE.Color(0x2b2257) }, uTime: { value: 0 }, uSat: { value: 1.14 }, uCon: { value: 1.12 } },
+  uniforms: { tDiffuse: { value: null }, uBlur: { value: 0 }, uFlash: { value: new THREE.Vector4(1, 1, 1, 0) }, uVig: { value: 0.1 }, uCA: { value: 0.0 }, uVigCol: { value: new THREE.Color(0x2b2257) }, uTime: { value: 0 }, uSat: { value: 1.14 }, uCon: { value: 1.12 }, uLo: { value: new THREE.Color(0.95, 0.98, 1.07) }, uHi: { value: new THREE.Color(1.05, 1.0, 0.93) } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: /* glsl */`
-    uniform sampler2D tDiffuse; uniform float uBlur; uniform vec4 uFlash; uniform float uVig; uniform float uCA; uniform float uTime; uniform float uSat; uniform vec3 uVigCol; uniform float uCon;
+    uniform sampler2D tDiffuse; uniform float uBlur; uniform vec4 uFlash; uniform float uVig; uniform float uCA; uniform float uTime; uniform float uSat; uniform vec3 uVigCol; uniform float uCon; uniform vec3 uLo; uniform vec3 uHi;
     varying vec2 vUv;
     void main(){
       vec2 c = vec2(0.5, 0.52); vec2 d = vUv - c; float r = length(d);
@@ -42,6 +42,8 @@ const GradeShader = {
       vec3 col = acc / tot;
       float l = dot(col, vec3(0.2126, 0.7152, 0.0722)); col = mix(vec3(l), col, uSat);
       col = max(vec3(0.0), (col - 0.18) * uCon + 0.18);                 // contraste alrededor del gris medio (lineal)
+      // virado partido: sombras hacia el frío, luces hacia el cálido (luz de tarde estilizada)
+      col *= mix(uLo, uHi, smoothstep(0.03, 0.5, dot(col, vec3(0.2126, 0.7152, 0.0722))));
       col = mix(col, col * uVigCol * 1.6, uVig * smoothstep(0.35, 0.95, r * 1.25));
       col = mix(col, uFlash.rgb, uFlash.a);
       gl_FragColor = vec4(col, 1.0);
@@ -135,6 +137,9 @@ export class Renderer {
     u.uDark.value = (A.dark || 0) + ((B.dark || 0) - (A.dark || 0)) * t;
     styleUniforms.uShadowCol.value.set(A.shadow || 0x6d5fc4).lerp(new THREE.Color(B.shadow || 0x6d5fc4), t);
     styleUniforms.uRimCol.value.set(A.rim || 0xbfe8ff).lerp(new THREE.Color(B.rim || 0xbfe8ff), t);
+    // sol con el color de cada mundo (dorado, rosado, frío de noche…)
+    const ka = A.sunK || [1.15, 1, 0.8], kb = B.sunK || [1.15, 1, 0.8];
+    styleUniforms.uSunCol.value.setRGB(ka[0] + (kb[0] - ka[0]) * t, ka[1] + (kb[1] - ka[1]) * t, ka[2] + (kb[2] - ka[2]) * t);
     u.uInvBase.value.set(A.inv || 0x13112a).lerp(new THREE.Color(B.inv || 0x13112a), t);
     this.sky.setTheme(A, B, t);
     this.decor.setTheme(t < 0.5 ? A : B);
@@ -269,10 +274,17 @@ export class Renderer {
 
     // ---- mundo
     this.tunnel.uniforms.uCam.value.copy(cam.position);
-    // la luz principal va con la cámara (arriba, algo por detrás y a la izquierda): la cara por la
-    // que corres siempre queda bien iluminada, dentro o fuera del tubo
+    // sol fijo en el marco de la pista (arriba del tubo, algo a la izquierda y por detrás): el suelo
+    // recibe sol cálido y el techo queda en sombra fría de color, así las formas grandes (losas,
+    // biseles, arcos) tienen volumen y al girar alrededor del tubo cambia la luz. Una parte sigue a
+    // la cámara (la mitad dentro, el 80 % por fuera) para que la cara por la que corres no quede en
+    // sombra (legibilidad).
     const right = new THREE.Vector3().crossVectors(this.look, this.upS).normalize();
-    this.tunnel.uniforms.uKey.value.copy(this.upS).multiplyScalar(0.85).addScaledVector(this.look, -0.35).addScaledVector(right, -0.4).normalize();
+    const camKey = new THREE.Vector3().copy(this.upS).multiplyScalar(0.85).addScaledVector(this.look, -0.35).addScaledVector(right, -0.4).normalize();
+    const trackKey = new THREE.Vector3().copy(fr.U).multiplyScalar(0.8).addScaledVector(fr.X, -0.5).addScaledVector(fr.F, -0.3).normalize();
+    const outsideK = game.fold < 29 ? 0.8 : 0.5;         // por fuera, tu cara casi siempre al sol
+    this.keyFollow = this.keyFollow === undefined ? outsideK : this.keyFollow + (outsideK - this.keyFollow) * Math.min(1, dt * 1.5);
+    this.tunnel.uniforms.uKey.value.copy(trackKey).lerp(camKey, this.keyFollow).normalize();
     cam.updateMatrixWorld();
     styleUniforms.uSunDirV.value.copy(this.tunnel.uniforms.uKey.value).transformDirection(cam.matrixWorldInverse);
     const gapNear = game.gaps.some((g) => g.from - s < 34 && g.to - s > -6);
