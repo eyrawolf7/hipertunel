@@ -10,6 +10,7 @@ import { LANES, ROWS } from '../sim/game.js';
 import { section, CELL_W, toWorld } from './track.js';
 import { ROW_M } from '../sim/game.js';
 import { loadModel, loadTexture } from './assets.js';
+import { stylize } from './stylize.js';
 
 const MAXI = (ROWS + 4) * LANES;
 const HALF_W = 1.035, LEN = 4.0;
@@ -22,9 +23,11 @@ attribute vec3 aC0; attribute vec3 aC1; attribute vec3 aC2; attribute vec3 aC3;
 attribute vec3 aN0; attribute vec3 aN1; attribute vec4 aWarn;
 varying vec4 vWarn; varying float vFacet;
 vec3 cellPos(vec3 p, out vec3 Tx, out vec3 Ny, out vec3 Tz){
-  float u = clamp(p.x / ${(2 * HALF_W).toFixed(3)} + 0.5, -0.1, 1.1), v = p.z / ${LEN.toFixed(1)};
+  // X del kit va de C1 a C0 (no al revés): así la base (X, Y hacia dentro, Z adelante) es
+  // dextrógira y la losa no sale reflejada (se verían sus caras de abajo)
+  float u = clamp(0.5 - p.x / ${(2 * HALF_W).toFixed(3)}, -0.1, 1.1), v = p.z / ${LEN.toFixed(1)};
   vec3 a = mix(aC0, aC1, u), b = mix(aC3, aC2, u);
-  Tx = normalize(mix(aC1 - aC0, aC2 - aC3, v));
+  Tx = -normalize(mix(aC1 - aC0, aC2 - aC3, v));
   Tz = normalize(b - a);
   Ny = normalize(mix(aN0, aN1, v));
   return mix(a, b, v) + Ny * p.y;
@@ -63,33 +66,42 @@ export class TunnelKit {
   async load() {
     const kit = await loadModel('kit/tunnel_kit');
     if (!kit) return;
-    const tex = async (n, srgb) => { const t = await loadTexture('kit/' + n); if (t) { t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = 8; } return t; };
-    const [alb, nrm, orm, cn] = await Promise.all([tex('stone_albedo.jpg', true), tex('stone_normal.png'), tex('stone_orm.jpg'), tex('crystal_normal.png')]);
+    const tex = async (n, srgb) => { const t = await loadTexture('kit/' + n); if (t) { t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.flipY = false; t.anisotropy = 8; t.needsUpdate = true; } return t; };
+    const [alb, nrm, orm, cn, ca] = await Promise.all([tex('stone_albedo.jpg', true), tex('stone_normal.png'), tex('stone_orm.jpg'), tex('crystal_normal.png'), tex('crystal_albedo.jpg', true)]);
     const stoneMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: alb, normalMap: nrm, aoMap: orm, roughnessMap: orm, roughness: 1, metalness: 0 });
-    const crystalMat = new THREE.MeshStandardMaterial({ color: 0xffffff, normalMap: cn, roughness: 0.18, metalness: 0.0, envMapIntensity: 1.4 });
+    const crystalMat = new THREE.MeshStandardMaterial({ color: 0xffffff, map: ca, normalMap: cn, roughness: 0.15, metalness: 0.0, envMapIntensity: 1.5, vertexColors: true });
     patch(stoneMat, false); patch(crystalMat, true);
+    stylize(stoneMat, { rim: 0.22, key: 'kit-stone' }); stylize(crystalMat, { rim: 0.6, key: 'kit-crystal' });
     this.stoneMat = stoneMat; this.crystalMat = crystalMat;
-    const names = { tile_stone: stoneMat, tile_arch: stoneMat, tile_crystal: crystalMat, tile_crystal_arch: crystalMat };
     kit.updateMatrixWorld(true);
-    for (const [name, mat] of Object.entries(names)) {
-      let src = null;
-      kit.traverse((o) => { if (o.isMesh && (o.name === name || o.parent?.name === name) && !src) src = o; });
-      if (!src) continue;
-      const g = src.geometry.clone();
-      if (g.attributes.uv && !g.attributes.uv1) g.setAttribute('uv1', g.attributes.uv);   // aoMap
-      const im = new THREE.InstancedMesh(g, mat, MAXI);
-      im.frustumCulled = false; im.count = 0;
+    for (const name of ['tile_stone', 'tile_arch', 'tile_crystal', 'tile_crystal_arch']) {
+      // un objeto de Blender con dos materiales llega como varias primitivas: se instancian todas y
+      // comparten los mismos atributos por instancia (las esquinas de la celda)
+      const prims = [];
+      const re = new RegExp('^' + name + '(_\\d+)?$');
+      kit.traverse((o) => { if (o.isMesh && (re.test(o.name) || (o.parent && o.parent.name === name))) prims.push(o); });
+      if (!prims.length) continue;
       const mk = (n) => { const a = new THREE.InstancedBufferAttribute(new Float32Array(MAXI * n), n); a.setUsage(THREE.DynamicDrawUsage); return a; };
-      for (const a of ['aC0', 'aC1', 'aC2', 'aC3', 'aN0', 'aN1']) g.setAttribute(a, mk(3));
-      g.setAttribute('aWarn', mk(4));
-      this.scene.add(im);
-      this.meshes[name] = im;
+      const attrs = { aC0: mk(3), aC1: mk(3), aC2: mk(3), aC3: mk(3), aN0: mk(3), aN1: mk(3), aWarn: mk(4) };
+      const list = [];
+      for (const o of prims) {
+        const g = o.geometry.clone();
+        const isCrystal = /crystal/i.test(o.material?.name || '');
+        const mat = isCrystal ? crystalMat : stoneMat;
+        if (!isCrystal && g.attributes.color) g.deleteAttribute('color');
+        if (isCrystal && !g.attributes.color) { const c = new Float32Array(g.attributes.position.count * 3).fill(1); g.setAttribute('color', new THREE.BufferAttribute(c, 3)); }
+        for (const [k, a] of Object.entries(attrs)) g.setAttribute(k, a);
+        const im = new THREE.InstancedMesh(g, mat, MAXI);
+        im.frustumCulled = false; im.count = 0;
+        this.scene.add(im); list.push(im);
+      }
+      this.meshes[name] = { list, attrs };
     }
-    this.ready = Object.keys(this.meshes).length >= 2;
+    this.ready = !!(this.meshes.tile_stone && this.meshes.tile_crystal);
     this.onReady && this.onReady();
   }
 
-  setVisible(v) { for (const m of Object.values(this.meshes)) m.visible = v; }
+  setVisible(v) { for (const m of Object.values(this.meshes)) for (const im of m.list) im.visible = v; }
 
   // colores de caja (THREE.Color por índice); laneGlow viene del túnel clásico (lo comparte)
   update(game, track, colors, laneGlow, tint, dark) {
@@ -113,11 +125,11 @@ export class TunnelKit {
           if (best) { const col = colors[best.color]; wr = col.r; wg = col.g; wb = col.b; wa = 0.42 + 0.58 * laneGlow[c]; }
         }
         const name = wa > 0 ? (archRow ? 'tile_crystal_arch' : 'tile_crystal') : (archRow ? 'tile_arch' : 'tile_stone');
-        const im = this.meshes[name] || this.meshes[wa > 0 ? 'tile_crystal' : 'tile_stone'];
-        if (!im) continue;
         const key = this.meshes[name] ? name : (wa > 0 ? 'tile_crystal' : 'tile_stone');
+        const vm = this.meshes[key];
+        if (!vm) continue;
         const i = cnt[key]++;
-        const g = im.geometry.attributes;
+        const g = vm.attrs;
         const b = sec.b, d = sec.d;
         const x0 = b[c * 2], y0 = b[c * 2 + 1], x1 = b[c * 2 + 2], y1 = b[c * 2 + 3];
         toWorld(ra, x0, y0, v); g.aC0.setXYZ(i, v.x, v.y, v.z);
@@ -130,10 +142,9 @@ export class TunnelKit {
         g.aWarn.setXYZW(i, wr, wg, wb, wa);
       }
     }
-    for (const [key, im] of Object.entries(this.meshes)) {
-      im.count = cnt[key] || 0;
-      const g = im.geometry.attributes;
-      for (const a of ['aC0', 'aC1', 'aC2', 'aC3', 'aN0', 'aN1', 'aWarn']) g[a].needsUpdate = true;
+    for (const [key, vm] of Object.entries(this.meshes)) {
+      for (const im of vm.list) im.count = cnt[key] || 0;
+      for (const a of Object.values(vm.attrs)) a.needsUpdate = true;
     }
     if (this.crystalMat) this.crystalMat.userData.uGlowK.value = dark ? 1.4 : 1;
   }

@@ -19,16 +19,17 @@ import { Coins } from './coins.js';
 import { Streaks } from './streaks.js';
 import { TunnelKit } from './tunnelkit.js';
 import { TunnelProps } from './tunnelprops.js';
+import { styleUniforms } from './stylize.js';
 import { THEMES, BOX_COLORS } from './worlds.js';
 
 const DEG = Math.PI / 180;
 const INV_FOG = new THREE.Color(0x0b0822);
 const BOOST_BLUE = new THREE.Color(0x3fb6ff).multiplyScalar(2);
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, uBlur: { value: 0 }, uFlash: { value: new THREE.Vector4(1, 1, 1, 0) }, uVig: { value: 0.1 }, uCA: { value: 0.0 }, uVigCol: { value: new THREE.Color(0x2b2257) }, uTime: { value: 0 }, uSat: { value: 1.08 } },
+  uniforms: { tDiffuse: { value: null }, uBlur: { value: 0 }, uFlash: { value: new THREE.Vector4(1, 1, 1, 0) }, uVig: { value: 0.1 }, uCA: { value: 0.0 }, uVigCol: { value: new THREE.Color(0x2b2257) }, uTime: { value: 0 }, uSat: { value: 1.14 }, uCon: { value: 1.12 } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: /* glsl */`
-    uniform sampler2D tDiffuse; uniform float uBlur; uniform vec4 uFlash; uniform float uVig; uniform float uCA; uniform float uTime; uniform float uSat; uniform vec3 uVigCol;
+    uniform sampler2D tDiffuse; uniform float uBlur; uniform vec4 uFlash; uniform float uVig; uniform float uCA; uniform float uTime; uniform float uSat; uniform vec3 uVigCol; uniform float uCon;
     varying vec2 vUv;
     void main(){
       vec2 c = vec2(0.5, 0.52); vec2 d = vUv - c; float r = length(d);
@@ -40,6 +41,7 @@ const GradeShader = {
         acc += vec3(texture2D(tDiffuse, uv + d * uCA).r, texture2D(tDiffuse, uv).g, texture2D(tDiffuse, uv - d * uCA).b) * w; tot += w; }
       vec3 col = acc / tot;
       float l = dot(col, vec3(0.2126, 0.7152, 0.0722)); col = mix(vec3(l), col, uSat);
+      col = max(vec3(0.0), (col - 0.18) * uCon + 0.18);                 // contraste alrededor del gris medio (lineal)
       col = mix(col, col * uVigCol * 1.6, uVig * smoothstep(0.35, 0.95, r * 1.25));
       col = mix(col, uFlash.rgb, uFlash.a);
       gl_FragColor = vec4(col, 1.0);
@@ -131,6 +133,8 @@ export class Renderer {
     const u = this.tunnel.uniforms;
     c('base', u.uBase.value); c('base2', u.uBase2.value); c('seam', u.uSeam.value); c('fog', u.uFog.value); c('glow', u.uGlow.value); c('moss', u.uMoss.value);
     u.uDark.value = (A.dark || 0) + ((B.dark || 0) - (A.dark || 0)) * t;
+    styleUniforms.uShadowCol.value.set(A.shadow || 0x6d5fc4).lerp(new THREE.Color(B.shadow || 0x6d5fc4), t);
+    styleUniforms.uRimCol.value.set(A.rim || 0xbfe8ff).lerp(new THREE.Color(B.rim || 0xbfe8ff), t);
     u.uInvBase.value.set(A.inv || 0x13112a).lerp(new THREE.Color(B.inv || 0x13112a), t);
     this.sky.setTheme(A, B, t);
     this.decor.setTheme(t < 0.5 ? A : B);
@@ -267,6 +271,8 @@ export class Renderer {
     // que corres siempre queda bien iluminada, dentro o fuera del tubo
     const right = new THREE.Vector3().crossVectors(this.look, this.upS).normalize();
     this.tunnel.uniforms.uKey.value.copy(this.upS).multiplyScalar(0.85).addScaledVector(this.look, -0.35).addScaledVector(right, -0.4).normalize();
+    cam.updateMatrixWorld();
+    styleUniforms.uSunDirV.value.copy(this.tunnel.uniforms.uKey.value).transformDirection(cam.matrixWorldInverse);
     const gapNear = game.gaps.some((g) => g.from - s < 34 && g.to - s > -6);
     const outside = game.fold < 29 || gapNear;
     const fogFar = (outside ? 190 : 120) * (1 + 0.3 * (this.landT > 0 ? this.landT / 1.5 : 0));
