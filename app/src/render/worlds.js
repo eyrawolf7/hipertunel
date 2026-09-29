@@ -1,18 +1,21 @@
 // Temas visuales. La simulación avanza de mundo en cada plegado; aquí se decide el aspecto.
 // Regla 2: el túnel siempre casi neutro, el color vivo es solo para los avisos.
 export const THEMES = [
-  { name: 'Cielo', base: 0xfffaf2, base2: 0xd4d0e6, seam: 0x2a2350, fog: 0xffe2c0, glow: 0xffd27a,
-    skyTop: 0x2f7fff, skyMid: 0x8fc8ff, skyBot: 0xfff3e0, sun: 0xfff2c8, stars: 0, decor: 'sky', exposure: 1.0 },
-  { name: 'Atardecer', base: 0xfbe9e0, base2: 0xe9d3d6, seam: 0x6a4a78, fog: 0xff9c86, glow: 0xffb27a,
-    skyTop: 0x5b3fb8, skyMid: 0xff8f8f, skyBot: 0xffd6a0, sun: 0xffb060, stars: 0.15, decor: 'sky', exposure: 1.0 },
-  { name: 'Noche de neón', base: 0xf4f2fb, base2: 0xd9d7e6, seam: 0x3a3170, fog: 0x2b1f63, glow: 0xff6ad5,
-    skyTop: 0x07051f, skyMid: 0x2d1670, skyBot: 0x8a3bb8, sun: 0xff9ae8, stars: 1, decor: 'neon', exposure: 0.95, dark: 1, inv: 0x1a1236 },
-  { name: 'Aurora', base: 0xf5fbf8, base2: 0xdde6e3, seam: 0x2e5a5f, fog: 0x0f3342, glow: 0x3fe0a0,
-    skyTop: 0x020d1c, skyMid: 0x0f4d5a, skyBot: 0x3fb8a0, sun: 0xc8fff0, stars: 1, decor: 'space', exposure: 0.95, dark: 1, inv: 0x0b2a2e },
-  { name: 'Caramelo', base: 0xfdeaf3, base2: 0xeed8e6, seam: 0x7a4a6c, fog: 0xff9fd0, glow: 0xff9ecf,
-    skyTop: 0x7ec8ff, skyMid: 0xffd0ea, skyBot: 0xfff6e0, sun: 0xfff8e0, stars: 0, decor: 'sky', exposure: 1.0 },
-  { name: 'Galaxia', base: 0xf5f3fb, base2: 0xdcd9e8, seam: 0x3a3270, fog: 0x1c0a26, glow: 0xffc857,
-    skyTop: 0x03010f, skyMid: 0x1b0f45, skyBot: 0x4b2b8f, sun: 0xffe6ff, stars: 1, decor: 'space', exposure: 0.95, dark: 1, inv: 0x2a0f3a },
+  // Islas del cielo: piedra arenisca clara, musgo, cristales turquesa, cascadas y castillos
+  { name: 'Islas del cielo', base: 0xe8d5ad, base2: 0xbfa57a, seam: 0x6b5a3e, fog: 0xd6ecff, glow: 0x5ff5e0, moss: 0x5fae3a,
+    skyTop: 0x3f8fff, skyMid: 0xbfe0ff, skyBot: 0xf4f8ff, sun: 0xfff2c8, stars: 0, decor: 'sky', pano: 'islas' },
+  // Selva: piedra más verde y húmeda, niebla verde azulada
+  { name: 'Selva perdida', base: 0xe2d8b8, base2: 0xb9ad86, seam: 0x4d5a36, fog: 0xc6e6cf, glow: 0x9dffb0, moss: 0x3f9a2e,
+    skyTop: 0x4aa3d8, skyMid: 0xbfe6d0, skyBot: 0xe8f6e4, sun: 0xfff6d0, stars: 0, decor: 'sky', pano: 'selva' },
+  // Noche bioluminiscente: piedra oscura, juntas y cristales cian que brillan
+  { name: 'Noche de luciérnagas', base: 0xd8d4e8, base2: 0xa9a4c4, seam: 0x2a2a50, fog: 0x14163a, glow: 0x3ff5e0, moss: 0x2f8f7a,
+    skyTop: 0x060a26, skyMid: 0x1c2a5e, skyBot: 0x2f5a7a, sun: 0xbff8ff, stars: 1, decor: 'neon', dark: 1, inv: 0x151b36, pano: 'noche' },
+  // Templo al atardecer: arenisca dorada, luz naranja
+  { name: 'Templo del ocaso', base: 0xf6dcb0, base2: 0xd6a978, seam: 0x7a4a2e, fog: 0xffc9a0, glow: 0xffd27a, moss: 0x8aa83a,
+    skyTop: 0x6a4bc4, skyMid: 0xff9f7a, skyBot: 0xffd8a0, sun: 0xffb060, stars: 0.1, decor: 'sky', pano: 'templo' },
+  // Volcán: piedra oscura rojiza con vetas de lava
+  { name: 'Islas de fuego', base: 0xe8d0c0, base2: 0xb89080, seam: 0x4a2020, fog: 0x3a1a2a, glow: 0xff8a3d, moss: 0x7a5a2a,
+    skyTop: 0x2a1030, skyMid: 0x8a3040, skyBot: 0xff8a50, sun: 0xffb070, stars: 0.3, decor: 'space', dark: 1, inv: 0x2a1418, pano: 'volcan' },
 ];
 
 // Colores de caja: 10, como el original, pero sin azul (el azul es solo del impulso).

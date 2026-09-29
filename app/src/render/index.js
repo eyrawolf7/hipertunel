@@ -17,6 +17,8 @@ import { Decor } from './decor.js';
 import { Fx } from './fx.js';
 import { Coins } from './coins.js';
 import { Streaks } from './streaks.js';
+import { TunnelKit } from './tunnelkit.js';
+import { TunnelProps } from './tunnelprops.js';
 import { THEMES, BOX_COLORS } from './worlds.js';
 
 const DEG = Math.PI / 180;
@@ -66,6 +68,11 @@ export class Renderer {
     this.sky = new Sky(this.scene);
     this.decor = new Decor(this.scene);
     this.tunnel = new Tunnel(this.scene);
+    this.kit = new TunnelKit(this.scene);
+    this.kit.onReady = () => this.warmup();
+    this.props = new TunnelProps(this.scene);
+    this.scene.fog = new THREE.Fog(0xffffff, 40, 120);
+    this.stoneTint = new THREE.Color(1, 1, 1);
     this.boxes = new Boxes(this.scene);
     this.pads = new Pads(this.scene);
     this.fx = new Fx(this.scene);
@@ -122,7 +129,7 @@ export class Renderer {
     const A = THEMES[from % THEMES.length], B = THEMES[to % THEMES.length];
     const c = (k, target) => target.set(A[k]).lerp(new THREE.Color(B[k]), t);
     const u = this.tunnel.uniforms;
-    c('base', u.uBase.value); c('base2', u.uBase2.value); c('seam', u.uSeam.value); c('fog', u.uFog.value); c('glow', u.uGlow.value);
+    c('base', u.uBase.value); c('base2', u.uBase2.value); c('seam', u.uSeam.value); c('fog', u.uFog.value); c('glow', u.uGlow.value); c('moss', u.uMoss.value);
     u.uDark.value = (A.dark || 0) + ((B.dark || 0) - (A.dark || 0)) * t;
     u.uInvBase.value.set(A.inv || 0x13112a).lerp(new THREE.Color(B.inv || 0x13112a), t);
     this.sky.setTheme(A, B, t);
@@ -269,6 +276,19 @@ export class Renderer {
     c.hit = Math.max(0, c.hit - dt * 3);
     this.tunnel.uniforms.uHit.value = c.hit;
     this.tunnel.update(game, tr, this.colors, dt);
+    // túnel modelado (kit de Blender) si está cargado y la calidad lo permite
+    const useKit = this.kit.ready && this.quality !== 'baja';
+    this.tunnel.mesh.visible = !useKit;
+    this.kit.setVisible(useKit);
+    if (useKit) {
+      const dk = Math.max(this.tunnel.uniforms.uDark.value, this.cam.invert);
+      this.stoneTint.setRGB(1, 1, 1).lerp(new THREE.Color(0.28, 0.3, 0.45), dk);
+      this.kit.update(game, tr, this.colors, this.tunnel.laneGlow, this.stoneTint, dk > 0.5);
+    }
+    this.props.setVisible(this.quality !== 'baja');
+    if (this.quality !== 'baja') this.props.update(game, tr);
+    const tu = this.tunnel.uniforms;
+    this.scene.fog.color.copy(tu.uFog.value); this.scene.fog.near = tu.uFogNear.value; this.scene.fog.far = tu.uFogFar.value;
     this.boxes.update(game, tr, this.colors, dt, !game.alive && this.deathT > 0 && Math.floor(this.deathT * 10) % 2 ? game.killer : 0, cam.position);
     this.tunnel.uniforms.uOutside.value += ((game.fold < 29 ? 1 : 0) - this.tunnel.uniforms.uOutside.value) * Math.min(1, dt * 2);
     this.tunnel.uniforms.uSkyFill.value.copy(this.sky.u.uTop.value);
@@ -278,8 +298,8 @@ export class Renderer {
     this.pads.update(game, tr, dt);
     this.coins.update(game, tr, dt, cam.position);
     this.fx.update(dt);
-    this.sky.update(cam, this.fr.U, outside ? 1 : 0, dt, this.cam.invert);
-    this.decor.update(game, tr, cam, outside, dt);
+    this.sky.update(cam, this.fr.U, outside ? 1 : 0, dt, this.cam.invert, this.fr.F);
+    this.decor.update(game, tr, cam, true, dt);   // se ve también por los arcos del túnel
     this.renderer.setClearColor(this.fogColor, 1);
 
     // impulso: 0,4 s de azul eléctrico en juntas y anillos (nunca en los carriles)

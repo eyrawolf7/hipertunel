@@ -4,13 +4,14 @@ Todo se construye con geometría procedural (listas de vértices y caras) para q
 reproducible al 100 %: mismas semillas -> mismos GLB.
 """
 import bpy
+import bmesh
 import math
 import os
 import random
 from mathutils import Vector, Matrix
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-ASSETS = os.path.join(ROOT, 'app', 'public', 'assets')
+ASSETS = os.path.join(ROOT, 'app', 'src', 'assets')
 PREVIEWS = '/private/tmp/blender-previews'
 
 
@@ -217,6 +218,139 @@ def lathe(profile, seg, radius_fn=None, phase=0.0):
 
 def transform(verts, mat):
     return [mat @ Vector(v) for v in verts]
+
+
+def mesh_vc(name, verts, faces, cols, mat=None, smooth=True, sharp_angle=None):
+    """Como mesh_obj, pero con un color RGB lineal por vértice (cols[i])."""
+    ob = mesh_obj(name, verts, faces, mat, smooth, sharp_angle)
+    me = ob.data
+    attr = me.color_attributes.new('Col', 'BYTE_COLOR', 'CORNER')
+    for p in me.polygons:
+        for li in p.loop_indices:
+            attr.data[li].color = (*cols[me.loops[li].vertex_index], 1)
+    me.color_attributes.active_color = attr
+    return ob
+
+
+class Geo:
+    """Acumula primitivas (vértices, caras, color por vértice) para crear un solo objeto."""
+
+    def __init__(self):
+        self.v, self.f, self.c = [], [], []
+
+    def add(self, verts, faces, col):
+        o = len(self.v)
+        for p in verts:
+            p = Vector(p)
+            self.v.append(p)
+            self.c.append(col(p) if callable(col) else col)
+        self.f += [tuple(i + o for i in fc) for fc in faces]
+        return self
+
+    def build(self, name, mat, **kw):
+        return mesh_vc(name, self.v, self.f, self.c, mat, **kw)
+
+
+def bevel(ob, offset=0.03, segments=2, profile=0.5):
+    """Bisela todas las aristas del objeto (bmesh)."""
+    me = ob.data
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bmesh.ops.bevel(bm, geom=list(bm.verts) + list(bm.edges), offset=offset, segments=segments,
+                    profile=profile, affect='EDGES', clamp_overlap=True)
+    bm.to_mesh(me)
+    bm.free()
+    me.update()
+    return ob
+
+
+def box8(c):
+    """Caras de un hexaedro con esquinas c[ix + 2*iy + 4*iz] (normales hacia fuera)."""
+    return c, [(0, 2, 3, 1), (4, 5, 7, 6), (0, 1, 5, 4), (2, 6, 7, 3), (0, 4, 6, 2), (1, 3, 7, 5)]
+
+
+def box(center, size, rot=None):
+    sx, sy, sz = (s / 2 for s in size)
+    c = [Vector(((ix * 2 - 1) * sx, (iy * 2 - 1) * sy, (iz * 2 - 1) * sz))
+         for iz in (0, 1) for iy in (0, 1) for ix in (0, 1)]
+    if rot is not None:
+        c = [rot @ p for p in c]
+    return box8([p + Vector(center) for p in c])
+
+
+def frame(t, up=None):
+    """Dos vectores perpendiculares a t."""
+    t = Vector(t).normalized()
+    up = up or (Vector((0, 0, 1)) if abs(t.z) < 0.9 else Vector((1, 0, 0)))
+    n = t.cross(up).normalized()
+    return n, t.cross(n)
+
+
+def sweep(path, radius, sides=6, cap_start=True, tip=0.0, phase=0.0):
+    """Tubo a lo largo de path (transporte paralelo). radius(t) o número. tip>0: punta final."""
+    path = [Vector(p) for p in path]
+    n = len(path)
+    T = [(path[min(i + 1, n - 1)] - path[max(i - 1, 0)]).normalized() for i in range(n)]
+    N, _ = frame(T[0])
+    verts, faces = [], []
+    for i in range(n):
+        if i:
+            ax = T[i - 1].cross(T[i])
+            if ax.length > 1e-6:
+                N = Matrix.Rotation(T[i - 1].angle(T[i]), 3, ax.normalized()) @ N
+        B = T[i].cross(N)
+        r = radius(i / (n - 1)) if callable(radius) else radius
+        for j in range(sides):
+            a = phase + 2 * math.pi * j / sides
+            verts.append(path[i] + (N * math.cos(a) + B * math.sin(a)) * r)
+    for i in range(n - 1):
+        for j in range(sides):
+            j2 = (j + 1) % sides
+            faces.append((i * sides + j, i * sides + j2, (i + 1) * sides + j2, (i + 1) * sides + j))
+    if cap_start:
+        faces.append(tuple(reversed(range(sides))))
+    last = (n - 1) * sides
+    if tip > 0:
+        verts.append(path[-1] + T[-1] * tip)
+        for j in range(sides):
+            faces.append((last + j, last + (j + 1) % sides, len(verts) - 1))
+    else:
+        faces.append(tuple(range(last, last + sides)))
+    return verts, faces
+
+
+def catmull(pts, per=6):
+    """Curva suave (Catmull-Rom) que pasa por pts; per puntos por tramo."""
+    pts = [Vector(p) for p in pts]
+    ext = [pts[0] * 2 - pts[1]] + pts + [pts[-1] * 2 - pts[-2]]
+    out = []
+    for i in range(1, len(ext) - 2):
+        p0, p1, p2, p3 = ext[i - 1], ext[i], ext[i + 1], ext[i + 2]
+        for k in range(per):
+            t = k / per
+            out.append(0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t
+                              + (-p0 + 3 * p1 - 3 * p2 + p3) * t ** 3))
+    out.append(pts[-1])
+    return out
+
+
+def leaf(base, direction, normal, length, width, n=6, cup=0.18):
+    """Hoja redonda con punta: abanico de n triángulos. Devuelve (verts, faces); el vértice 0 es el centro."""
+    d = Vector(direction).normalized()
+    nn = Vector(normal)
+    nn = (nn - d * nn.dot(d)).normalized()
+    s = nn.cross(d)
+    c = Vector(base) + d * (length * 0.5)
+    verts = [c + nn * (width * cup)]
+    for k in range(n):
+        th = math.pi + 2 * math.pi * k / n  # empieza en el pecíolo
+        x = math.cos(th) * length * 0.5
+        y = math.sin(th) * width * 0.5
+        if k == n // 2:
+            x *= 1.18  # punta
+        verts.append(c + d * x + s * y)
+    faces = [(0, 1 + k, 1 + (k + 1) % n) for k in range(n)]
+    return verts, faces
 
 
 # ---------------------------------------------------------------- salida
