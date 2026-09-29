@@ -10,7 +10,7 @@ SDL_LIBS   := $(shell sdl2-config --libs)
 # -ffp-contract=off: la simulación tiene que redondear igual que JS (ver README)
 CFLAGS  ?= -O2 -g
 CFLAGS  += -std=c99 -Wall -Wextra -Wno-unused-parameter -ffp-contract=off $(SDL_CFLAGS)
-SRCS    := src/main.c src/render.c src/track.c src/input.c src/gl.c src/png.c src/audio.c \
+SRCS    := src/main.c src/render.c src/track.c src/input.c src/gl.c src/png.c src/audio.c src/assets_data.c \
            sim/game.c sim/waves.c sim/rng.c sim/bot.c sim/jsmath.c
 OBJS    := $(patsubst %.c,$(BUILD)/obj/%.o,$(SRCS))
 

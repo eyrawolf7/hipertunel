@@ -7,6 +7,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "assets.h"
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_JPEG
+#define STBI_ONLY_PNG
+#define STBI_NO_STDIO
+#include "stb_image.h"
 
 #define DEG (M_PI / 180)
 
@@ -24,18 +30,41 @@ typedef struct {
   const char *name;
   unsigned base, base2, seam, fog, glow, skyTop, skyMid, skyBot, sun;
   float stars; int dark; unsigned inv;
+  unsigned shadow; float sunK[3]; unsigned inlay, seamGlow; int pano;
 } Theme;
+/* los mismos 5 mundos que la web (islas, selva, noche, templo, volcán) */
 static const Theme THEMES[] = {
-  { "Cielo", 0xfffaf2, 0xd4d0e6, 0x2a2350, 0xffe2c0, 0xffd27a, 0x2f7fff, 0x8fc8ff, 0xfff3e0, 0xfff2c8, 0, 0, 0 },
-  { "Atardecer", 0xfbe9e0, 0xe9d3d6, 0x6a4a78, 0xff9c86, 0xffb27a, 0x5b3fb8, 0xff8f8f, 0xffd6a0, 0xffb060, 0.15f, 0, 0 },
-  { "Noche de neón", 0xf4f2fb, 0xd9d7e6, 0x3a3170, 0x2b1f63, 0xff6ad5, 0x07051f, 0x2d1670, 0x8a3bb8, 0xff9ae8, 1, 1, 0x1a1236 },
-  { "Aurora", 0xf5fbf8, 0xdde6e3, 0x2e5a5f, 0x0f3342, 0x3fe0a0, 0x020d1c, 0x0f4d5a, 0x3fb8a0, 0xc8fff0, 1, 1, 0x0b2a2e },
-  { "Caramelo", 0xfdeaf3, 0xeed8e6, 0x7a4a6c, 0xff9fd0, 0xff9ecf, 0x7ec8ff, 0xffd0ea, 0xfff6e0, 0xfff8e0, 0, 0, 0 },
-  { "Galaxia", 0xf5f3fb, 0xdcd9e8, 0x3a3270, 0x120c33, 0xc58bff, 0x03010f, 0x1b0f45, 0x4b2b8f, 0xffe6ff, 1, 1, 0x150c2e },
+  { "Islas del cielo", 0xe8d5ad, 0xbfa57a, 0x6b5a3e, 0xbfe0ff, 0x5ff5e0, 0x3f8fff, 0xbfe0ff, 0xf4f8ff, 0xfff2c8, 0, 0, 0, 0xa6c6f2, { 1.26f, 1.03f, 0.72f }, 0xffc861, 0, 0 },
+  { "Selva perdida", 0xe2d8b8, 0xb9ad86, 0x4d5a36, 0xbfe6d0, 0x9dffb0, 0x4aa3d8, 0xbfe6d0, 0xe8f6e4, 0xfff6d0, 0, 0, 0, 0x9ec6ea, { 1.18f, 1.08f, 0.76f }, 0xffd970, 0, 1 },
+  { "Noche de luciérnagas", 0xd8d4e8, 0xa9a4c4, 0x2a2a50, 0x1c2a5e, 0x3ff5e0, 0x060a26, 0x1c2a5e, 0x2f5a7a, 0xbff8ff, 1, 1, 0x151b36, 0x5868a8, { 0.8f, 0.95f, 1.15f }, 0x8dffd0, 0x1f8f7a, 2 },
+  { "Templo del ocaso", 0xf6dcb0, 0xd6a978, 0x7a4a2e, 0xff9f7a, 0xffd27a, 0x6a4bc4, 0xff9f7a, 0xffd8a0, 0xffb060, 0.1f, 0, 0, 0xa8b4d8, { 1.3f, 0.96f, 0.7f }, 0xffb45a, 0, 3 },
+  { "Islas de fuego", 0xe8d0c0, 0xb89080, 0x4a2020, 0x8a3040, 0xff8a3d, 0x2a1030, 0x8a3040, 0xff8a50, 0xffb070, 0.3f, 1, 0x2a1418, 0x7a4868, { 1.25f, 0.86f, 0.72f }, 0xff8a3d, 0x8a2a0a, 4 },
 };
-#define NTHEMES 6
-static const unsigned HUES[6] = { 0xff3d57, 0xffc21a, 0xff5fb4, 0xff8a1a, 0xa05cff, 0x22d08a };
+#define NTHEMES 5
+/* colores de caja: sin azul (solo del impulso) ni amarillo (se confundía con la arenisca) */
+static const unsigned HUES[6] = { 0xff3d57, 0x7cc41a, 0xff5fb4, 0xff6a0a, 0xa05cff, 0x22d08a };
 static C3 COLORS[10];
+
+/* ---------------------------------------------------------------- texturas (las de la web, dentro del ejecutable) */
+static GLuint tex_load(const char *name, int srgb, int repeatT) {
+  int i, w, h, n;
+  unsigned char *px;
+  GLuint t = 0;
+  for (i = 0; ASSETS[i].name; i++) if (!strcmp(ASSETS[i].name, name)) break;
+  if (!ASSETS[i].name) { fprintf(stderr, "falta la textura %s\n", name); return 0; }
+  px = stbi_load_from_memory(ASSETS[i].data, (int)ASSETS[i].size, &w, &h, &n, 4);
+  if (!px) { fprintf(stderr, "no se pudo leer %s\n", name); return 0; }
+  glGenTextures(1, &t); glBindTexture(GL_TEXTURE_2D, t);
+  glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+  glTexImage2D(GL_TEXTURE_2D, 0, srgb ? GL_SRGB8_ALPHA8 : GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, px);
+  glGenerateMipmap(GL_TEXTURE_2D);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, repeatT ? GL_REPEAT : GL_CLAMP_TO_EDGE);
+  stbi_image_free(px);
+  return t;
+}
 
 /* ---------------------------------------------------------------- GL: programas y mallas */
 static int gles;
@@ -70,6 +99,7 @@ static GLint U(GLuint p, const char *n) {
   if (nucache < 256) { ucache[nucache].p = p; ucache[nucache].n = n; ucache[nucache].loc = glGetUniformLocation(p, n); return ucache[nucache++].loc; }
   return glGetUniformLocation(p, n);
 }
+static void bind_tex(GLuint p, const char *u, int unit, GLuint t) { glActiveTexture(GL_TEXTURE0 + unit); glBindTexture(GL_TEXTURE_2D, t); glUniform1i(U(p, u), unit); }
 static void u1(GLuint p, const char *n, float a) { glUniform1f(U(p, n), a); }
 static void u2(GLuint p, const char *n, float a, float b) { glUniform2f(U(p, n), a, b); }
 static void u3(GLuint p, const char *n, float a, float b, float c) { glUniform3f(U(p, n), a, b, c); }
@@ -198,6 +228,8 @@ typedef struct { V3 p, v; double t; } Flying;
 
 static struct {
   int w, h; double aspect, baseFov, fov;
+  GLuint tAlb, tNrm, tOrm, tCAlb, tCNrm, tPano[5];
+  C3 shadowCol, sunCol, inlay, seamGlow, tint; int panoA, panoB; float panoT; V3 sunDir, fwd; double keyFollow, inside;
   GLuint pTun, pBox, pCoin, pPad, pSky, pFlash, pHud;
   Mesh box, coin, plane, full;
   Track tr;
@@ -251,6 +283,14 @@ static void apply_theme(int from, int to, double t) {
   R.seaB = cscale(clerp(R.skyMid, R.skyBot, 0.5f), night ? 0.7f : 0.95f);
   R.seaFog = R.skyMid;
   R.themeFog = R.uFog; R.themeGlow = R.uGlow;
+  R.shadowCol = clerp(hexc(A->shadow), hexc(B->shadow), tf);
+  R.sunCol.r = A->sunK[0] + (B->sunK[0] - A->sunK[0]) * tf; R.sunCol.g = A->sunK[1] + (B->sunK[1] - A->sunK[1]) * tf; R.sunCol.b = A->sunK[2] + (B->sunK[2] - A->sunK[2]) * tf;
+  R.inlay = clerp(hexc(A->inlay), hexc(B->inlay), tf);
+  R.seamGlow = clerp(A->seamGlow ? hexc(A->seamGlow) : hexc(0), B->seamGlow ? hexc(B->seamGlow) : hexc(0), tf);
+  /* mundos oscuros: la piedra más fría y oscura, pero sin bajar a negro */
+  R.tint = clerp(hexc(0xffffff), cscale(hexc(0xffffff), 1), 0);
+  { float dk = R.uDark; R.tint.r = 1 + (0.46f - 1) * dk; R.tint.g = 1 + (0.48f - 1) * dk; R.tint.b = 1 + (0.64f - 1) * dk; }
+  R.panoA = A->pano; R.panoB = B->pano; R.panoT = tf;
 }
 
 static double fov_for(double aspect) {
@@ -288,9 +328,15 @@ int rn_init(int es) {
   R.pFlash = program(VS_SKY, FS_FLASH, aMesh);
   R.pHud = program(VS_HUD, FS_HUD, aHud);
   if (!R.pTun || !R.pBox || !R.pCoin || !R.pPad || !R.pSky || !R.pFlash || !R.pHud) return 1;
+  {
+    static const char *P[5] = { "sky_islas", "sky_selva", "sky_noche", "sky_templo", "sky_volcan" };
+    R.tAlb = tex_load("stone_albedo", 1, 1); R.tNrm = tex_load("stone_normal", 0, 1); R.tOrm = tex_load("stone_orm", 0, 1);
+    R.tCAlb = tex_load("crystal_albedo", 1, 1); R.tCNrm = tex_load("crystal_normal", 0, 1);
+    for (i = 0; i < 5; i++) R.tPano[i] = tex_load(P[i], 1, 0);
+  }
   R.box = make_rounded_box(); R.coin = make_coin(); R.plane = make_plane(); R.full = make_fullscreen();
   tunnel_gl_init();
-  R.fogFar = 118; R.fogNear = 40; R.skyUp = v3(0, 1, 0); R.hemiI = 1; R.satAmt = 1.08f;
+  R.fogFar = 118; R.fogNear = 40; R.skyUp = v3(0, 1, 0); R.hemiI = 1; R.satAmt = 1.14f; R.keyFollow = 0.5;
   R.kickAmp = 1;
   rn_resize(1280, 720);
   rn_reset();
@@ -450,7 +496,7 @@ static void boxes_update(const Game *g, double dt, int flashId) {
     g0 = gi >= 0 ? R.glowBy[gi].g : 0;
     { double kk = (want > g0 ? 10 : 5) * dt; g1 = g0 + (want - g0) * (kk < 1 ? kk : 1); }
     if (gi >= 0) R.glowBy[gi].g = g1;
-    bd->glow = (float)g1; bd->col = COLORS[b->color % 10]; bd->flat = 0;
+    bd->glow = (float)g1; bd->col = COLORS[b->color % 10]; bd->flat = b->fixed ? 0 : 1;   /* flat: rodante de cristal */
     if (flashId == b->id) { bd->col.r = bd->col.g = bd->col.b = 1; bd->glow = 2; }
     R.boxPos[R.nBoxPos].id = b->id; R.boxPos[R.nBoxPos].p = p; R.nBoxPos++;
     /* con invulnerabilidad atraviesas las cajas: la que tienes encima no llena la pantalla */
@@ -599,7 +645,17 @@ void rn_update(const Game *g, double s, double theta, double dt, RenderOpts o) {
   /* ---- mundo */
   /* la luz del túnel va con la cámara (arriba, algo por detrás y a la izquierda) */
   R.key = vnorm(vadd(vadd(vscale(R.upS, 0.85), vscale(R.look, -0.35)), vscale(vnorm(vcross(R.look, R.upS)), -0.4)));
+  /* sol fijo en la pista (un lado del tubo al sol, el otro en sombra de color) y una parte que
+     sigue a la cámara para que tu cara nunca quede a oscuras (index.js) */
+  {
+    V3 trackKey = vnorm(vadd(vadd(vscale(fr.U, 0.8), vscale(fr.X, -0.5)), vscale(fr.F, -0.3)));
+    double want = g->fold < 29 ? 0.8 : 0.5;
+    R.keyFollow += (want - R.keyFollow) * minf(1, dt * 1.5);
+    R.sunDir = vnorm(vlerp(trackKey, R.key, R.keyFollow));
+    R.fwd = fr.F;
+  }
   for (i = 0; i < g->nGaps; i++) if (g->gaps[i].from - s < 34 && g->gaps[i].to - s > -6) gapNear = 1;
+  R.inside = gapNear ? 0 : clamp01((g->fold - 20) / 10);
   outside = g->fold < 29 || gapNear;
   fogFar = (outside ? 190 : 120) * (1 + 0.3 * (R.landT > 0 ? R.landT / 1.5 : 0));
   if (R.landT > 0) R.landT -= dt;
@@ -613,12 +669,13 @@ void rn_update(const Game *g, double s, double theta, double dt, RenderOpts o) {
   pads_update(g, dt);
   coins_update(g, dt);
   /* cielo: su "arriba" es el de la pista, suavizado; solo se ve por fuera */
-  R.skyUp = vnorm(vlerp(R.skyUp, fr.U, minf(1, dt * 1.5)));
+  /* el horizonte del paisaje sigue sobre todo a la cámara: queda casi a nivel en la vista */
+  R.skyUp = vnorm(vlerp(R.skyUp, vnorm(vlerp(fr.U, R.upS, 0.7)), minf(1, dt * 1.5)));
   R.skyTime += dt; R.seaTime += dt;
   R.skyVis += ((outside ? 1 : 0) - R.skyVis) * minf(1, dt * 3);
-  R.skyOn = R.skyVis > 0.01;
+  R.skyOn = 1;   /* por los arcos del túnel el cielo se ve siempre */
   R.seaAlpha = (float)(R.skyVis * (1 - R.invert));
-  R.seaOn = R.skyVis > 0.01 && R.invert < 0.99;
+  R.seaOn = 0;   /* con paisaje de 360° el mar de nubes sobra */
   /* impulso: 0,4 s de azul eléctrico en juntas y anillos (nunca en los carriles) */
   bk = (R.kick - 0.28 > 0 ? R.kick - 0.28 : 0) / 0.72;
   {
@@ -681,6 +738,8 @@ void rn_render(void) {
     glDisable(GL_DEPTH_TEST); glDepthMask(GL_FALSE);
     glUseProgram(p); set_common(p);
     uc(p, "uTop", R.skyTop); uc(p, "uMid", R.skyMid); uc(p, "uBot", R.skyBot); uc(p, "uSun", R.sun);
+    bind_tex(p, "tPanoA", 0, R.tPano[R.panoA]); bind_tex(p, "tPanoB", 1, R.tPano[R.panoB]); u1(p, "uPanoT", R.panoT);
+    uv(p, "uFwd", R.fwd); u1(p, "uIn", (float)R.inside);
     uv(p, "uUp", up); uv(p, "uSunDir", vnorm(v3(-0.4, 0.5, -1)));
     u1(p, "uStars", R.stars); u1(p, "uTime", (float)R.skyTime); u1(p, "uInvert", (float)R.invert);
     uv(p, "uCamF", vscale(R.camZ, -1)); uv(p, "uCamR", R.camX); uv(p, "uCamU", R.camY);
@@ -706,6 +765,9 @@ void rn_render(void) {
     u1(p, "uInvert", (float)R.invert); u2(p, "uCellSize", (float)TR_CELL_W, (float)ROW_M); u1(p, "uHit", (float)R.hit);
     uc(p, "uRing", R.uRing); u1(p, "uOutside", (float)R.outside); uc(p, "uSkyFill", R.skyTop); u1(p, "uDark", R.uDark);
     uc(p, "uInvBase", R.uInvBase);
+    bind_tex(p, "tAlb", 0, R.tAlb); bind_tex(p, "tNrm", 1, R.tNrm); bind_tex(p, "tOrm", 2, R.tOrm); bind_tex(p, "tCAlb", 3, R.tCAlb); bind_tex(p, "tCNrm", 4, R.tCNrm);
+    uv(p, "uSunDir", R.sunDir); uc(p, "uSunCol", R.sunCol); uc(p, "uShadowCol", R.shadowCol); uc(p, "uInlay", R.inlay);
+    uc(p, "uSeamGlow", R.seamGlow); uc(p, "uTint", R.tint); u1(p, "uGlowK", R.uDark > 0.5f ? 1.4f : 1.0f);
     glBindVertexArray(tunVao);
     glBindBuffer(GL_ARRAY_BUFFER, tunVbo);
     glBufferSubData(GL_ARRAY_BUFFER, 0, (GLsizeiptr)(tunQuads * 4 * TV * sizeof(float)), tunV);
@@ -718,16 +780,17 @@ void rn_render(void) {
     V3 key = vnorm(vadd(vadd(vscale(R.camX, -0.4), R.camY), vscale(R.camZ, 1.6)));
     glUseProgram(p); set_common(p);
     um(p, "uVP", &vp); uv(p, "uKey", key); u3(p, "uCam", 0, 0, 0); u1(p, "uHemiI", R.hemiI);
+    bind_tex(p, "tAlb", 0, R.tAlb); uv(p, "uSunDir", R.sunDir); uc(p, "uSunCol", R.sunCol); uc(p, "uShadowCol", R.shadowCol);
     glBindVertexArray(R.box.vao);
-    glEnable(GL_CULL_FACE); glFrontFace(GL_CCW);
+    glEnable(GL_CULL_FACE); glFrontFace(GL_CCW); glCullFace(GL_BACK);
     for (i = 0; i < R.nBoxDraw; i++) {
       BoxDraw *b = &R.boxes[i];
+      double w = b->scale.x;
+      int nH = (int)floor(b->scale.y / w + 0.5), nL = (int)floor(b->scale.z / w + 0.5);
+      nH = nH < 1 ? 1 : nH > 4 ? 4 : nH; nL = nL < 1 ? 1 : nL > 3 ? 3 : nL;
       um(p, "uModel", &b->m); uv(p, "uScale", b->scale); u1(p, "uOutlineW", 0);
-      uc(p, "uColor", b->col); u1(p, "uGlow", b->glow); u1(p, "uFlat", 0);
-      glCullFace(GL_BACK);
-      glDrawElements(GL_TRIANGLES, R.box.nIdx, GL_UNSIGNED_SHORT, 0);
-      u1(p, "uOutlineW", 0.06f); uc(p, "uColor", hexc(0x3a1f5c)); u1(p, "uFlat", 1);
-      glCullFace(GL_FRONT);
+      uc(p, "uColor", b->col); u1(p, "uGlow", b->glow); u1(p, "uFlat", 0); u1(p, "uCrystal", (float)b->flat);
+      u3(p, "uBlocks", 1, (float)nH, (float)nL);
       glDrawElements(GL_TRIANGLES, R.box.nIdx, GL_UNSIGNED_SHORT, 0);
     }
     glDisable(GL_CULL_FACE);

@@ -42,6 +42,23 @@ typedef ptrdiff_t GLintptr;
 #define GL_FLOAT 0x1406
 #define GL_RGBA 0x1908
 #define GL_RGBA8 0x8058
+/* texturas */
+#define GL_TEXTURE_2D 0x0DE1
+#define GL_TEXTURE0 0x84C0
+#define GL_TEXTURE_MIN_FILTER 0x2801
+#define GL_TEXTURE_MAG_FILTER 0x2800
+#define GL_TEXTURE_WRAP_S 0x2802
+#define GL_TEXTURE_WRAP_T 0x2803
+#define GL_LINEAR 0x2601
+#define GL_LINEAR_MIPMAP_LINEAR 0x2703
+#define GL_REPEAT 0x2901
+#define GL_CLAMP_TO_EDGE 0x812F
+#define GL_RGB 0x1907
+#define GL_RGBA 0x1908
+#define GL_RGB8 0x8051
+#define GL_SRGB8 0x8C41
+#define GL_SRGB8_ALPHA8 0x8C43
+#define GL_UNPACK_ALIGNMENT 0x0CF5
 #define GL_VENDOR 0x1F00
 #define GL_RENDERER 0x1F01
 #define GL_VERSION 0x1F02
@@ -121,6 +138,13 @@ typedef ptrdiff_t GLintptr;
   X(void, glRenderbufferStorageMultisample, (GLenum t, GLsizei s, GLenum f, GLsizei w, GLsizei h)) \
   X(void, glFramebufferRenderbuffer, (GLenum t, GLenum a, GLenum rt, GLuint r)) \
   X(GLenum, glCheckFramebufferStatus, (GLenum t)) \
+  X(void, glGenTextures, (GLsizei n, GLuint *t)) \
+  X(void, glBindTexture, (GLenum t, GLuint x)) \
+  X(void, glActiveTexture, (GLenum u)) \
+  X(void, glTexImage2D, (GLenum t, GLint l, GLint inf, GLsizei w, GLsizei h, GLint b, GLenum f, GLenum ty, const void *d)) \
+  X(void, glTexParameteri, (GLenum t, GLenum p, GLint v)) \
+  X(void, glGenerateMipmap, (GLenum t)) \
+  X(void, glUniform1i, (GLint l, GLint v)) \
   X(void, glBlitFramebuffer, (GLint a, GLint b, GLint c, GLint d, GLint e, GLint f, GLint g, GLint h, GLbitfield m, GLenum fl))
 
 /* Los punteros llevan el prefijo ht_ para no chocar con los símbolos de libGLESv2/libGL al enlazar;
@@ -130,6 +154,13 @@ HT_GL_FUNCS(HT_GL_DECL)
 #undef HT_GL_DECL
 #ifndef HT_GL_NO_MACROS
 #define glViewport ht_glViewport
+#define glGenTextures ht_glGenTextures
+#define glBindTexture ht_glBindTexture
+#define glActiveTexture ht_glActiveTexture
+#define glTexImage2D ht_glTexImage2D
+#define glTexParameteri ht_glTexParameteri
+#define glGenerateMipmap ht_glGenerateMipmap
+#define glUniform1i ht_glUniform1i
 #define glClearColor ht_glClearColor
 #define glClear ht_glClear
 #define glEnable ht_glEnable

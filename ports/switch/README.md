@@ -137,8 +137,10 @@ así no se pierde precisión a decenas de kilómetros del origen.
 - **Sonido**: un sintetizador propio (`src/audio.c`) con música, turbina y efectos, más sencillo que el de la web.
 - **Posproceso**: sin bloom, sin el desenfoque radial de los bordes ni la viñeta suave (sí están
   el tono, la saturación, los destellos y la viñeta azul del nivel 3).
-- **Decorado**: sin las islas flotantes ni los modelos GLB (`decor.js`, `assets.js`); las cajas
-  son cubos redondeados generados en código y las monedas discos con bisel.
+- **Aspecto**: las texturas de piedra y cristal y los paisajes de 360° de la web van dentro del
+  `.nro` (`tools/embed.py` genera `src/assets_data.c`; volver a lanzarlo si cambian). Las losas son
+  planas con relieve por normal map (sin la geometría de Blender), y faltan las islas 3D, las
+  enredaderas y las partículas.
 - **Líneas de velocidad y cascotes** (`streaks.js`, `fx.js`).
 - **Modos**: Arcade y Clásico (sin Aventura, supervivencia ni contrarreloj en el menú, aunque la
   simulación tiene los dos últimos), sin ajustes, sin top 5 (se guarda solo el mejor: `sdmc:/switch/hipertunel-record.txt`
