@@ -5,7 +5,7 @@
 #   sh noche/turno.sh [hasta HH:MM] [máximo de rondas]      p. ej.  sh noche/turno.sh 07:30 60
 #
 # - Copia de trabajo: ../hipertunel-noche (rama de integración noche/AAAA-MM-DD/todo, desde main).
-# - Cada tarea va en su propia rama noche/AAAA-MM-DD/<id> (desde main). Si pasa la puerta, se fusiona
+# - Cada tarea va en su propia rama noche/AAAA-MM-DD/<id> (desde la de integración). Si pasa la puerta y es segura, se fusiona
 #   también en la de integración, para poder probarlo todo junto. Víctor elige por la mañana.
 # - Estado (tareas, progreso, informe, capturas): ../hipertunel-noche/.noche/ (fuera de git).
 # - Seguridad: ajustes propios (noche/ajustes.json: sin push, sin publicar, sin tocar el núcleo de

@@ -5,7 +5,7 @@ Antes de nada lee `CLAUDE.md` (reglas de diseño que no se rompen), `docs/CONTRA
 ## Pasos de la ronda
 
 1. **Elige** la primera tarea con `"estado": "pendiente"` por orden de `prioridad` (la más baja primero) cuyas `depende` estén `hecha`. Márcala `"en_curso"` y guarda `tareas.json`.
-2. **Rama**: `git switch -c noche/<fecha>/<id> main` (si ya existe de un intento anterior, `git switch` a ella). Nunca trabajes en `main` ni en la de integración (`noche/<fecha>/todo`). `<fecha>` es la de la rama de integración (`git branch --list "noche/*/todo"`).
+2. **Rama**: `git switch -c noche/<fecha>/<id> noche/<fecha>/todo` (parte de la integración, que ya lleva las tareas seguras terminadas: así cada una usa el bot y las métricas de las anteriores; si ya existe de un intento anterior, `git switch` a ella). Nunca trabajes en `main` ni en la de integración (`noche/<fecha>/todo`). `<fecha>` es la de la rama de integración (`git branch --list "noche/*/todo"`).
 3. **Mide antes** lo que diga su `verificacion` (bots, capturas, métricas) y apúntalo.
 4. **Cambia** lo mínimo para cumplir el `criterio_hecho`, respetando la carpeta dueña según el CONTRATO y el estilo del código de alrededor. Si tocas `app/src/sim/` (Arcade, Aventura, modos nuevos), pórtalo a `ports/switch/sim/` en la misma rama.
 5. **Mide después** y compara. Pide opinión al crítico que toque con contexto limpio (tarea con `critico`): lanza el agente correspondiente de `.claude/agents/` (director-arte, critico-jugador, qa-jugador, auditor-fidelidad, sonido) con las capturas o cifras de antes y después; para lo visual exige ≥8/10 y que no baje ninguna pantalla.
