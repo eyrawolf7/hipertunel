@@ -50,6 +50,12 @@ TAN15 = math.tan(math.radians(15))
 HWB = HW + T * TAN15              # semiancho en la cara exterior (inglete)
 JE = [-HW, -0.345, 0.345, HW]     # juntas hiladas pares
 JO = [-HW, -0.69, 0.0, 0.69, HW]  # juntas hiladas impares (aparejo a soga)
+# sillería de la textura: losas grandes, una por carril y hilada (el concepto C·3); a ladrillitos
+# se leía recargado a toda velocidad. La geometría sigue usando CL (ventanas y cristales).
+TNC = 4
+TCL = L / TNC                     # 1 m por hilada
+TJE = [-HW, 0.0, HW]              # dos sillares por carril, a soga
+TJO = [-HW, -0.52, 0.52, HW]
 G = 0.024                         # media llaga (referencia)
 GI, GS = 0.011, 0.022             # media llaga interior / en la costura de carril
 
@@ -240,11 +246,11 @@ def stone_top(seed=11):
     rng = np.random.default_rng(seed)
     shape = XX.shape
 
-    course = (np.floor(ZZ / CL).astype(np.int32)) % NC
+    course = (np.floor(ZZ / TCL).astype(np.int32)) % TNC
     kk = np.zeros(shape, np.int32)
     jl = np.zeros(shape, np.float32)
     jr = np.zeros(shape, np.float32)
-    for parity, J in ((0, JE), (1, JO)):
+    for parity, J in ((0, TJE), (1, TJO)):
         m = (course % 2) == parity
         Ja = np.array(J, np.float32)
         idx = np.clip(np.searchsorted(Ja, XX[m], side='right') - 1, 0, len(J) - 2)
@@ -252,11 +258,11 @@ def stone_top(seed=11):
         jl[m] = Ja[idx]
         jr[m] = Ja[idx + 1]
     bid = course * 5 + kk
-    NB = NC * 5
+    NB = TNC * 5
     cx = (jl + jr) / 2
     hx = (jr - jl) / 2
-    cz = (course + 0.5) * CL
-    hz = CL / 2
+    cz = (course + 0.5) * TCL
+    hz = TCL / 2
     lx = XX - cx
     lz = ZZ - cz
 
@@ -286,7 +292,8 @@ def stone_top(seed=11):
     prof = 0.45 * t + 0.55 * np.sqrt(1 - (1 - t) ** 2)
     top = (0.012 + base[bid] + tlx[bid] * lx + tlz[bid] * lz
            + dome[bid] * (1 - (lx / hx) ** 2) * (1 - (lz / hz) ** 2)
-           + 0.0018 * n1 + 0.0003 * n2)
+           + 0.0022 * n1 + 0.0006 * n2
+           + 0.0009 * pnoise(shape, dx * 6, dz, 0.3, seed + 15))       # veta en relieve
     GR = -0.026 + 0.0015 * n2
     seam = np.clip(1 - (HW - np.abs(XX)) / 0.05, 0, 1)
     GR = GR - 0.008 * seam
@@ -295,7 +302,7 @@ def stone_top(seed=11):
         m = bid == b
         if not m.any():
             continue
-        for _ in range(int(rng.integers(1, 3))):
+        for _ in range(int(rng.random() < 0.5)):
             side = int(rng.integers(4))
             dist = [ax_[m] - llx[m], ax_[m] + llx[m], az_ - lz[m], az_ + lz[m]][side]
             fw, fd = rng.uniform(0.09, 0.2), rng.uniform(0.004, 0.009)
@@ -312,7 +319,7 @@ def stone_top(seed=11):
         axb = float(ax_[m][0])
         ox = float(ccx[m][0] - cx[m][0])
         az = az_
-        for _ in range(int(rng.integers(1, 4))):
+        for _ in range(int(rng.integers(2, 5))):
             if rng.random() < 0.5:
                 px, pz = axb * rng.choice([-1, 1]), az * rng.choice([-1, 1])
             else:
@@ -328,7 +335,7 @@ def stone_top(seed=11):
             chip[m] = np.maximum(chip[m], H[m] - nh)
             H[m] = nh
         # grietas que nacen en un borde (30 % de los bloques)
-        if rng.random() < 0.3:
+        for _ in range(int(rng.random() < 0.5)):
             side = int(rng.integers(4))
             u = rng.uniform(-0.6, 0.6)
             p = [(axb, u * az), (-axb, u * az), (u * axb, az), (u * axb, -az)][side]
@@ -358,13 +365,17 @@ def stone_top(seed=11):
     H = lerp(H, np.maximum(H, Hm), moss).astype(np.float32)
 
     # --- albedo (sRGB): arenisca cálida, variada por bloque, sin ruido fino
-    pal = np.stack([srgb(c) for c in ('#cbb088', '#c6aa80', '#d1b890', '#c4ab86', '#cdb28a', '#c2a883',
-                                      '#c3b194')])
+    pal = np.stack([srgb(c) for c in ('#d6c39c', '#d0bb92', '#dac7a3', '#cfbc96')])
     pidx = rng.integers(0, len(pal), NB)
-    vgain = rng.uniform(0.93, 1.06, NB)
+    vgain = rng.uniform(0.96, 1.04, NB)
     gdx = rng.uniform(-1, 1, NB)
     gdz = rng.uniform(-1, 1, NB)
-    A = pal[pidx[bid]] * (vgain[bid] * (1 + 0.03 * n_big + 0.02 * n1
+    # veta de la piedra a lo largo de la vía (ruido estirado en Z) y manchas de intemperie
+    grain = pnoise(shape, dx * 6, dz, 0.35, seed + 12)
+    grain2 = pnoise(shape, dx * 3, dz, 0.12, seed + 13)
+    stain = pnoise(shape, dx, dz, 0.22, seed + 14)
+    A = pal[pidx[bid]] * (vgain[bid] * (1 + 0.03 * n_big + 0.025 * n1 + 0.012 * grain + 0.008 * grain2
+                                        - 0.03 * sstep(0.8, 2.0, stain)
                                         + 0.035 * (gdx[bid] * lx / hx + gdz[bid] * lz / hz)))[..., None]
     warm = pnoise(shape, dx, dz, 0.5, seed + 9)
     A = A * (1 + np.stack([0.025 * warm, 0.0 * warm, -0.03 * warm], -1))   # moteado cálido/frío suave
@@ -414,11 +425,11 @@ def stone_strip(seed=23):
     n2 = pnoise(shape, ds, dp, 0.08, seed + 2)
     nm = pnoise(shape, ds, dp, 0.3, seed + 3)
     nmf = pnoise(shape, ds, dp, 0.02, seed + 4)
-    c = np.floor(SS / CL)
-    ls = SS - (c + 0.5) * CL
-    e = (CL / 2 - GI) - np.abs(ls) + 0.003 * n1
+    c = np.floor(SS / TCL)
+    ls = SS - (c + 0.5) * TCL
+    e = (TCL / 2 - GI) - np.abs(ls) + 0.003 * n1
     t = np.clip(e / 0.032, 0, 1)
-    top = 0.01 + 0.002 * n1 + 0.004 * (1 - (ls / (CL / 2)) ** 2)
+    top = 0.01 + 0.002 * n1 + 0.004 * (1 - (ls / (TCL / 2)) ** 2)
     GR = -0.028
     H = np.where(e > 0, GR + (top - GR) * (0.45 * t + 0.55 * np.sqrt(1 - (1 - t) ** 2)), GR)
     # desconchones en la arista superior
@@ -1115,13 +1126,13 @@ def join_into(target, others):
 
 
 # ------------------------------------------------------------------ cajas
-BOX_BLOCKS = [(0, 0), (0, 1), (2, 2), (2, 0), (4, 1), (4, 2)]   # (hilada, bloque) de la textura
+BOX_BLOCKS = [(0, 0), (0, 1), (2, 0), (2, 1), (0, 1), (2, 0)]   # hiladas sin hiedra   # (hilada, bloque) de la textura
 
 
 def block_rect(course, k):
-    J = JE if course % 2 == 0 else JO
+    J = TJE if course % 2 == 0 else TJO
     x0, x1 = J[k] + GS + 0.012, J[k + 1] - GS - 0.012
-    z0, z1 = course * CL + GS + 0.012, (course + 1) * CL - GS - 0.012
+    z0, z1 = course * TCL + GS + 0.012, (course + 1) * TCL - GS - 0.012
     u0, v0 = uv_top(x0, z0)
     u1, v1 = uv_top(x1, z1)
     return u0, v0, u1, v1
