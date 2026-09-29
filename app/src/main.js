@@ -9,6 +9,7 @@ import { createUI } from './ui/index.js';
 import { createInput } from './input/index.js';
 import { createMissions } from './missions.js';
 import { createShop, SHOP } from './shop.js';
+import { Adventure, STAGES, packGhost, unpackGhost, quantSteer } from './sim/adventure.js';
 
 const VERSION = '0.40';
 const STEP = 1 / 60;
@@ -50,12 +51,19 @@ let game = null, mode = 'classic', state = 'attract';
 let acc = 0, prev = { s: 0, theta: 0 }, countdown = 0, overT = 0, pausedFrom = null;
 let pausedAt = -1e9;                 // cuándo se pausó con un toque (para no reanudar con el mismo)
 let coins = 0;
-let worldBase = 0;                   // modo Viaje: mundo visual con el que se empieza
+let worldBase = 0;
+// Aventura: tramo elegido, progreso guardado (estrellas, mejor avance y fantasma) y la partida del fantasma
+let advStage = 0, advRec = [], ghostSteers = null, ghostGame = null;
+const loadAdv = () => { try { return JSON.parse(localStorage.getItem('hipertunel-aventura') || '{}'); } catch (e) { return {}; } };
+const saveAdv = (d) => { try { localStorage.setItem('hipertunel-aventura', JSON.stringify(d)); } catch (e) {} };
+const advInfo = () => { const d = loadAdv(); return STAGES.map((st, i) => ({ name: st.name, boss: !!st.boss, stars: d[i]?.stars || 0, best: d[i]?.best || 0, locked: i > 0 && !(d[i - 1]?.stars > 0) })); };                   // modo Viaje: mundo visual con el que se empieza
 let lostAt = -1, killBox = null, recAnnounced = false, visWorld = 1;   // visWorld: mundo que se ve (1, 2…)   // para el resumen del fin de partida
 const bestAtStart = {};
 
 const ui = createUI($('ui'), {
-  onPlay: (m) => { audio.unlock(); input.requestTilt(); goLandscape(); startGame(m); },
+  onPlay: (m, stage) => { audio.unlock(); input.requestTilt(); goLandscape(); if (m === 'adventure') advStage = stage | 0; startGame(m); },
+  onMap: () => ui.map?.(advInfo()),
+  onNext: () => { audio.unlock(); advStage = Math.min(STAGES.length - 1, advStage + 1); startGame('adventure'); },
   onResume: () => resume(),
   onRestart: () => { audio.unlock(); startGame(mode, true); },
   onMenu: () => toMenu(),
@@ -119,8 +127,15 @@ function goLandscape() {
 // ---------------------------------------------------------------- estados
 function newGame(m, seed) {
   if (m === 'daily' && seed === undefined) seed = daySeed(dayKey());
-  game = new Game({ mode: simMode(m), seed: seed ?? ((Math.random() * 1e9) | 0) });
-  worldBase = m === 'voyage' ? maxWorld() : 0;
+  if (m === 'adventure') {
+    game = new Adventure({ stage: advStage });
+    const saved = loadAdv()[advStage];
+    ghostSteers = saved && saved.ghost ? unpackGhost(saved.ghost) : null;
+    ghostGame = ghostSteers ? new Adventure({ stage: advStage }) : null;
+    advRec = [];
+  } else { game = new Game({ mode: simMode(m), seed: seed ?? ((Math.random() * 1e9) | 0) }); ghostGame = null; ghostSteers = null; }
+  renderer.ghostGame = ghostGame;
+  worldBase = m === 'voyage' ? maxWorld() : m === 'adventure' ? STAGES[advStage].world : 0;
   renderer.themeBase = worldBase;
   renderer.reset();
   prev = { s: game.s, theta: game.theta };
@@ -170,6 +185,7 @@ function toMenu() { audio.pause(false); attract(); }
 
 function finish() {
   state = 'over'; overT = 0;
+  if (game.mode === 'adventure') return finishAdventure();
   const distM = game.distanceM;
   coins = game.coinsGot;
   const score = Math.round(distM + coins * 10);
@@ -244,6 +260,31 @@ function padDirection() {
   return da > 0 ? 1 : -1;                          // girar a la derecha sube theta
 }
 
+// fin de un tramo de Aventura: estrellas, mejor avance, fantasma y desbloqueo del siguiente
+function finishAdventure() {
+  const d = loadAdv(); const cur = d[advStage] || {};
+  const stars = game.stars, prog = game.progress;
+  const better = stars > (cur.stars || 0) || (stars === (cur.stars || 0) && prog > (cur.best || 0) + 0.001);
+  if (better) d[advStage] = { stars: Math.max(stars, cur.stars || 0), best: Math.max(prog, cur.best || 0), ghost: packGhost(advRec) };
+  saveAdv(d);
+  shop.add(game.coinsGot);
+  const mr = missions.finish(); pushMissions();
+  const st = STAGES[advStage];
+  const lines = [];
+  if (game.cleared) {
+    if (stars < 2) lines.push('Supéralo sin chocar ni caer para la segunda estrella');
+    else if (stars < 3) lines.push(`Coge la mitad de las monedas para la tercera (${game.coinsGot}/${Math.ceil(game.coinsSpawned * 0.5)})`);
+    else lines.push('¡Tramo perfecto!');
+  } else {
+    lines.push(`Llegaste al ${Math.round(prog * 100)} % del tramo` + (cur.best ? ` (tu mejor: ${Math.round(Math.max(cur.best, prog) * 100)} %)` : ''));
+    if (game.falls > 0) lines.push('Mira dónde aterrizas: solo los carriles enteros aguantan');
+  }
+  if (ghostGame) lines.push('La luz que va delante es tu mejor intento');
+  ui.over({ mode: 'adventure', distM: game.distanceM, coins: game.coinsGot, score: Math.round(game.distanceM + game.coinsGot * 10), best: 0, isRecord: false, time: game.time, top: [], missionsDone: mr.completed, facts: { lines: lines.slice(0, 2) }, headline: game.cleared ? (stars === 3 ? '¡Perfecto!' : '¡Tramo superado!') : '¡Casi lo tienes!', adv: { name: st.name, n: advStage + 1, stars, cleared: game.cleared, hasNext: game.cleared && advStage + 1 < STAGES.length } });
+  ui.show('over');
+  if (mr.rankUp) setTimeout(() => { audio.play('record'); ui.toast(`¡Rango ${missions.rank().level}: ${missions.rank().name}!`, 'mission'); }, 700);
+}
+
 // vibración (móvil): se apaga con "Reducir efectos"
 const buzz = (p) => { if (settings.reduceFx || state === 'attract') return; try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
 let nearT = 0, pendingChime = false, padHint = false, hitstop = 0;
@@ -270,6 +311,11 @@ function stepSim() {
   let steer = 0;
   if (state === 'attract') steer = botSteer(game);
   else if (state === 'play') steer = input.steer(STEP, game.theta, game.fold !== 30 && game.fold !== -30);
+  if (game.mode === 'adventure' && state !== 'attract') {
+    // se juega con el giro cuantizado igual que se guarda: el fantasma repite la partida exacta
+    steer = quantSteer(steer); if (state === 'play') advRec.push(steer);
+    if (ghostGame && ghostGame.alive) { const gs = ghostSteers[ghostGame.frame]; ghostGame.step({ steer: gs === undefined ? 0 : gs }); }
+  }
   else input.steer(STEP, game.theta, false);
   const ev = game.step({ steer });
   renderer.onEvents(ev, game);
@@ -280,6 +326,11 @@ function stepSim() {
       if (!e.fatal) lostAt = game.time; else killBox = game.boxes.find((b) => b.id === e.id) || null;
       audio.play(e.fatal ? 'death' : 'crash'); buzz(e.fatal ? [120, 60, 200] : [40, 30, 60]); if (!e.fatal) { ui.toast('¡Impulsos perdidos!', 'info'); hitstop = settings.reduceFx ? 0 : 0.07; } }
     else if (e.type === 'coin') { coins = game.coinsGot; audio.play('coin', { combo: e.combo }); if (e.combo >= 3) buzz(8); coinFly(e); }
+    else if (e.type === 'fall') { ui.toast(game.boostOn || game.invul > 0 ? '¡Por poco! Caes y pierdes los impulsos' : '¡Al vacío!', 'info'); renderer.flash(0x000000, 0.35); }
+    else if (e.type === 'crumble') { audio.play('crash'); buzz(15); }
+    else if (e.type === 'power') { const n = { magnet: 'Imán', x2: 'Monedas ×2', shield: 'Escudo' }[e.kind]; ui.toast(`¡${n}!`, 'mission'); audio.play('world'); buzz([10, 20, 10]); }
+    else if (e.type === 'shield') { ui.toast('El escudo te ha salvado', 'mission'); audio.play('crash'); renderer.flash(0xb58cff, 0.35); }
+    else if (e.type === 'clear') { audio.play('record'); buzz([30, 40, 30, 40, 60]); }
     else if (e.type === 'foldStart') audio.play('foldStart');
     else if (e.type === 'foldOrder' && game.fold < 0) {
       // desde fuera, el plegado hacia dentro lleva a un mundo nuevo: se avisa con la distancia
@@ -340,7 +391,7 @@ function frame(now) {
     if (n === 6) acc = 0;
     if (state === 'play' && !game.alive) { state = 'dying'; overT = 0; }
   }
-  if (state === 'dying') { overT += dt; if (overT > 0.9) finish(); }
+  if (state === 'dying') { overT += dt; if (overT > (game.cleared ? 0.5 : 0.9)) finish(); }
   if (state === 'over') overT += dt;
 
   const a = window.__freeze ? 1 : state === 'play' || state === 'attract' || state === 'dying' ? acc / STEP : 1;
@@ -352,7 +403,7 @@ function frame(now) {
   renderer.render();
   audio.setSpeed(game.speedMS, game.level);
   if (state === 'play' || state === 'countdown' || state === 'dying') {
-    ui.hud({ padDir: state === 'play' ? padDirection() : 0, distM: game.distanceM, speedMS: state === 'countdown' && game.frame === 0 ? 0 : game.speedMS, level: game.level, coins: game.coinsGot, timeLeft: mode === 'timetrial' ? game.timeLeft : null, mode, invul: game.invul > 0, best: bestAtStart[mode] || 0, countdown: state === 'countdown' ? Math.ceil(countdown) : 0 });
+    ui.hud({ adv: game.mode === 'adventure' ? { p: game.progress, power: game.power, powerT: game.powerT, shield: game.shield, n: advStage + 1 } : null, padDir: state === 'play' ? padDirection() : 0, distM: game.distanceM, speedMS: state === 'countdown' && game.frame === 0 ? 0 : game.speedMS, level: game.level, coins: game.coinsGot, timeLeft: mode === 'timetrial' ? game.timeLeft : null, mode, invul: game.invul > 0, best: bestAtStart[mode] || 0, countdown: state === 'countdown' ? Math.ceil(countdown) : 0 });
   }
   // en la web desde Android se ofrece la app; dentro de la app (Capacitor) no
   const apk = $('apk'); if (apk) apk.hidden = !(IS_ANDROID_WEB && state === 'attract');

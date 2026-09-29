@@ -20,6 +20,7 @@ import { Streaks } from './streaks.js';
 import { TunnelKit, kitU } from './tunnelkit.js';
 import { TunnelProps } from './tunnelprops.js';
 import { Life } from './life.js';
+import { AdvView } from './advview.js';
 import { styleUniforms } from './stylize.js';
 import { THEMES, BOX_COLORS } from './worlds.js';
 
@@ -75,7 +76,7 @@ export class Renderer {
     this.tunnel = new Tunnel(this.scene);
     this.kit = new TunnelKit(this.scene);
     this.kit.onReady = () => this.warmup();
-    this.props = new TunnelProps(this.scene); this.life = new Life(this.scene);
+    this.props = new TunnelProps(this.scene); this.life = new Life(this.scene); this.adv = new AdvView(this.scene); this.ghostGame = null;
     this.scene.fog = new THREE.Fog(0xffffff, 40, 120);
     this.stoneTint = new THREE.Color(1, 1, 1);
     this.boxes = new Boxes(this.scene);
@@ -305,7 +306,8 @@ export class Renderer {
     this.tunnel.uniforms.uHit.value = c.hit;
     this.tunnel.update(game, tr, this.colors, dt);
     // túnel modelado (kit de Blender) si está cargado y la calidad lo permite
-    const useKit = this.kit.ready && this.quality !== 'baja';
+    // (en Aventura siempre el kit: los huecos y las grietas solo los dibuja él)
+    const useKit = this.kit.ready && (this.quality !== 'baja' || game.mode === 'adventure');
     this.tunnel.mesh.visible = !useKit;
     this.kit.setVisible(useKit);
     if (useKit) {
@@ -333,6 +335,7 @@ export class Renderer {
     this.sky.inside = gapNear ? 0 : Math.max(0, Math.min(1, (game.fold - 20) / 10));
     this.sky.update(cam, this._skyUp, outside ? 1 : 0, dt, this.cam.invert, this.fr.F);
     this.decor.update(game, tr, cam, true, dt);   // se ve también por los arcos del túnel
+    this.adv.update(game, tr, dt, this.ghostGame);
     this.life.update(cam, this.look, this.upS, outside, this.themeIdx, dt, this.quality !== 'baja' && !reduceFx, this.cam.invert);
     this.renderer.setClearColor(this.fogColor, 1);
 

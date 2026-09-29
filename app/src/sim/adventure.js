@@ -31,6 +31,7 @@ export const STAGES = [
   { name: 'Jefe: el Volcán', seed: 1110, wave: 22, rows: 800, breaks: 4, crumble: 3, powers: 3, world: 4, boss: true },
 ];
 
+export const COIN_STAR = 0.5;   // parte de las monedas del tramo para la 3.ª estrella
 const BREAK_ROWS = 6;          // filas sin carretera
 const LAND_ROWS = 3;           // filas de aterrizaje con huecos
 const CRUMBLE_ROWS = 90;       // largo de una zona que se desmorona
@@ -81,8 +82,18 @@ export class Adventure extends Game {
         // al aterrizar solo sigue entero un arco de 4-6 carriles
         const n = 4 + Math.floor(r.float(0, 1) * 3), c0 = Math.floor(r.float(0, 1) * LANES);
         const ok = new Set(); for (let j = 0; j < n; j++) ok.add(mod(c0 + j, LANES));
+        // los carriles que no aguantan ya faltan antes de la rotura (desde 10 filas antes, cada vez
+        // más): se ve venir y da tiempo a ponerse en uno entero
+        for (let k = from - 10; k < from; k++) {
+          const h = new Set(); const reach = Math.ceil((LANES - n) * (k - (from - 10) + 1) / 10);
+          const bad = []; for (let j = 0; j < LANES - n; j++) bad.push(mod(c0 + n + j, LANES));
+          // se hunden primero los del centro del arco malo y luego hacia los bordes
+          bad.sort((x, y) => Math.abs(mod(x - c0 - n, LANES) - (LANES - n) / 2) - Math.abs(mod(y - c0 - n, LANES) - (LANES - n) / 2));
+          for (let j = 0; j < reach; j++) h.add(bad[j]);
+          this.holes.set(k, h);
+        }
         for (let k = to + 1; k <= to + LAND_ROWS; k++) { const h = new Set(); for (let l = 0; l < LANES; l++) if (!ok.has(l)) h.add(l); this.holes.set(k, h); }
-        for (let k = from - 8; k <= to + LAND_ROWS + 4; k++) this.safe.set(k, true);
+        for (let k = from - 14; k <= to + LAND_ROWS + 4; k++) this.safe.set(k, true);
       }
     }
     this.gaps.sort((a, b) => a.from - b.from);
@@ -94,6 +105,16 @@ export class Adventure extends Game {
     }
   }
 
+  // el salto por encima de una rotura es bajo (1,6): en el tubo, el de 5,5 del salto entre mundos
+  // sacaba la cámara del túnel
+  jumpAt(s) {
+    for (const g of this.gaps) {
+      const a = g.from - 3, b = g.to + 1;
+      if (s > a && s < b) { const t = (s - a) / (b - a); return 4 * (g.adv ? 1.6 : 5.5) * t * (1 - t); }
+    }
+    return 0;
+  }
+
   isHole(k, lane) { const h = this.holes.get(k); return !!(h && h.has(lane)); }
   // desgaste 0..1 de un carril en la fila k (para las grietas del dibujo)
   wearAt(k, lane) { for (const z of this.zones) if (k >= z.from && k <= z.to) return z.gone.has(lane) ? 1 : Math.min(1, z.wear[lane] / WEAR_S); return 0; }
@@ -101,7 +122,7 @@ export class Adventure extends Game {
 
   // sin cajas en las roturas ni en los aterrizajes (no se puede esquivar lo que no se ve al saltar)
   updateBoxes(row) { if (this.safe.get(row.k) === true) return; super.updateBoxes(row); }
-  spawnCoins(row) { const n = this.coins.length; super.spawnCoins(row); this.coinsSpawned += this.coins.length - n; }
+  spawnCoins(row) { const n = this.coins.length; super.spawnCoins(row); for (let i = n; i < this.coins.length; i++) if (this.coins[i].k <= this.stage.rows) this.coinsSpawned++; }
 
   crash(box) {
     if (this.shield && this.invul <= 0 && !box.hit && this.alive) {
@@ -184,12 +205,12 @@ export class Adventure extends Game {
     for (const k of this.holes.keys()) if (k < k0) this.holes.delete(k);
   }
 
-  // estrellas: 1 = superado, 2 = sin chocar ni caer, 3 = además el 80 % de las monedas
+  // estrellas: 1 = superado, 2 = sin chocar ni caer, 3 = además la mitad de las monedas
   get stars() {
     if (!this.cleared) return 0;
     let s = 1;
     if (this.crashes === 0 && this.falls === 0) s++;
-    if (this.coinsGot >= Math.ceil(this.coinsSpawned * 0.8)) s++;
+    if (this.coinsGot >= Math.ceil(this.coinsSpawned * COIN_STAR)) s++;
     return s;
   }
 }

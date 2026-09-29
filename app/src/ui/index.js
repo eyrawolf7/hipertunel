@@ -14,6 +14,7 @@
 import { ICON } from './icons.js';
 
 const MODES = {
+  adventure: { name: 'Aventura', desc: '10 tramos: el tubo se rompe, el suelo se hunde, poderes y jefes.', tag: 'Nuevo' },
   classic: { name: 'Clásico', desc: 'Sin límite. Llega lo más lejos que puedas.', tag: 'Lo de siempre' },
   survival: { name: 'Supervivencia', desc: 'Sin impulsos y la velocidad no para de subir.', tag: 'Para valientes' },
   timetrial: { name: 'Contrarreloj', desc: '60 s. Cada impulso suma tiempo, cada choque resta.', tag: 'A toda prisa' },
@@ -21,7 +22,7 @@ const MODES = {
   voyage: { name: 'Viaje', desc: 'Empieza en el último mundo al que llegaste.', tag: 'Mundos', lockedDesc: 'Llega al mundo 2 para desbloquearlo.' },
 };
 const MODE_KEYS = Object.keys(MODES);
-const MENU_SCREENS = new Set(['title', 'modes', 'settings', 'pause', 'over', 'shop']);
+const MENU_SCREENS = new Set(['title', 'modes', 'settings', 'pause', 'over', 'shop', 'map']);
 const LOGO = 'Hipertúnel';
 const LOGO_TINTS = ['r', 'y', 'b', 'm'];
 
@@ -126,6 +127,16 @@ function modesHTML() {
 </section>`;
 }
 
+function mapHTML() {
+  return `
+<section class="scr scr-menu scr-map" data-screen="map">
+  <div class="vig vig-menu"></div>
+  ${headerHTML('Aventura')}
+  <div class="map-total" data-bind="mapTotal"></div>
+  <div class="map-path" data-bind="map"></div>
+</section>`;
+}
+
 function shopHTML() {
   return `
 <section class="scr scr-menu scr-shop" data-screen="shop">
@@ -222,6 +233,7 @@ function overHTML() {
     <div class="oc-head"><h2 data-bind="headline">¡Buena carrera!</h2><span class="oc-mode" data-bind="mode">Clásico</span></div>
     <div class="oc-cols">
       <div class="oc-main">
+        <div class="oc-adv" data-bind="adv"></div>
         <div class="oc-lbl">Distancia</div>
         <div class="oc-dist"><b data-bind="dist">0</b><span>m</span></div>
         <div class="oc-best">${ICON.trophy}<span>Mejor</span><b data-bind="bestO">—</b></div>
@@ -240,6 +252,7 @@ function overHTML() {
     </div>
     <div class="oc-btns">
       <button class="btn btn-primary" data-nav data-act="restart" data-default><span class="btn-ico">${ICON.retry}</span><span>Otra vez</span></button>
+      <button class="btn btn-primary btn-next" data-nav data-act="next"><span class="btn-ico">${ICON.play}</span><span>Siguiente</span></button>
       <button class="btn btn-sec" data-nav data-act="menu"><span class="btn-ico">${ICON.home}</span><span>Menú</span></button>
     </div>
     <div class="oc-hint">Toca en cualquier sitio para reintentar</div>
@@ -260,6 +273,7 @@ function hudHTML() {
     <div class="hud-speed"><b data-hud="speed">0</b> km/h</div>
   </div>
   <div class="hud-count" data-hud="count"></div>
+  <div class="adv-bar" data-hud="advBar"><span data-hud="advN">Tramo 1</span><i><b data-hud="advP"></b></i><em data-hud="advPow"></em></div>
   <div class="pad-hint pad-l" data-hud="padL">${ICON.chevron}<span>placa</span></div>
   <div class="pad-hint pad-r" data-hud="padR"><span>placa</span>${ICON.chevron}</div>
   <div class="hud-br" data-hud="chevs">
@@ -281,7 +295,7 @@ export function createUI(root, handlers = {}) {
     cssLink.addEventListener('load', () => root.classList.remove('htui-loading'), { once: true });
     cssLink.addEventListener('error', () => root.classList.remove('htui-loading'), { once: true });
   }
-  root.innerHTML = titleHTML() + modesHTML() + settingsHTML() + shopHTML() + pauseHTML() + overHTML() + hudHTML()
+  root.innerHTML = titleHTML() + modesHTML() + settingsHTML() + shopHTML() + mapHTML() + pauseHTML() + overHTML() + hudHTML()
     + '<div class="toasts" aria-live="polite"></div>';
 
   const $ = (sel, el = root) => el.querySelector(sel);
@@ -371,6 +385,7 @@ export function createUI(root, handlers = {}) {
     switch (current) {
       case 'modes': snd('menuBack'); show('title'); break;
       case 'shop': snd('menuBack'); show('title'); break;
+      case 'map': snd('menuBack'); show('modes'); break;
       case 'settings': snd('menuBack'); show(settingsFrom === 'pause' ? 'pause' : 'title'); break;
       case 'pause': snd('menuBack'); call('onResume'); break;
       case 'over': snd('menuBack'); call('onMenu'); break;
@@ -386,9 +401,14 @@ export function createUI(root, handlers = {}) {
     if (el.dataset.set) { setVal(el.dataset.set, !vals[el.dataset.set]); snd('menuOk'); return; }
     if (el.dataset.adjust === 'quality') { adjust('quality', 1, true); return; }
     if (el.dataset.adjust) return;
+    if (el.dataset.stage !== undefined) {
+      if (el.classList.contains('locked')) { snd('menuBack'); toast('Supera el tramo anterior para abrirlo', 'info'); return; }
+      lastMode = 'adventure'; snd('menuOk'); call('onPlay', 'adventure', +el.dataset.stage); return;
+    }
     if (el.dataset.buy) { const [cat, id] = el.dataset.buy.split(':'); call('onShop', cat, id); return; }
     if (el.dataset.mode) {
       if (el.classList.contains('locked')) { snd('menuBack'); toast(MODES[el.dataset.mode].lockedDesc || 'Bloqueado', 'info'); return; }
+      if (el.dataset.mode === 'adventure') { snd('menuOk'); call('onMap'); show('map'); return; }
       lastMode = el.dataset.mode; snd('menuOk'); call('onPlay', lastMode); return;
     }
     const act = el.dataset.act;
@@ -405,6 +425,7 @@ export function createUI(root, handlers = {}) {
       case 'settings': show('settings'); break;
       case 'resume': call('onResume'); break;
       case 'restart': call('onRestart'); break;
+      case 'next': call('onNext'); break;
       case 'menu': call('onMenu'); break;
       case 'calibrate': call('onCalibrate'); toast('Centro calibrado', 'info'); break;
       default: break;
@@ -518,7 +539,7 @@ export function createUI(root, handlers = {}) {
   const hudEl = {
     coins: $('[data-hud="coins"]'), timer: $('[data-hud="timer"]'), timerBox: $('[data-hud="timerBox"]'),
     dist: $('[data-hud="dist"]'), speed: $('[data-hud="speed"]'), chevs: $('[data-hud="chevs"]'),
-    chev: $$('.chev'), distBox: $('.hud-dist'), padL: $('[data-hud="padL"]'), padR: $('[data-hud="padR"]'),
+    chev: $$('.chev'), distBox: $('.hud-dist'), padL: $('[data-hud="padL"]'), padR: $('[data-hud="padR"]'), advBar: $('[data-hud="advBar"]'), advN: $('[data-hud="advN"]'), advP: $('[data-hud="advP"]'), advPow: $('[data-hud="advPow"]'),
   };
   const last = {};
   function hudReset() {
@@ -536,6 +557,16 @@ export function createUI(root, handlers = {}) {
       if (beyond !== last.beyond) { last.beyond = beyond; hudEl.distBox.classList.toggle('gold', beyond); }
     }
     // flecha hacia la placa más cercana tras perder los impulsos (en el borde, nunca en el centro)
+    // Aventura: avance del tramo y poder activo
+    const av = st.adv;
+    hudEl.advBar.classList.toggle('on', !!av);
+    if (av) {
+      const p = Math.round(av.p * 1000);
+      if (p !== last.advP) { last.advP = p; hudEl.advP.style.width = (p / 10) + '%'; }
+      if (av.n !== last.advN) { last.advN = av.n; hudEl.advN.textContent = 'Tramo ' + av.n; }
+      const pw = av.power ? `${{ magnet: 'Imán', x2: '×2' }[av.power]} ${Math.ceil(av.powerT)}` : av.shield ? 'Escudo' : '';
+      if (pw !== last.advPow) { last.advPow = pw; hudEl.advPow.textContent = pw; hudEl.advPow.classList.toggle('on', !!pw); }
+    }
     const pd = st.padDir | 0;
     if (pd !== last.pd) { last.pd = pd; hudEl.padL.classList.toggle('on', pd < 0); hudEl.padR.classList.toggle('on', pd > 0); }
     const spd = Math.round((st.speedMS || 0) * 3.6);
@@ -628,6 +659,10 @@ export function createUI(root, handlers = {}) {
       rows.push(`<li class="${me ? 'me' : ''} r${i + 1}"><i>${i + 1}</i><b>${fmtInt(v)} m</b>${when}</li>`);
     }
     bind('top').innerHTML = rows.join('');
+    const adv = r.adv;
+    scr.classList.toggle('is-adv', !!adv);
+    scr.classList.toggle('has-next', !!(adv && adv.hasNext));
+    bind('adv').innerHTML = adv ? `<span class="oa-n">Tramo ${adv.n} · ${esc(adv.name)}</span><span class="oa-stars">${[0, 1, 2].map((i) => `<i class="st ${i < adv.stars ? 'on' : ''}" style="--d:${i}">★</i>`).join('')}</span>` : '';
     bind('facts').innerHTML = (r.facts && r.facts.lines ? r.facts.lines : []).map((t) => `<li>${esc(t)}</li>`).join('');
     // misiones cumplidas en esta partida (ya sustituidas en la lista por las nuevas)
     const done = Array.isArray(r.missionsDone) ? r.missionsDone : [];
@@ -637,6 +672,22 @@ export function createUI(root, handlers = {}) {
     show('over');
     // se reinicia la animación de entrada
     restart($('.over-card', scr), 'enter');
+  }
+
+  // ----- mapa de la Aventura -----
+  const starsHTML = (n) => [0, 1, 2].map((i) => `<i class="st ${i < n ? 'on' : ''}">★</i>`).join('');
+  function paintMap(list = []) {
+    const tot = list.reduce((a, s) => a + s.stars, 0);
+    $('[data-bind="mapTotal"]').innerHTML = `<b>${tot}</b>/${list.length * 3} ★`;
+    const firstOpen = list.findIndex((s) => !s.locked && s.stars === 0);
+    $('[data-bind="map"]').innerHTML = list.map((s, i) => `
+      <button class="stage ${s.locked ? 'locked' : ''} ${s.boss ? 'boss' : ''} ${s.stars ? 'done' : ''}" data-nav data-stage="${i}" style="--i:${i}" ${i === (firstOpen < 0 ? 0 : firstOpen) ? 'data-default' : ''}>
+        <span class="sg-n">${s.locked ? '🔒' : i + 1}</span>
+        <span class="sg-name">${esc(s.name)}</span>
+        <span class="sg-stars">${starsHTML(s.stars)}</span>
+        ${!s.stars && s.best > 0 ? `<span class="sg-best">${Math.round(s.best * 100)} %</span>` : ''}
+      </button>`).join('');
+    if (current === 'map') { const d = $('[data-default]', screens.map); if (d) { focused = null; setFocus(d, false); } }
   }
 
   // ----- tienda -----
@@ -688,7 +739,7 @@ export function createUI(root, handlers = {}) {
   show('none');
 
   return {
-    show, hud, toast, over, settings, tiltMeter, records: setRecords, missions, shop: paintShop,
+    show, hud, toast, over, settings, tiltMeter, records: setRecords, missions, shop: paintShop, map: paintMap,
     // modos bloqueados: { voyage: true } → tarjeta en gris con su descripción de desbloqueo
     locks(l = {}) { for (const k of MODE_KEYS) { const c = $(`.card-${k}`); if (!c) continue; c.classList.toggle('locked', !!l[k]); const d = $('.card-desc', c); if (d) d.textContent = l[k] && MODES[k].lockedDesc ? MODES[k].lockedDesc : MODES[k].desc; } },
     navigate, confirm, back,

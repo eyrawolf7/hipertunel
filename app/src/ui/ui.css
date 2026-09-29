@@ -801,3 +801,32 @@
 .htui .si-eq { color: #1fa25a; } .htui .si-use { color: #5a49d6; }
 .htui .si-price .ico { font-size: 1.25em; }
 .htui .si-price.poor { color: #b3aac6; }
+/* ---------- Aventura ---------- */
+.htui .card-adventure { --c: #ff9a3d; --cd: #e0600f; --detail: #e0600f; }
+.htui .map-total { position: absolute; top: calc(var(--st) + 1em); right: calc(var(--sr) + 1.2em); background: var(--paper); color: var(--ink); border: .13em solid var(--ink); border-radius: 999px; padding: .2em .8em; box-shadow: 0 .2em 0 var(--ink); font-weight: 700; z-index: 2; }
+.htui .map-total b { font-size: 1.15em; }
+.htui .map-path { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: .7em; max-width: 52em; width: 100%; margin: 0 auto; padding: .3em .4em 1em; align-content: center; }
+.htui .stage { font: inherit; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .2em; background: var(--paper); color: var(--ink); border: .15em solid var(--ink); border-radius: 1.1em; box-shadow: 0 .28em 0 var(--ink); padding: .5em .4em .45em; cursor: pointer; animation: cardIn .5s calc(.04s + var(--i) * .04s) var(--spring) both; transition: transform .18s var(--spring); }
+.htui .stage.is-focus, .htui .stage:hover { transform: translateY(-.15em) scale(1.03); }
+.htui .stage.boss { background: linear-gradient(180deg, #ffe2c2, var(--paper)); }
+.htui .stage.boss .sg-n { background: #e0600f; color: #fff; }
+.htui .stage.locked { filter: grayscale(.9); opacity: .6; }
+.htui .sg-n { width: 1.9em; height: 1.9em; border-radius: 50%; display: grid; place-items: center; font-weight: 700; background: var(--yel); box-shadow: inset 0 0 0 .12em var(--ink); }
+.htui .sg-name { font-weight: 700; font-size: .72em; text-align: center; line-height: 1.1; }
+.htui .sg-best { position: absolute; top: .35em; right: .5em; font-size: .62em; font-weight: 700; color: #7a7299; }
+.htui .st { font-style: normal; color: #d8cfbd; font-size: 1em; text-shadow: 0 .06em 0 rgba(30, 20, 60, .4); }
+.htui .st.on { color: #ffc21a; text-shadow: 0 .06em 0 var(--ink); }
+.htui .adv-bar { position: absolute; top: calc(var(--st) + .8em); left: 50%; transform: translateX(-50%); display: none; align-items: center; gap: .5em; color: #fff; font-weight: 700; font-size: .8em; text-shadow: 0 .08em 0 var(--ink); }
+.htui .adv-bar.on { display: flex; }
+.htui .adv-bar i { width: 11em; height: .55em; border-radius: 999px; background: var(--hudbg, rgba(50, 34, 140, .62)); box-shadow: inset 0 0 0 .1em rgba(255, 255, 255, .35); overflow: hidden; }
+.htui .adv-bar i b { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffb13d, var(--yel)); border-radius: 999px; }
+.htui .adv-bar em { font-style: normal; display: none; background: var(--yel); color: var(--ink); text-shadow: none; border-radius: 999px; padding: .05em .55em; box-shadow: inset 0 0 0 .1em var(--ink); }
+.htui .adv-bar em.on { display: inline-block; }
+.htui .oc-adv { display: none; flex-direction: column; gap: .1em; margin-bottom: .3em; }
+.htui .is-adv .oc-adv { display: flex; }
+.htui .oa-n { font-weight: 700; font-size: .85em; color: #6b6394; }
+.htui .oa-stars .st { font-size: 1.9em; display: inline-block; animation: popIn .5s calc(.3s + var(--d) * .18s) var(--spring) both; }
+.htui .btn-next { display: none; }
+.htui .has-next .btn-next { display: inline-flex; }
+.htui .is-adv .oc-best, .htui .is-adv .oc-tabs .oc-tab[data-tab="top"] { display: none; }
+.htui .card-adventure .card-rec { visibility: hidden; }
