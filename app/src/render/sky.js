@@ -120,7 +120,9 @@ export class Sky {
     this.sea.quaternion.setFromUnitVectors(Z, skyUp);
     this.seaU.uOff.value.set(camera.position.x, -camera.position.z);
     this.seaU.uTime.value += dt;
-    this.seaU.uAlpha.value = this.vis * (1 - invert);
-    this.sea.visible = this.vis > 0.01 && invert < 0.99;
+    // con panorama el mar de nubes sobra: el panorama ya trae su horizonte (islas, selva…)
+    const u = this.u, hasP = u.uHasA.value + (u.uHasB.value - u.uHasA.value) * u.uPanoT.value;
+    this.seaU.uAlpha.value = this.vis * (1 - invert) * (1 - hasP);
+    this.sea.visible = this.seaU.uAlpha.value > 0.01;
   }
 }
