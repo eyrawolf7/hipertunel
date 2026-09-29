@@ -130,8 +130,9 @@ export function createInput(target) {
     get hasTilt() { return st.has; },
     // Llamar una vez por paso de simulación (60 Hz). Devuelve el "a" final.
     // theta: ángulo actual del jugador; open: lámina abierta (sin vuelta).
+    // Leer el mando: main.js lo llama una vez por fotograma, en todos los estados (menús incluidos).
+    poll: pollPad,
     steer(dt, theta = 0, open = false) {
-      pollPad();
       let a = 0, src = 'none';
       const kd = (st.keys.has('ArrowLeft') || st.keys.has('KeyA') ? -1 : 0) + (st.keys.has('ArrowRight') || st.keys.has('KeyD') ? 1 : 0);
       let td = 0; for (const t of st.touches.values()) td = t.d;
