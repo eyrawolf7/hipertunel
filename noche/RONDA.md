@@ -6,11 +6,19 @@ Antes de nada lee `CLAUDE.md` (reglas de diseño que no se rompen), `docs/CONTRA
 
 ## Pasos de la ronda
 
+0. **Repaso conjunto** (cada 4 tareas cerradas: si en `progreso.md` el último «Repaso conjunto» es de hace 4 o más tareas `hecha`, esta ronda es el repaso y no haces tarea): con la rama de integración, lanza en paralelo `critico-jugador`, `director-arte` y `qa-jugador` para que prueben el conjunto (bots, capturas, QA) y digan qué ha mejorado, qué ha empeorado y qué deben hacer distinto las próximas rondas. Escribe sus conclusiones en `progreso.md` bajo «Repaso conjunto N · Lecciones» (las siguientes rondas las aplican) y, si algo de lo fusionado ha empeorado, añade en `tareas.json` una tarea `segura` de arreglo con prioridad 0,5 (es la única excepción a no inventar tareas). Actualiza el informe y termina.
+
+
 1. **Elige** la primera tarea con `"estado": "pendiente"` por orden de `prioridad` (la más baja primero) cuyas `depende` estén `hecha`. Márcala `"en_curso"` y guarda `tareas.json`.
 2. **Rama**: `git switch -c noche/<fecha>/<id> noche/<fecha>/todo` (parte de la integración, que ya lleva las tareas seguras terminadas: así cada una usa el bot y las métricas de las anteriores; si ya existe de un intento anterior, `git switch` a ella). Nunca trabajes en `main` ni en la de integración (`noche/<fecha>/todo`). `<fecha>` es la de la rama de integración (`git branch --list "noche/*/todo"`).
 3. **Mide antes** lo que diga su `verificacion` (bots, capturas, métricas) y apúntalo.
 4. **Cambia** lo mínimo para cumplir el `criterio_hecho`, respetando la carpeta dueña según el CONTRATO y el estilo del código de alrededor. Si tocas `app/src/sim/` (Arcade, Aventura, modos nuevos), pórtalo a `ports/switch/sim/` en la misma rama.
-5. **Mide después** y compara. Pide opinión al crítico que toque con contexto limpio (tarea con `critico`): lanza el agente correspondiente de `.claude/agents/` (director-arte, critico-jugador, qa-jugador, auditor-fidelidad, sonido) con las capturas o cifras de antes y después; para lo visual exige ≥8/10 y que no baje ninguna pantalla.
+5. **Mide después y revisión en equipo** (nunca cierres una tarea con tu propia opinión). Lanza, con contexto limpio y en paralelo, a los críticos que toquen (agentes de `.claude/agents/`), pasándoles las capturas o cifras de antes y después y el `criterio_hecho`:
+   - siempre `qa-jugador` (que no se ha roto nada) y el `critico` de la tarea;
+   - lo visual o de interfaz: `director-arte` (≥ 8/10 y ninguna pantalla peor); si afecta a cómo se juega o se entiende: también `critico-jugador`;
+   - si tocas `app/src/sim/` o una mecánica: también `auditor-fidelidad`;
+   - si tocas sonido: `sonido`.
+   Aplica lo que pidan y vuelve a pasárselo (hasta 3 vueltas). Si discrepan entre ellos, decide con las cifras y anota el porqué. La tarea solo se cierra cuando todos aprueban; si tras 3 vueltas no, cuenta como intento fallido. Guarda un resumen de cada veredicto en `.noche/capturas/<id>/criticos.md`.
 6. **Puerta**: `sh noche/puerta.sh` (la completa, con qa.mjs) tiene que salir en verde. Si falla, arréglalo; si no puedes en esta ronda, `git restore`/`git reset` a lo último bueno, suma 1 a `intentos` y, con 3 intentos, marca la tarea `"bloqueada"` explicando por qué.
 7. **Commit** en la rama de la tarea, con mensaje en español como los del repo y al final la línea `Co-Authored-By: Claude <noreply@anthropic.com>`.
 8. **Integración**: si la tarea es `"tipo": "segura"`, `git switch noche/<fecha>/todo` (la de integración), `git merge --no-ff noche/<fecha>/<id>`, `sh noche/puerta.sh rapida`; si choca o falla, `git merge --abort` o `git reset --hard HEAD~1` y anótalo (la rama suelta queda para Víctor). Las de `"tipo": "propuesta"` (mecánicas y funciones nuevas) NO se fusionan: se quedan en su rama para que Víctor las pruebe por separado.
