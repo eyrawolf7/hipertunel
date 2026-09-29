@@ -18,6 +18,7 @@ export class Decor {
     this.items = [];
     this.theme = null;
     this.fr = makeFrame();
+    this.camUp = new THREE.Vector3(0, 1, 0);
     this.fallback();
     this.load();
   }
@@ -46,7 +47,7 @@ export class Decor {
     if (m) {
       const o = m.clone(true);
       // el decorado queda por debajo del umbral del bloom: solo brillan bombillas y cristales
-      o.traverse((c) => { if (c.isMesh && c.material) { c.material = c.material.clone(); c.material.envMapIntensity = 0.45; c.material.fog = false; if (c.material.color) c.material.color.multiplyScalar(0.82); } });
+      o.traverse((c) => { if (c.isMesh && c.material) { c.material = c.material.clone(); c.material.envMapIntensity = 0.3; c.material.fog = false; if (c.material.color) c.material.color.multiplyScalar(0.82); } });
       return o;
     }
     return this.make[name]();
@@ -72,15 +73,21 @@ export class Decor {
     const k = game.kLast - (far ? 0 : Math.floor(Math.random() * 20));
     const r = track.rings.get(k) || track.last();
     const side = Math.random() < 0.5 ? -1 : 1;
-    // lejos de la pista y nunca a su altura cerca de ella: o por debajo de la carretera o muy arriba
+    // lejos de la pista y nunca a su altura cerca de ella. La altura va con la vertical de la
+    // cámara (que gira con el carril en el que vas): las islas quedan casi siempre por debajo de
+    // lo que ves y se ve su césped, como en el concepto; vistas desde abajo parecen conchas.
     const lateral = side * (75 + Math.random() * 130);
-    const low = Math.random() < 0.7;
+    const low = Math.random() < (it.name.startsWith('island') || it.name === 'volcano' ? 0.92 : 0.7);
     const vertical = it.name === 'planet' ? 90 + Math.random() * 80
       : it.name === 'cloud' ? (low ? -55 + Math.random() * 30 : 45 + Math.random() * 40)
-      : (low ? -70 + Math.random() * 45 : 40 + Math.random() * 35);
+      : (low ? -75 + Math.random() * 45 : 45 + Math.random() * 30);
     const ahead = 120 + Math.random() * 520;
-    it.obj.position.copy(r.P).addScaledVector(r.F, ahead).addScaledVector(r.X, lateral).addScaledVector(r.U, vertical);
-    it.obj.rotation.y = Math.random() * Math.PI * 2;
+    const up = this.camUp;
+    const side3 = this._side || (this._side = new THREE.Vector3());
+    side3.copy(r.F).cross(up); if (side3.lengthSq() < 1e-4) side3.copy(r.X); side3.normalize();
+    it.obj.position.copy(r.P).addScaledVector(r.F, ahead).addScaledVector(side3, lateral).addScaledVector(up, vertical);
+    it.obj.quaternion.setFromUnitVectors(this._y || (this._y = new THREE.Vector3(0, 1, 0)), up);
+    it.obj.rotateY(Math.random() * Math.PI * 2);
     it.k = k + ahead / 4;
     it.placed = true;
   }
@@ -88,10 +95,11 @@ export class Decor {
   update(game, track, camera, outside, dt) {
     this.group.visible = outside;
     if (!outside) { for (const it of this.items) it.placed = false; return; }
+    if (camera) this.camUp.setFromMatrixColumn(camera.matrixWorld, 1).normalize();
     for (const it of this.items) {
       if (!it.placed) this.place(it, game, track, false);
       else if (it.k < game.s - 30) this.place(it, game, track, true);
-      it.obj.rotation.y += it.spin * dt;
+      it.obj.rotateY(it.spin * dt);
       // la pista curva: si algo se ha quedado cerca de ella, se lleva a otro sitio
       if (!it.checkT || (it.checkT -= dt) <= 0) {
         it.checkT = 0.25;
