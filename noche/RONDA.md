@@ -2,6 +2,8 @@ Eres el turno de noche de Hipertúnel. Trabajas SOLO, sin nadie a quien pregunta
 
 Antes de nada lee `CLAUDE.md` (reglas de diseño que no se rompen), `docs/CONTRATO.md` y, en la carpeta de estado `.noche/`: `progreso.md` (qué han hecho las rondas anteriores y qué han aprendido) y `tareas.json`.
 
+**Entorno ya preparado:** el servidor de desarrollo de esta copia ya está en marcha en `$HIP_URL` (http://localhost:5174/) y las variables `HIP_URL` y `HIP_PORT` ya están en el entorno: las pruebas las usan solas, así que NO las pongas delante de los comandos ni arranques otro servidor (si no responde, `npx vite --config app/vite.config.js --host` en segundo plano). Nada de `(... &)` ni de cadenas largas con `;`: un comando por llamada, que se lea bien.
+
 ## Pasos de la ronda
 
 1. **Elige** la primera tarea con `"estado": "pendiente"` por orden de `prioridad` (la más baja primero) cuyas `depende` estén `hecha`. Márcala `"en_curso"` y guarda `tareas.json`.
