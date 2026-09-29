@@ -62,6 +62,17 @@ console.log('Placas');
   ok(pads > 0, 'se cogen placas (' + pads + ' en un minuto)');
 }
 
+console.log('Arcade (capa encima del clásico)');
+{
+  const { Arcade } = await import('../app/src/sim/arcade.js');
+  const g = new Arcade({ seed: 5 });
+  ok(g.level === 1 && g.mode === 'classic', 'empieza con un impulso y con las reglas del clásico');
+  const c = new Game({ seed: 5 });
+  ok(c.waves[3].n === 50 && g.waves[3].n === 20, 'comprime el guion (50 → 20 cajas) sin tocar el del clásico');
+  let t = 0; for (let n = 0; n < 10; n++) { const q = new Arcade({ seed: 300 + n }); while (q.alive && q.time < 60) q.step({ steer: 0 }); t += q.time; }
+  ok(t / 10 < 12, `quieto en un carril no aguantas (mueres a los ${(t / 10).toFixed(1)} s de media)`);
+}
+
 console.log('Cámara (fluidez del giro)');
 {
   // Deslizándote a ritmo constante, la vista debe girar y avanzar a ritmo constante. Si la cámara

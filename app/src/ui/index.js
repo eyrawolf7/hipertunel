@@ -14,8 +14,9 @@
 import { ICON } from './icons.js';
 
 const MODES = {
+  arcade: { name: 'Arcade', desc: 'Boost a tope: más cajas, mundos antes y racha ×5 si arriesgas.', tag: 'Recomendado', unit: 'pts' },
   adventure: { name: 'Aventura', desc: '10 tramos: el tubo se rompe, el suelo se hunde, poderes y jefes.', tag: 'Nuevo' },
-  classic: { name: 'Clásico', desc: 'Sin límite. Llega lo más lejos que puedas.', tag: 'Lo de siempre' },
+  classic: { name: 'Clásico', desc: 'Boost 2 tal cual: sin límite, llega lo más lejos que puedas.', tag: 'El original' },
   survival: { name: 'Supervivencia', desc: 'Sin impulsos y la velocidad no para de subir.', tag: 'Para valientes' },
   timetrial: { name: 'Contrarreloj', desc: '60 s. Cada impulso suma tiempo, cada choque resta.', tag: 'A toda prisa' },
   daily: { name: 'Reto diario', desc: 'El mismo túnel para todos hoy. ¿Hasta dónde llegas?', tag: 'Hoy' },
@@ -192,6 +193,7 @@ function settingsHTML() {
         </div>
       </div>
       ${toggleRow('reduceFx', 'eye', 'Menos efectos', 'Por si te mareas')}
+      ${toggleRow('vibe', 'phone', 'Vibración', 'Motor, monedas y choques')}
       ${toggleRow('music', 'music', 'Música')}
       ${toggleRow('sound', 'sound', 'Efectos de sonido')}
     </div>
@@ -275,6 +277,7 @@ function hudHTML() {
     <div class="hud-speed"><b data-hud="speed">0</b> km/h</div>
   </div>
   <div class="hud-count" data-hud="count"></div>
+  <div class="hud-mult" data-hud="mult"><b data-hud="multN">×1</b><small data-hud="pts">0</small></div>
   <div class="adv-intro" data-hud="advIntro"></div>
   <div class="adv-bar" data-hud="advBar"><span data-hud="advN">Tramo 1</span><i><b data-hud="advP"></b></i><em data-hud="advPow"></em></div>
   <div class="pad-hint pad-l" data-hud="padL">${ICON.chevron}<span>placa</span></div>
@@ -309,11 +312,11 @@ export function createUI(root, handlers = {}) {
 
   let current = 'none';
   let settingsFrom = 'title';
-  let lastMode = 'classic';
+  let lastMode = 'arcade';
   let overShownAt = 0;
   let focused = null;
   const records = { classic: 0, survival: 0, timetrial: 0 };
-  const vals = { tilt: true, invert: false, sens: 1, quality: 'alta', reduceFx: false, music: true, sound: true };
+  const vals = { tilt: true, invert: false, sens: 1, quality: 'alta', reduceFx: false, music: true, sound: true, vibe: true };
 
   // ----- pantallas -----
   function show(name) {
@@ -528,11 +531,11 @@ export function createUI(root, handlers = {}) {
   function paintRecords() {
     for (const k of MODE_KEYS) {
       const el = $(`[data-rec="${k}"]`);
-      el.textContent = records[k] > 0 ? `${fmtInt(records[k])} m` : 'Sin récord';
+      el.textContent = records[k] > 0 ? `${fmtInt(records[k])} ${MODES[k].unit || 'm'}` : 'Sin récord';
       el.parentElement.classList.toggle('none', !(records[k] > 0));
     }
-    const b = records[lastMode] || records.classic;
-    $('[data-bind="best"]').textContent = b > 0 ? `${fmtInt(b)} m` : '—';
+    const lm = MODES[lastMode] ? lastMode : 'arcade', b = records[lm] || 0;
+    $('[data-bind="best"]').textContent = b > 0 ? `${fmtInt(b)} ${MODES[lm].unit || 'm'}` : '—';
   }
   function setRecords(r = {}) {
     for (const k of MODE_KEYS) if (r[k] != null) records[k] = +r[k] || 0;
@@ -543,7 +546,7 @@ export function createUI(root, handlers = {}) {
   const hudEl = {
     coins: $('[data-hud="coins"]'), timer: $('[data-hud="timer"]'), timerBox: $('[data-hud="timerBox"]'),
     dist: $('[data-hud="dist"]'), speed: $('[data-hud="speed"]'), chevs: $('[data-hud="chevs"]'),
-    chev: $$('.chev'), distBox: $('.hud-dist'), padL: $('[data-hud="padL"]'), padR: $('[data-hud="padR"]'), advBar: $('[data-hud="advBar"]'), advIntro: $('[data-hud="advIntro"]'), advN: $('[data-hud="advN"]'), advP: $('[data-hud="advP"]'), advPow: $('[data-hud="advPow"]'),
+    chev: $$('.chev'), distBox: $('.hud-dist'), padL: $('[data-hud="padL"]'), padR: $('[data-hud="padR"]'), advBar: $('[data-hud="advBar"]'), advIntro: $('[data-hud="advIntro"]'), mult: $('[data-hud="mult"]'), multN: $('[data-hud="multN"]'), pts: $('[data-hud="pts"]'), advN: $('[data-hud="advN"]'), advP: $('[data-hud="advP"]'), advPow: $('[data-hud="advPow"]'),
   };
   const last = {};
   function hudReset() {
@@ -562,6 +565,11 @@ export function createUI(root, handlers = {}) {
     }
     // flecha hacia la placa más cercana tras perder los impulsos (en el borde, nunca en el centro)
     // Aventura: avance del tramo y poder activo
+    // Arcade: racha y puntos
+    const mu = st.mult | 0;
+    hudEl.mult.classList.toggle('on', mu > 0);
+    if (mu && mu !== last.mu) { last.mu = mu; hudEl.multN.textContent = '×' + mu; hudEl.mult.dataset.m = mu; restart(hudEl.mult, 'bump'); }
+    if (mu) { const pt = st.points | 0; if (pt !== last.pt) { last.pt = pt; hudEl.pts.textContent = fmtInt(pt) + ' pts'; } }
     // la tarjeta del tramo solo durante la cuenta atrás
     const introOn = !!st.adv && st.countdown > 0;
     if (introOn !== last.introOn) { last.introOn = introOn; hudEl.advIntro.classList.toggle('on', introOn); }
@@ -648,22 +656,23 @@ export function createUI(root, handlers = {}) {
     bind('mode').textContent = MODES[mode].name;
     bind('headline').textContent = r.headline ? r.headline : r.isRecord ? '¡Increíble!' : pick(mode === 'timetrial' ? ['¡Se acabó el tiempo!'] : ['¡Buena carrera!', '¡Casi!', '¡Qué viaje!', '¡Uf, por poco!']);
     bind('dist').textContent = fmtInt(r.distM);
-    bind('bestO').textContent = r.best > 0 ? `${fmtInt(r.best)} m` : '—';
+    const unit = MODES[mode] && MODES[mode].unit ? ' ' + MODES[mode].unit : ' m';
+    bind('bestO').textContent = r.best > 0 ? `${fmtInt(r.best)}${unit}` : '—';
     bind('coins').textContent = fmtInt(r.coins);
     bind('score').textContent = fmtInt(r.score);
     bind('time').textContent = fmtTime(r.time);
     const top = Array.isArray(r.top) ? r.top.slice(0, 5) : [];
-    const val = (e) => (typeof e === 'number' ? e : +(e && (e.distM ?? e.dist ?? e.score)) || 0);
+    const val = (e) => (typeof e === 'number' ? e : +(e && (mode === 'arcade' ? e.score : (e.distM ?? e.dist ?? e.score))) || 0);
     let marked = false;
     const rows = [];
     for (let i = 0; i < 5; i++) {
       const e = top[i];
       if (e == null) { rows.push(`<li class="empty"><i>${i + 1}</i><b>—</b></li>`); continue; }
       const v = val(e);
-      const me = !marked && (e.current || (Math.round(v) === Math.round(r.distM || -1)));
+      const me = !marked && (e.me || e.current || (Math.round(v) === Math.round((mode === 'arcade' ? r.score : r.distM) || -1)));
       if (me) marked = true;
       const when = e && e.date ? `<small>${esc(typeof e.date === 'number' ? new Date(e.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }) : e.date)}</small>` : '';
-      rows.push(`<li class="${me ? 'me' : ''} r${i + 1}"><i>${i + 1}</i><b>${fmtInt(v)} m</b>${when}</li>`);
+      rows.push(`<li class="${me ? 'me' : ''} r${i + 1}"><i>${i + 1}</i><b>${fmtInt(v)}${unit}</b>${when}</li>`);
     }
     bind('top').innerHTML = rows.join('');
     const adv = r.adv;
@@ -674,7 +683,7 @@ export function createUI(root, handlers = {}) {
     bind('facts').innerHTML = (r.facts && r.facts.lines ? r.facts.lines : []).map((t) => `<li>${esc(t)}</li>`).join('');
     // misiones cumplidas en esta partida (ya sustituidas en la lista por las nuevas)
     const done = Array.isArray(r.missionsDone) ? r.missionsDone : [];
-    bind('missDone').innerHTML = done.map((m) => `<div class="md">✔ ${esc(m.text)}</div>`).join('');
+    bind('missDone').innerHTML = done.length > 1 ? `<div class="md">✔ ${done.length} misiones cumplidas</div>` : done.map((m) => `<div class="md">✔ ${esc(m.text)}</div>`).join('');
     // con récord se enseña primero la tabla; si no, las misiones
     setTab(adv ? 'goals' : r.isRecord ? 'top' : 'miss');
     if (adv) {

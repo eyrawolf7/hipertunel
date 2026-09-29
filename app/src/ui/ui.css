@@ -847,3 +847,10 @@
 .htui .has-cp .btn-cp { display: inline-flex; }
 .htui .is-adv .oc-tabs { display: none; }
 .htui .map-path { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.htui .card-arcade { --c: #ff5fb4; --cd: #d6307f; --detail: #d6307f; }
+.htui .hud-mult { position: absolute; top: calc(var(--st) + 4.6em); right: calc(var(--sr) + 1em); display: none; flex-direction: column; align-items: flex-end; gap: .05em; color: #fff; text-shadow: 0 .08em 0 var(--ink); pointer-events: none; }
+.htui .hud-mult.on { display: flex; }
+.htui .hud-mult b { font-size: 1.5em; font-weight: 800; line-height: 1; padding: .05em .4em .1em; border-radius: .5em; background: var(--hudbg, rgba(50, 34, 140, .62)); }
+.htui .hud-mult[data-m="2"] b { background: #e0600f; } .htui .hud-mult[data-m="3"] b { background: #d6307f; } .htui .hud-mult[data-m="4"] b { background: #8a3fe0; } .htui .hud-mult[data-m="5"] b { background: linear-gradient(90deg, #ff3d57, #ffc21a); color: var(--ink); text-shadow: none; }
+.htui .hud-mult small { font-size: .72em; font-weight: 700; font-variant-numeric: tabular-nums; }
+.htui .hud-mult.bump { animation: bump .35s var(--spring); }
