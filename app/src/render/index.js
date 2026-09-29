@@ -8,7 +8,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { CELL_DEG, LANES } from '../sim/game.js';
-import { Track, makeFrame, section, surf } from './track.js';
+import { Track, makeFrame, section, surf, surfSmooth } from './track.js';
 import { Tunnel } from './tunnel.js';
 import { Boxes } from './boxes.js';
 import { Pads } from './pads.js';
@@ -224,7 +224,7 @@ export class Renderer {
     const camS = s - 0.12;
     tr.frameAt(camS, this.fr);
     const u = theta / (CELL_DEG * DEG);
-    surf(sec, u, closed, this.sp);
+    surfSmooth(sec, u, closed, this.sp);
     const sp = this.sp, fr = this.fr;
     const N = new THREE.Vector3().copy(fr.X).multiplyScalar(sp.nx).addScaledVector(fr.U, sp.ny);
     const jump = game.jumpAt(camS);

@@ -62,5 +62,18 @@ console.log('Placas');
   ok(pads > 0, 'se cogen placas (' + pads + ' en un minuto)');
 }
 
+console.log('Cámara (fluidez del giro)');
+{
+  // Deslizándote a ritmo constante, la vista debe girar y avanzar a ritmo constante. Si la cámara
+  // siguiera las caras planas del dodecágono, giraría a golpes en las juntas ("saltitos de carril").
+  const { section, surfSmooth } = await import('../app/src/render/track.js');
+  for (const [fold, closed] of [[30, true], [-22, false], [10, false]]) {
+    const sec = section(fold), o = {}; let pa = null; const r = [];
+    for (let u = 1; u < 10; u += 0.02) { surfSmooth(sec, u, closed, o); const a = Math.atan2(o.ny, o.nx); if (pa !== null) r.push(Math.abs(Math.atan2(Math.sin(a - pa), Math.cos(a - pa)))); pa = a; }
+    const mx = Math.max(...r), mn = Math.min(...r);
+    ok(mx - mn < 1e-6 + mx * 0.02, `pliegue ${fold}: giro de la cámara uniforme (${(mn * 180 / Math.PI).toFixed(3)}°–${(mx * 180 / Math.PI).toFixed(3)}° por paso)`);
+  }
+}
+
 console.log(fails ? `\n${fails} comprobaciones fallan` : '\nTodo OK');
 process.exit(fails ? 1 : 0);
