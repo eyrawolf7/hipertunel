@@ -1,0 +1,522 @@
+start mode=classic seed=42 waves=43 rng=2079754343 crng=2654435731 lastLoc=11
+f=34 s=5.16079912 th=0 v=2 vt=2 lv=0 wi=0 wl=14 fold=30 w=0 al=1 nb=1 np=0 nc=0 cg=0 tl=60 st=0 h=2f9b06df b=1f63cbd1 rng=3151602092 crng=758928721
+  ev spawn id=1 frame=34
+f=48 s=7.28583405 th=0 v=2 vt=2 lv=0 wi=0 wl=13 fold=30 w=0 al=1 nb=2 np=0 nc=0 cg=0 tl=60 st=0 h=9fcb6783 b=b7cd6b8e rng=1256095082 crng=127093051
+  ev spawn id=2 frame=48
+f=60 s=9.10729256 th=0 v=2 vt=2 lv=0 wi=0 wl=13 fold=30 w=0 al=1 nb=2 np=0 nc=0 cg=0 tl=60 st=0 h=9fcb6783 b=8a1b10bb rng=2455825225 crng=1958658864
+f=120 s=18.2145851 th=0 v=2 vt=2 lv=0 wi=0 wl=13 fold=30 w=0 al=1 nb=2 np=0 nc=0 cg=0 tl=60 st=0 h=9fcb6783 b=4551c66f rng=2895837304 crng=3094447810
+f=180 s=27.3218777 th=0 v=2 vt=2 lv=0 wi=0 wl=13 fold=30 w=0 al=1 nb=2 np=0 nc=0 cg=0 tl=60 st=0 h=9fcb6783 b=20771137 rng=1504283570 crng=2398670943
+f=240 s=36.4291702 th=0 v=2 vt=2 lv=0 wi=0 wl=13 fold=30 w=0 al=1 nb=2 np=0 nc=0 cg=0 tl=60 st=0 h=9fcb6783 b=861ffce1 rng=112729836 crng=1702894076
+f=265 s=40.2238755 th=0 v=2 vt=2 lv=0 wi=0 wl=12 fold=30 w=0 al=1 nb=1 np=0 nc=0 cg=0 tl=60 st=0 h=8042b1b9 b=ba6e10c8 rng=1248518782 crng=439222736
+  ev spawn id=3 frame=265
+f=278 s=42.1971222 th=0 v=2 vt=2 lv=0 wi=0 wl=11 fold=30 w=0 al=1 nb=2 np=0 nc=0 cg=0 tl=60 st=0 h=0d3f3601 b=e0de70b5 rng=3647979068 crng=4102354362
+  ev spawn id=4 frame=278
+f=300 s=45.5364628 th=0 v=2 vt=2 lv=0 wi=0 wl=11 fold=30 w=0 al=1 nb=2 np=0 nc=0 cg=0 tl=60 st=0 h=0d3f3601 b=948a0911 rng=1752472058 crng=1007117209
+f=360 s=54.6437553 th=0 v=2 vt=2 lv=0 wi=0 wl=11 fold=30 w=0 al=1 nb=2 np=0 nc=0 cg=0 tl=60 st=0 h=0d3f3601 b=0c59d537 rng=3392214280 crng=311340342
+f=364 s=55.2509082 th=0 v=2 vt=2 lv=0 wi=0 wl=10 fold=30 w=0 al=1 nb=3 np=0 nc=0 cg=0 tl=60 st=0 h=9d79c1a3 b=0cd07276 rng=3960108753 crng=2142906155
+  ev spawn id=5 frame=364
+f=420 s=63.7510479 th=0 v=2 vt=2 lv=0 wi=0 wl=10 fold=30 w=0 al=1 nb=3 np=2 nc=0 cg=0 tl=60 st=0 h=73f45741 b=41e02ef6 rng=2568555019 crng=3910530771
+f=436 s=66.1796593 th=0 v=2 vt=2 lv=0 wi=0 wl=9 fold=30 w=0 al=1 nb=4 np=2 nc=0 cg=0 tl=60 st=0 h=1fb7607b b=ed90db18 rng=41212339 crng=815293618
+  ev spawn id=6 frame=436
+f=480 s=72.8583405 th=0.472259117 v=2 vt=2 lv=0 wi=0 wl=9 fold=30 w=0 al=1 nb=3 np=2 nc=0 cg=0 tl=60 st=0.0179688805 h=e6f9d20d b=eea563b2 rng=3576461571 crng=3214753904
+f=489 s=74.2244343 th=0.472259117 v=2 vt=2 lv=0 wi=0 wl=8 fold=30 w=0 al=1 nb=3 np=2 nc=0 cg=0 tl=60 st=0.0179688805 h=7c84c695 b=fe76af4e rng=1680954561 crng=2582918234
+  ev spawn id=7 frame=489
+f=524 s=79.5370217 th=0.472259117 v=3.65 vt=3.65 lv=1 wi=0 wl=8 fold=30 w=0 al=1 nb=3 np=2 nc=0 cg=0 tl=60 st=0.0179688805 h=427ffb57 b=e1e095b1 rng=2816743507 crng=3150812707
+  ev boost level=1 frame=524
+f=540 s=83.9692374 th=0.472259117 v=3.65 vt=3.65 lv=1 wi=0 wl=8 fold=30 w=0 al=1 nb=3 np=0 nc=0 cg=0 tl=60 st=0.0179688805 h=97a6d7cf b=849da813 rng=3320696783 crng=1887141367
+f=563 s=90.3405475 th=0.472259117 v=3.65 vt=3.65 lv=1 wi=0 wl=7 fold=30 w=0 al=1 nb=3 np=0 nc=0 cg=0 tl=60 st=0.0179688805 h=3410ad58 b=3761e573 rng=2560978719 crng=1823200170
+  ev spawn id=8 frame=563
+f=567 s=91.4486014 th=0.472259117 v=3.65 vt=3.65 lv=1 wi=0 wl=6 fold=30 w=0 al=1 nb=4 np=0 nc=0 cg=0 tl=60 st=0.0179688805 h=139c520b b=379d7bdf rng=1297307379 crng=3654765983
+  ev spawn id=9 frame=567
+f=592 s=98.3739385 th=0.472259117 v=3.65 vt=3.65 lv=1 wi=0 wl=5 fold=30 w=0 al=1 nb=4 np=0 nc=0 cg=0 tl=60 st=0.0179688805 h=6c9b8aab b=5d9b0d06 rng=537589315 crng=3590824786
+  ev spawn id=10 frame=592
+f=600 s=100.590046 th=0.472259117 v=3.65 vt=3.65 lv=1 wi=0 wl=5 fold=30 w=0 al=1 nb=4 np=0 nc=0 cg=0 tl=60 st=0.0179688805 h=6c9b8aab b=88bf12e0 rng=3568885271 crng=2958989116
+f=660 s=117.210855 th=0.472259117 v=3.65 vt=3.65 lv=1 wi=0 wl=5 fold=30 w=0 al=1 nb=3 np=2 nc=11 cg=0 tl=60 st=0.0179688805 h=92cb953e b=211ef62e rng=785777803 crng=2831106722
+f=690 s=125.52126 th=1.11095272 v=3.65 vt=3.65 lv=1 wi=0 wl=4 fold=30 w=0 al=1 nb=2 np=2 nc=14 cg=0 tl=60 st=0.173059423 h=2cd83a54 b=af4d91a1 rng=4257085838 crng=935599712
+  ev spawn id=11 frame=690
+f=698 s=127.737368 th=1.31347621 v=4.7555 vt=4.7555 lv=2 wi=0 wl=4 fold=30 w=0 al=1 nb=2 np=2 nc=14 cg=0 tl=60 st=0.0968409049 h=6cbaf952 b=591a66ce rng=2993414498 crng=303764042
+  ev boost level=2 frame=698
+f=709 s=131.707426 th=1.45497563 v=4.7555 vt=4.7555 lv=2 wi=0 wl=3 fold=30 w=0 al=1 nb=2 np=0 nc=14 cg=0 tl=60 st=0.0435884347 h=6a737095 b=c0baf5e1 rng=2865532104 crng=3335059998
+  ev spawn id=12 frame=709
+f=720 s=135.677485 th=1.51866502 v=4.7555 vt=4.7555 lv=2 wi=0 wl=3 fold=30 w=0 al=1 nb=2 np=0 nc=12 cg=0 tl=60 st=0.019619309 h=f06686f3 b=eb7c8bfe rng=338189424 crng=2071388658
+f=739 s=142.534859 th=1.51866502 v=4.7555 vt=4.7555 lv=2 wi=0 wl=2 fold=30 w=0 al=1 nb=3 np=0 nc=9 cg=0 tl=60 st=0.0182459574 h=f47f8933 b=7c474506 rng=3873438656 crng=2007447461
+  ev spawn id=13 frame=739
+f=780 s=157.33235 th=1.51866502 v=4.7555 vt=4.7555 lv=2 wi=0 wl=2 fold=30 w=0 al=1 nb=2 np=0 nc=0 cg=0 tl=60 st=0.0182459574 h=86455b40 b=56cc8394 rng=522436715 crng=1879565067
+f=786 s=159.497836 th=1.72190339 v=4.7555 vt=4.7555 lv=2 wi=0 wl=1 fold=30 w=0 al=1 nb=3 np=2 nc=0 cg=0 tl=60 st=0.140185053 h=7de1f791 b=a1efae59 rng=4121627144 crng=3079295210
+  ev spawn id=14 frame=786
+f=789 s=160.580579 th=1.79477879 v=4.7555 vt=4.7555 lv=2 wi=0 wl=0 fold=30 w=0 al=1 nb=4 np=2 nc=0 cg=0 tl=60 st=0.112758828 h=f7b24f26 b=8b8f2859 rng=2857955804 crng=615893727
+  ev spawn id=15 frame=789
+f=792 s=161.663323 th=1.85339662 v=4.7555 vt=4.7555 lv=2 wi=1 wl=15 fold=30 w=0 al=1 nb=4 np=2 nc=0 cg=0 tl=60 st=0.090698353 h=f7b24f26 b=3ab1401e rng=394554321 crng=2447459540
+  ev wave wave=1 frame=792
+f=840 s=178.987214 th=2.53679757 v=4.7555 vt=4.7555 lv=2 wi=1 wl=15 fold=30 w=0 al=1 nb=2 np=2 nc=5 cg=0 tl=60 st=0.0305577503 h=26bb449e b=0fe226b7 rng=1466402070 crng=1687741476
+f=847 s=181.513615 th=2.56546066 v=5.5 vt=5.5 lv=3 wi=1 wl=15 fold=30 w=0 al=1 nb=2 np=2 nc=5 cg=0 tl=60 st=0.018386625 h=7129dd44 b=991eb6d1 rng=2034296543 crng=2887471619
+  ev boost level=3 frame=847
+f=864 s=188.609714 th=2.76884091 v=5.5 vt=5.5 lv=3 wi=1 wl=14 fold=30 w=0 al=1 nb=3 np=0 nc=5 cg=0 tl=60 st=0.140282914 h=395dc492 b=5c913ab6 rng=3170085489 crng=2823530422
+  ev spawn id=16 frame=864
+f=868 s=190.279384 th=2.86275496 v=5.5 vt=5.5 lv=3 wi=1 wl=14 fold=30 w=0 al=1 nb=3 np=0 nc=5 cg=1 tl=60 st=0.104938915 h=014477af b=84cd591a rng=706684006 crng=360128939
+  ev coin combo=0 lane=5 k=191 frame=868
+f=870 s=191.11422 th=2.82968774 v=5.5 vt=5.5 lv=3 wi=1 wl=14 fold=30 w=0 al=1 nb=2 np=0 nc=5 cg=2 tl=60 st=-0.0796697335 h=e4531299 b=528e6025 rng=2538249819 crng=2191694752
+  ev coin combo=1 lane=5 k=192 frame=870
+f=871 s=191.531637 th=2.81486917 v=5.5 vt=5.5 lv=3 wi=1 wl=13 fold=30 w=0 al=1 nb=3 np=0 nc=5 cg=2 tl=60 st=-0.0740928521 h=ce3e0add b=82e6f964 rng=3106144292 crng=4023260565
+  ev spawn id=17 frame=871
+f=873 s=192.366472 th=2.78827132 v=5.5 vt=5.5 lv=3 wi=1 wl=13 fold=30 w=0 al=1 nb=2 np=0 nc=5 cg=3 tl=60 st=-0.0640829078 h=4dc665b7 b=c38ce7b9 rng=3106144292 crng=4023260565
+  ev coin combo=2 lane=5 k=193 frame=873
+f=875 s=193.201307 th=2.76526684 v=5.5 vt=5.5 lv=3 wi=1 wl=13 fold=30 w=0 al=1 nb=2 np=0 nc=5 cg=4 tl=60 st=-0.055425307 h=543ba944 b=83009ca2 rng=642742809 crng=1559859082
+  ev coin combo=3 lane=5 k=194 frame=875
+f=877 s=194.036143 th=2.74537026 v=5.5 vt=5.5 lv=3 wi=1 wl=13 fold=30 w=0 al=1 nb=2 np=0 nc=4 cg=5 tl=60 st=-0.047937348 h=5fffe3ed b=fa419119 rng=2474308622 crng=3391424895
+  ev coin combo=4 lane=5 k=195 frame=877
+f=878 s=194.45356 th=2.73645391 v=5.5 vt=5.5 lv=3 wi=1 wl=12 fold=30 w=0 al=1 nb=3 np=0 nc=4 cg=5 tl=60 st=-0.0445817336 h=46a16813 b=92daac57 rng=3042203095 crng=928023412
+  ev spawn id=18 frame=878
+f=888 s=198.627736 th=2.67532644 v=5.5 vt=5.5 lv=3 wi=1 wl=11 fold=30 w=0 al=1 nb=4 np=0 nc=0 cg=5 tl=60 st=-0.0215767703 h=4a41063f b=57ce5a15 rng=2978261898 crng=3959319368
+  ev spawn id=19 frame=888
+f=900 s=203.636747 th=2.67131316 v=5.5 vt=5.5 lv=3 wi=1 wl=11 fold=30 w=0 al=1 nb=4 np=0 nc=0 cg=5 tl=60 st=-0.0186617486 h=4a41063f b=736203c3 rng=3546156371 crng=232246545
+f=910 s=207.810923 th=2.67131316 v=5.5 vt=5.5 lv=3 wi=1 wl=10 fold=30 w=0 al=1 nb=5 np=0 nc=0 cg=5 tl=60 st=-0.0186617486 h=e1fe9c34 b=c730aa07 rng=3482215174 crng=3263542501
+  ev spawn id=20 frame=910
+f=931 s=216.576692 th=2.67131316 v=5.5 vt=5.5 lv=3 wi=1 wl=9 fold=30 w=0 al=1 nb=6 np=0 nc=0 cg=5 tl=60 st=-0.0186617486 h=3c216453 b=4b0362ce rng=3986168450 crng=2567765634
+  ev spawn id=21 frame=931
+f=960 s=228.681801 th=2.8784328 v=5.5 vt=5.5 lv=3 wi=1 wl=9 fold=30 w=0 al=1 nb=3 np=0 nc=10 cg=5 tl=60 st=0.0990386533 h=db722daa b=a943a3ec rng=195154430 crng=672258624
+f=965 s=230.768889 th=2.82659575 v=5.5 vt=5.5 lv=3 wi=1 wl=8 fold=30 w=0 al=1 nb=3 np=0 nc=10 cg=5 tl=60 st=-0.0785060799 h=11a7eff1 b=06e174d9 rng=763048903 crng=40422954
+  ev spawn id=22 frame=965
+f=996 s=243.708834 th=2.21768163 v=5.5 vt=5.5 lv=3 wi=1 wl=7 fold=30 w=0 al=1 nb=3 np=0 nc=10 cg=5 tl=60 st=-0.243451457 h=25047c3a b=7cf7e6dd rng=3330839 crng=2375942043
+  ev spawn id=23 frame=996
+f=1013 s=250.804933 th=2.01028963 v=5.5 vt=5.5 lv=3 wi=1 wl=6 fold=30 w=0 al=1 nb=3 np=0 nc=10 cg=5 tl=60 st=0.0316525968 h=5fd04eca b=3a65e2b8 rng=1139119785 crng=2312000846
+  ev spawn id=24 frame=1013
+f=1020 s=253.726856 th=2.04378877 v=5.5 vt=5.5 lv=3 wi=1 wl=6 fold=30 w=0 al=1 nb=3 np=0 nc=7 cg=5 tl=60 st=0.0190453951 h=1033be31 b=d9fdbaff rng=2338849928 crng=3511730989
+f=1034 s=259.570702 th=2.04378877 v=5.5 vt=5.5 lv=3 wi=1 wl=5 fold=30 w=0 al=1 nb=4 np=0 nc=3 cg=5 tl=60 st=0.0177122174 h=dc49bc39 b=4c44c0c4 rng=379401721 crng=984388309
+  ev spawn id=25 frame=1034
+f=1070 s=274.597735 th=2.04378877 v=5.5 vt=5.5 lv=3 wi=1 wl=4 fold=30 w=0 al=1 nb=4 np=0 nc=7 cg=5 tl=60 st=0.0177122174 h=eeeb582c b=01f6a23f rng=3282815283 crng=2120177255
+  ev spawn id=26 frame=1070
+f=1072 s=275.43257 th=2.04378877 v=5.5 vt=5.5 lv=3 wi=1 wl=3 fold=30 w=0 al=1 nb=4 np=0 nc=7 cg=5 tl=60 st=0.0177122174 h=9870af2f b=a595bc40 rng=2019143943 crng=3951743068
+  ev spawn id=27 frame=1072
+f=1080 s=278.77191 th=2.04378877 v=5.5 vt=5.5 lv=3 wi=1 wl=2 fold=30 w=0 al=1 nb=5 np=0 nc=7 cg=5 tl=60 st=0.0177122174 h=83763485 b=9c431475 rng=123636933 crng=856505915
+  ev spawn id=28 frame=1080
+f=1089 s=282.528669 th=2.04378877 v=5.5 vt=5.5 lv=3 wi=1 wl=1 fold=30 w=0 al=1 nb=5 np=0 nc=9 cg=5 tl=60 st=0.0177122174 h=c6444d71 b=35f5dd71 rng=59695736 crng=3255966201
+  ev spawn id=29 frame=1089
+f=1140 s=303.816965 th=1.4206537 v=5.5 vt=5.5 lv=3 wi=1 wl=1 fold=30 w=0 al=1 nb=4 np=0 nc=15 cg=5 tl=60 st=-0.140548012 h=b51202e4 b=1b7e14e8 rng=4162839441 crng=1296517994
+f=1161 s=312.582734 th=1.51034577 v=5.5 vt=5.5 lv=3 wi=1 wl=0 fold=30 w=0 al=1 nb=2 np=0 nc=15 cg=5 tl=60 st=0.0227502102 h=cf9008c5 b=4627e2b0 rng=371825421 crng=600741127
+  ev spawn id=30 frame=1161
+f=1163 s=313.417569 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=30 w=0 al=1 nb=2 np=0 nc=15 cg=5 tl=60 st=0.0196766568 h=404a9fa6 b=2c9e558b rng=371825421 crng=3632037083
+  ev foldOrder frame=1163
+  ev wave wave=2 frame=1163
+f=1200 s=328.86202 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=30 w=0 al=1 nb=1 np=0 nc=12 cg=5 tl=60 st=0.0182992909 h=39e248db b=cb1a0ba6 rng=371825421 crng=2936260216
+f=1229 s=340.967129 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=30 w=0 al=1 nb=1 np=0 nc=7 cg=6 tl=60 st=0.0182992909 h=6e0bbf96 b=522bce51 rng=3971015850 crng=3440213492
+  ev coin combo=0 lane=3 k=342 frame=1229
+f=1232 s=342.219382 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=30 w=0 al=1 nb=1 np=0 nc=7 cg=7 tl=60 st=0.0182992909 h=476e98fd b=1a544c9e rng=1507614367 crng=976812009
+  ev coin combo=1 lane=3 k=343 frame=1232
+f=1234 s=343.054217 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=30 w=0 al=1 nb=1 np=0 nc=7 cg=8 tl=60 st=0.0182992909 h=ada6fa50 b=13082037 rng=3339180180 crng=2808377822
+  ev coin combo=2 lane=3 k=344 frame=1234
+f=1237 s=344.30647 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=30 w=0 al=1 nb=0 np=0 nc=7 cg=9 tl=60 st=0.0182992909 h=5f24f71a b=e30c28ad rng=875778697 crng=344976339
+  ev coin combo=3 lane=3 k=345 frame=1237
+f=1239 s=345.141305 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=30 w=0 al=1 nb=0 np=0 nc=6 cg=10 tl=60 st=0.0182992909 h=7dd37814 b=2621bdb9 rng=2707344510 crng=2176542152
+  ev coin combo=4 lane=3 k=346 frame=1239
+f=1240 s=345.558723 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=29.9 w=0 al=1 nb=0 np=0 nc=6 cg=10 tl=60 st=0.0182992909 h=7dd37814 b=4b8912bf rng=243943027 crng=4008107965
+  ev foldStart toIn=0 frame=1240
+f=1241 s=345.97614 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=29.8 w=0 al=1 nb=0 np=0 nc=6 cg=11 tl=60 st=0.0182992909 h=9461938f b=db8a29fa rng=243943027 crng=4008107965
+  ev coin combo=5 lane=3 k=347 frame=1241
+f=1244 s=347.228393 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=29.5 w=0 al=1 nb=0 np=0 nc=4 cg=12 tl=60 st=0.0182992909 h=73ca2e79 b=8a0ae07a rng=2075508840 crng=1544706482
+  ev coin combo=6 lane=3 k=348 frame=1244
+f=1245 s=347.64581 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=29.4 w=0 al=1 nb=1 np=0 nc=4 cg=12 tl=60 st=0.0182992909 h=37bfb057 b=da1f9e5b rng=811837500 crng=3376272295
+  ev spawn id=31 frame=1245
+f=1260 s=353.907074 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=27.9 w=0 al=1 nb=1 np=0 nc=0 cg=12 tl=60 st=0.0182992909 h=b9341ce3 b=57833070 rng=3211297786 crng=1480765285
+f=1276 s=360.585755 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=26.3 w=0 al=1 nb=2 np=0 nc=0 cg=12 tl=60 st=0.0182992909 h=ed4d40d9 b=8015ab0e rng=1251849579 crng=1416824088
+  ev spawn id=32 frame=1276
+f=1278 s=361.42059 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=26.1 w=0 al=1 nb=3 np=0 nc=0 cg=12 tl=60 st=0.0182992909 h=aff407f4 b=da22fe0e rng=1251849579 crng=3248389901
+  ev spawn id=33 frame=1278
+f=1281 s=362.672843 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=25.8 w=0 al=1 nb=4 np=0 nc=0 cg=12 tl=60 st=0.0182992909 h=bd86c117 b=b2ae932a rng=1251849579 crng=784988418
+  ev spawn id=34 frame=1281
+f=1283 s=363.507678 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=25.6 w=0 al=1 nb=5 np=0 nc=0 cg=12 tl=60 st=0.0182992909 h=35f3291e b=3b772ba5 rng=1251849579 crng=2616554231
+  ev spawn id=35 frame=1283
+f=1286 s=364.759931 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=25.3 w=0 al=1 nb=6 np=0 nc=0 cg=12 tl=60 st=0.0182992909 h=a52bab85 b=54229ebe rng=1251849579 crng=153152748
+  ev spawn id=36 frame=1286
+f=1288 s=365.594766 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=25.1 w=0 al=1 nb=7 np=0 nc=0 cg=12 tl=60 st=0.0182992909 h=6e18ed78 b=e323a6ff rng=1251849579 crng=1984718561
+  ev spawn id=37 frame=1288
+f=1295 s=368.516689 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=24.4 w=0 al=1 nb=8 np=0 nc=0 cg=12 tl=60 st=0.0182992909 h=6c87c138 b=48d90a17 rng=1819744052 crng=3184448704
+  ev spawn id=38 frame=1295
+f=1319 s=378.534711 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=22 w=0 al=1 nb=9 np=0 nc=2 cg=12 tl=60 st=0.0182992909 h=7f2d136a b=fec96d35 rng=4155263141 crng=1856836167
+  ev spawn id=39 frame=1319
+f=1320 s=378.952129 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=21.9 w=0 al=1 nb=9 np=0 nc=2 cg=12 tl=60 st=0.0182992909 h=7f2d136a b=d37e41e2 rng=4155263141 crng=1856836167
+f=1329 s=382.708887 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=21 w=0 al=1 nb=9 np=0 nc=2 cg=12 tl=60 st=0.0182992909 h=702bae8d b=9da38e3d rng=4091321944 crng=1225000497
+  ev spawn id=40 frame=1329
+f=1338 s=386.465645 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=20.1 w=0 al=1 nb=10 np=0 nc=2 cg=12 tl=60 st=0.0182992909 h=87038126 b=3e59bc4e rng=4027380747 crng=4256296453
+  ev spawn id=41 frame=1338
+f=1341 s=387.717898 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=19.8 w=0 al=1 nb=11 np=0 nc=2 cg=12 tl=60 st=0.0182992909 h=ca588acf b=88bc0150 rng=2763709407 crng=1792894970
+  ev spawn id=42 frame=1341
+f=1362 s=396.483667 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=17.7 w=0 al=1 nb=7 np=0 nc=2 cg=12 tl=60 st=0.0182992909 h=8f6148da b=a7b63656 rng=3267662683 crng=1097118103
+  ev spawn id=43 frame=1362
+f=1380 s=403.997183 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=15.9 w=0 al=1 nb=5 np=0 nc=2 cg=12 tl=60 st=0.0182992909 h=4c050c43 b=4c96c8f6 rng=3203721486 crng=1033176906
+f=1413 s=417.771963 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=12.6 w=0 al=1 nb=4 np=0 nc=4 cg=12 tl=60 st=0.0182992909 h=a864ae40 b=d8d378dd rng=3643733565 crng=905294512
+  ev spawn id=44 frame=1413
+f=1415 s=418.606798 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=12.4 w=0 al=1 nb=4 np=0 nc=5 cg=12 tl=60 st=0.0182992909 h=57689225 b=d2eb6be3 rng=3643733565 crng=905294512
+  ev spawn id=45 frame=1415
+f=1417 s=419.441633 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=12.2 w=0 al=1 nb=4 np=0 nc=6 cg=12 tl=60 st=0.0182992909 h=dd534c77 b=8d1649d8 rng=3643733565 crng=905294512
+  ev spawn id=46 frame=1417
+f=1420 s=420.693886 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=11.9 w=0 al=1 nb=5 np=0 nc=7 cg=12 tl=60 st=0.0182992909 h=18f11395 b=2016f493 rng=3643733565 crng=905294512
+  ev spawn id=47 frame=1420
+f=1422 s=421.528721 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=11.7 w=0 al=1 nb=6 np=0 nc=8 cg=12 tl=60 st=0.0182992909 h=47cc7906 b=2bddaa74 rng=3643733565 crng=905294512
+  ev spawn id=48 frame=1422
+f=1440 s=429.042238 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=9.9 w=0 al=1 nb=5 np=0 nc=10 cg=12 tl=60 st=0.0182992909 h=af633398 b=d3148f88 rng=1748226555 crng=1473188985
+f=1451 s=433.633831 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=8.8 w=0 al=1 nb=6 np=0 nc=10 cg=12 tl=60 st=0.0182992909 h=a19de9a1 b=7df4514e rng=3515851171 crng=2041083458
+  ev spawn id=49 frame=1451
+f=1456 s=435.720919 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=8.3 w=0 al=1 nb=7 np=0 nc=11 cg=12 tl=60 st=0.0182992909 h=0874a069 b=ef213024 rng=4083745644 crng=145576448
+  ev spawn id=50 frame=1456
+f=1463 s=438.642842 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=7.6 w=0 al=1 nb=8 np=0 nc=14 cg=12 tl=60 st=0.0182992909 h=43592ad3 b=29b9d2bf rng=2188238634 crng=145576448
+  ev spawn id=51 frame=1463
+f=1470 s=441.564765 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=6.90991155 w=0 al=1 nb=9 np=0 nc=17 cg=12 tl=60 st=0.0182992909 h=8671476b b=0d80f279 rng=292731624 crng=145576448
+  ev spawn id=52 frame=1470
+f=1477 s=444.486688 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=6.25074982 w=0 al=1 nb=10 np=0 nc=19 cg=12 tl=60 st=0.0182992909 h=a89fcafe b=c658488a rng=2692191910 crng=1977142261
+  ev spawn id=53 frame=1477
+f=1480 s=445.738941 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=5.97756418 w=0 al=1 nb=11 np=0 nc=19 cg=12 tl=60 st=0.0182992909 h=d9ba807d b=b6d1ff75 rng=1428520570 crng=3808708074
+  ev spawn id=54 frame=1480
+f=1500 s=454.087292 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=4.28994003 w=0 al=1 nb=6 np=0 nc=10 cg=12 tl=60 st=0.0182992909 h=6ce59c68 b=1e7e3979 rng=3196145186 crng=1281365394
+f=1501 s=454.50471 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=4.21134043 w=0 al=1 nb=7 np=0 nc=10 cg=12 tl=60 st=0.0182992909 h=f91e1879 b=11777727 rng=1932473846 crng=3112931207
+  ev spawn id=55 frame=1501
+f=1508 s=457.426633 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=3.67562115 w=0 al=1 nb=8 np=0 nc=10 cg=12 tl=60 st=0.0182992909 h=be144212 b=7540d58d rng=1236696979 crng=1217424197
+  ev spawn id=56 frame=1508
+f=1511 s=458.678886 th=1.51851264 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=3.45359549 w=0 al=1 nb=9 np=0 nc=11 cg=12 tl=60 st=0.0182992909 h=d1fdbf5f b=fb379b20 rng=1236696979 crng=1217424197
+  ev spawn id=57 frame=1511
+f=1513 s=459.513721 th=1.48552058 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=3.30803438 w=0 al=1 nb=10 np=0 nc=12 cg=12 tl=60 st=-0.164960281 h=8db983eb b=dddb8888 rng=1236696979 crng=1217424197
+  ev spawn id=58 frame=1513
+f=1516 s=460.765973 th=1.39976575 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=3.09331156 w=0 al=1 nb=11 np=0 nc=13 cg=12 tl=60 st=-0.132686956 h=0e4d570a b=71b85e49 rng=1236696979 crng=1217424197
+  ev spawn id=59 frame=1516
+f=1518 s=461.600809 th=1.35213379 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=2.95253822 w=0 al=1 nb=12 np=0 nc=14 cg=12 tl=60 st=-0.114760949 h=dfb35b36 b=6499bab7 rng=1236696979 crng=1217424197
+  ev spawn id=60 frame=1518
+f=1520 s=462.435644 th=1.3109369 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=2.8136356 w=0 al=1 nb=13 np=0 nc=15 cg=12 tl=60 st=-0.0992567445 h=ecf155d3 b=a47f766d rng=1236696979 crng=1217424197
+  ev spawn id=61 frame=1520
+f=1528 s=465.774984 th=1.19478129 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=2.27624007 w=0 al=1 nb=13 np=0 nc=17 cg=12 tl=60 st=-0.0555422687 h=759f029a b=5b49d4f0 rng=1804591452 crng=1785318670
+  ev spawn id=62 frame=1528
+f=1532 s=467.444655 th=1.15759787 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=2.01813577 w=0 al=1 nb=13 np=0 nc=17 cg=12 tl=60 st=-0.0415485057 h=b401f67a b=2b52d402 rng=2372485925 crng=1785318670
+  ev spawn id=63 frame=1532
+f=1540 s=470.783995 th=1.10897556 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=1.52219003 w=0 al=1 nb=13 np=0 nc=15 cg=12 tl=60 st=-0.023249788 h=e69c2ee3 b=09825860 rng=476978915 crng=1785318670
+  ev spawn id=64 frame=1540
+f=1552 s=475.793006 th=0.821784401 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=0.826300533 w=0 al=1 nb=13 np=0 nc=10 cg=12 tl=60 st=0.0848329061 h=91d1c2a3 b=2c8ae5d9 rng=2244603531 crng=2353213143
+  ev spawn id=65 frame=1552
+f=1560 s=479.132347 th=0.921060453 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=0.39245578 w=0 al=1 nb=11 np=0 nc=10 cg=12 tl=60 st=0.0474709511 h=c313230c b=acee1ad0 rng=3444333674 crng=3552943286
+f=1566 s=481.636852 th=0.863149651 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=0.0819726489 w=0 al=1 nb=12 np=0 nc=10 cg=12 tl=60 st=-0.127787964 h=609ab22a b=e3e3ffc1 rng=1548826664 crng=457706133
+  ev spawn id=66 frame=1566
+f=1578 s=486.645863 th=0.665733515 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-0.548855028 w=0 al=1 nb=12 np=0 nc=10 cg=12 tl=60 st=-0.0534915686 h=72ffebc1 b=307b1df5 rng=3316451280 crng=1025600606
+  ev spawn id=67 frame=1578
+f=1600 s=495.82905 th=0.301282138 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-1.81578049 w=0 al=1 nb=7 np=0 nc=3 cg=12 tl=60 st=-0.113385751 h=c628a66b b=dd3e6cd8 rng=1357003073 crng=329823739
+  ev spawn id=68 frame=1600
+f=1609 s=499.585808 th=0.387392989 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-2.38986676 w=0 al=1 nb=6 np=0 nc=1 cg=12 tl=60 st=0.0512602423 h=b25aae76 b=90b46aee rng=1293061876 crng=3361119695
+  ev spawn id=69 frame=1609
+f=1611 s=500.420643 th=0.405794391 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-2.5221712 w=0 al=1 nb=7 np=0 nc=1 cg=12 tl=60 st=0.0443349836 h=2b4f07c1 b=5fae7d56 rng=1860956349 crng=897718212
+  ev spawn id=70 frame=1611
+f=1616 s=502.507731 th=0.441643635 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-2.86072766 w=0 al=1 nb=7 np=0 nc=0 cg=12 tl=60 st=0.0308433324 h=64a37044 b=0462f0c1 rng=2428850822 crng=265882542
+  ev spawn id=71 frame=1616
+f=1620 s=504.177401 th=0.462292068 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-3.13978889 w=0 al=1 nb=7 np=0 nc=0 cg=12 tl=60 st=0.0230724168 h=64a37044 b=4cca43a9 rng=4260416635 crng=2097448355
+f=1633 s=509.60383 th=0.470574604 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-4.09970537 w=0 al=1 nb=7 np=0 nc=5 cg=12 tl=60 st=0.01855846 h=85804d1e b=d3355cfc rng=3564639768 crng=2665342828
+  ev spawn id=72 frame=1633
+f=1647 s=515.447676 th=0.263324989 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-5.23053319 w=0 al=1 nb=7 np=0 nc=10 cg=12 tl=60 st=-0.0991008022 h=359cd00e b=d5d98b8c rng=2868862901 crng=3233237301
+  ev spawn id=73 frame=1647
+f=1650 s=516.699929 th=0.211807298 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-5.48684503 w=0 al=1 nb=8 np=0 nc=10 cg=12 tl=60 st=-0.0797124239 h=ebcaf809 b=20d15a25 rng=1605191561 crng=3233237301
+  ev spawn id=74 frame=1650
+f=1680 s=529.222456 th=0.0533478526 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-8.331032 w=0 al=1 nb=6 np=0 nc=16 cg=12 tl=60 st=-0.0186717484 h=24c21828 b=18f8113a rng=2109144837 crng=1969565961
+f=1700 s=537.570807 th=0.171876075 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-10.331032 w=0 al=1 nb=4 np=0 nc=15 cg=12 tl=60 st=-0.0646845444 h=9fc587bd b=7c79afa0 rng=2613098113 crng=1273789094
+  ev spawn id=75 frame=1700
+f=1722 s=546.753994 th=0.439008217 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-12.531032 w=0 al=1 nb=4 np=0 nc=11 cg=12 tl=60 st=0.425941762 h=b16c5b25 b=f9092345 rng=3117051389 crng=2409578040
+  ev spawn id=76 frame=1722
+f=1723 s=547.171412 th=0.518233385 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-12.631032 w=0 al=1 nb=3 np=0 nc=10 cg=13 tl=60 st=0.396125838 h=acb8f8d4 b=c01b8a4b rng=3117051389 crng=2409578040
+  ev coin combo=0 lane=1 k=548 frame=1723
+f=1725 s=548.006247 th=0.518233385 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-12.831032 w=0 al=1 nb=2 np=0 nc=11 cg=14 tl=60 st=0.00187788669 h=83af1fa2 b=64449948 rng=653649906 crng=2409578040
+  ev coin combo=1 lane=1 k=549 frame=1725
+f=1726 s=548.423664 th=0.518233385 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-12.931032 w=0 al=1 nb=3 np=0 nc=11 cg=14 tl=60 st=0.00187788669 h=e2c1b357 b=2bba5ce0 rng=3684945862 crng=2409578040
+  ev spawn id=77 frame=1726
+f=1728 s=549.258499 th=0.518233385 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-13.131032 w=0 al=1 nb=3 np=0 nc=11 cg=15 tl=60 st=0.00187788669 h=7141fe62 b=389dcfb0 rng=3684945862 crng=2409578040
+  ev coin combo=2 lane=1 k=550 frame=1728
+f=1730 s=550.093335 th=0.518233385 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-13.331032 w=0 al=1 nb=3 np=0 nc=11 cg=16 tl=60 st=0.00187788669 h=15475251 b=8abc6802 rng=1221544379 crng=2409578040
+  ev coin combo=3 lane=1 k=551 frame=1730
+f=1733 s=551.345587 th=0.518233385 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-13.631032 w=0 al=1 nb=3 np=0 nc=11 cg=17 tl=60 st=0.00187788669 h=a6bf216c b=16a3d614 rng=3053110192 crng=2409578040
+  ev coin combo=4 lane=1 k=552 frame=1733
+f=1735 s=552.180422 th=0.518233385 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-13.831032 w=0 al=1 nb=3 np=0 nc=11 cg=18 tl=60 st=0.00187788669 h=7d13c37f b=7b95e7df rng=589708709 crng=2409578040
+  ev coin combo=5 lane=1 k=553 frame=1735
+f=1740 s=554.26751 th=0.518233385 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-14.331032 w=0 al=1 nb=3 np=0 nc=9 cg=18 tl=60 st=0.00187788669 h=667f9d8e b=9ac85576 rng=4252840335 crng=1777742370
+f=1750 s=558.441686 th=0.518233385 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-15.331032 w=0 al=1 nb=4 np=0 nc=12 cg=18 tl=60 st=0.00187788669 h=b4d9be07 b=bf99c1a4 rng=1725497655 crng=514071030
+  ev spawn id=78 frame=1750
+f=1780 s=570.964213 th=0.518233385 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-18.331032 w=0 al=1 nb=3 np=0 nc=16 cg=19 tl=60 st=0.00187788669 h=41b41de4 b=0752ff2c rng=2229450931 crng=2281695646
+  ev coin combo=0 lane=1 k=572 frame=1780
+f=1786 s=573.468719 th=0.518233385 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-18.931032 w=0 al=1 nb=4 np=0 nc=16 cg=19 tl=60 st=0.00187788669 h=86091fa7 b=fc015ae2 rng=333943921 crng=3481425789
+  ev spawn id=79 frame=1786
+f=1791 s=575.555807 th=0.518233385 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-19.431032 w=0 al=1 nb=5 np=0 nc=15 cg=19 tl=60 st=0.00187788669 h=d7627b04 b=b9e8edee rng=901838394 crng=2849590119
+  ev spawn id=80 frame=1791
+f=1800 s=579.312565 th=0.518233385 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-20.331032 w=0 al=1 nb=4 np=0 nc=11 cg=19 tl=60 st=0.00187788669 h=f9c57b60 b=0aa187aa rng=2101568537 crng=4049320262
+f=1803 s=580.564818 th=0.518233385 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-20.631032 w=0 al=1 nb=4 np=0 nc=11 cg=19 tl=60 st=0.00187788669 h=2094f639 b=3dc06a42 rng=2669463010 crng=3417484592
+  ev spawn id=81 frame=1803
+f=1813 s=584.738993 th=0.518233385 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-21.631032 w=0 al=1 nb=5 np=0 nc=11 cg=19 tl=60 st=0.00187788669 h=18b6aaf3 b=a3f9ff5f rng=1973686143 crng=1521977582
+  ev spawn id=82 frame=1813
+f=1815 s=585.573828 th=0.555260877 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-21.831032 w=0 al=1 nb=6 np=0 nc=12 cg=19 tl=60 st=0.185137458 h=38def4a5 b=0579ea78 rng=1973686143 crng=1521977582
+  ev spawn id=83 frame=1815
+f=1818 s=586.826081 th=0.651504843 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-22.131032 w=0 al=1 nb=7 np=0 nc=12 cg=19 tl=60 st=0.14891661 h=68a6fb4b b=cceb7011 rng=1973686143 crng=1521977582
+  ev spawn id=84 frame=1818
+f=1820 s=587.660916 th=0.704962928 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-22.331032 w=0 al=1 nb=8 np=0 nc=12 cg=19 tl=60 st=0.128797976 h=5611589d b=de5d7c86 rng=1973686143 crng=1521977582
+  ev spawn id=85 frame=1820
+f=1822 s=588.495752 th=0.751198826 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-22.531032 w=0 al=1 nb=9 np=0 nc=12 cg=19 tl=60 st=0.11139737 h=e283059b b=4b127e73 rng=1973686143 crng=1521977582
+  ev spawn id=86 frame=1822
+f=1825 s=589.748004 th=0.809108904 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-22.831032 w=0 al=1 nb=10 np=0 nc=12 cg=19 tl=60 st=0.0896032541 h=a9009d11 b=641d1b4d rng=1973686143 crng=1521977582
+  ev spawn id=87 frame=1825
+f=1851 s=600.600861 th=0.995331808 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-25.431032 w=0 al=1 nb=10 np=0 nc=8 cg=19 tl=60 st=0.0181530102 h=7a606615 b=14ee0b55 rng=14237936 crng=2657766528
+  ev spawn id=88 frame=1851
+f=1860 s=604.357619 th=0.995331808 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-26.331032 w=0 al=1 nb=10 np=0 nc=11 cg=19 tl=60 st=0.0181530102 h=dcdb0ff2 b=136ee99b rng=1213968079 crng=1394095188
+f=1875 s=610.618883 th=0.995331808 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-27.831032 w=0 al=1 nb=9 np=0 nc=16 cg=19 tl=60 st=0.0181530102 h=a0da9e4f b=f9a74bef rng=2349757025 crng=762259518
+  ev spawn id=89 frame=1875
+f=1877 s=611.453718 th=0.995331808 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-28.031032 w=0 al=1 nb=10 np=0 nc=16 cg=19 tl=60 st=0.0181530102 h=2ebf9782 b=59cdc3ca rng=1086085685 crng=2593825331
+  ev spawn id=90 frame=1877
+f=1880 s=612.705971 th=0.995331808 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-28.331032 w=0 al=1 nb=10 np=0 nc=16 cg=19 tl=60 st=0.0181530102 h=be0ca338 b=a46a757b rng=4117381641 crng=130423848
+  ev spawn id=91 frame=1880
+f=1897 s=619.80207 th=0.995331808 v=5.5 vt=5.5 lv=3 wi=2 wl=21 fold=-30 w=0 al=1 nb=6 np=0 nc=11 cg=19 tl=60 st=0.0181530102 h=cb497dee b=80cbf542 rng=4053440444 crng=66482651
+  ev foldEnd toIn=0 world=0 frame=1897
+f=1901 s=621.47174 th=0.995331808 v=5.5 vt=5.5 lv=3 wi=2 wl=20 fold=-30 w=0 al=1 nb=5 np=0 nc=9 cg=19 tl=60 st=0.0181530102 h=eae6b0e1 b=d798adef rng=3357663577 crng=3729614277
+  ev spawn id=92 frame=1901
+f=1906 s=623.558828 th=0.995331808 v=5.5 vt=5.5 lv=3 wi=2 wl=19 fold=-30 w=0 al=1 nb=6 np=0 nc=8 cg=19 tl=60 st=0.0181530102 h=46b8e581 b=4e27c67c rng=1462156567 crng=3097778607
+  ev spawn id=93 frame=1906
+f=1920 s=629.402674 th=0.995331808 v=5.5 vt=5.5 lv=3 wi=2 wl=19 fold=-30 w=0 al=1 nb=6 np=0 nc=8 cg=19 tl=60 st=0.0181530102 h=46b8e581 b=80200b95 rng=2030051040 crng=3665673080
+f=1928 s=632.742015 th=1.21553996 v=5.5 vt=5.5 lv=3 wi=2 wl=18 fold=-30 w=0 al=1 nb=6 np=0 nc=11 cg=19 tl=60 st=-0.0633546688 h=671ad96a b=75cdc9b4 rng=1334274173 crng=1770166070
+  ev spawn id=94 frame=1928
+f=1930 s=633.57685 th=1.1927969 v=5.5 vt=5.5 lv=3 wi=2 wl=17 fold=-30 w=0 al=1 nb=7 np=0 nc=11 cg=19 tl=60 st=-0.0547954531 h=cbbac602 b=1c118ab1 rng=1334274173 crng=1770166070
+  ev spawn id=95 frame=1930
+f=1933 s=634.829102 th=1.1643114 v=5.5 vt=5.5 lv=3 wi=2 wl=16 fold=-30 w=0 al=1 nb=8 np=0 nc=11 cg=19 tl=60 st=-0.0440751063 h=9c99b8e4 b=2a9a33c9 rng=1334274173 crng=1770166070
+  ev spawn id=96 frame=1933
+f=1935 s=635.663938 th=1.14848932 v=5.5 vt=5.5 lv=3 wi=2 wl=15 fold=-30 w=0 al=1 nb=9 np=0 nc=11 cg=19 tl=60 st=-0.0381205594 h=53f16199 b=ec3e4ea7 rng=1334274173 crng=1770166070
+  ev spawn id=97 frame=1935
+f=1937 s=636.498773 th=1.1348048 v=5.5 vt=5.5 lv=3 wi=2 wl=14 fold=-30 w=0 al=1 nb=10 np=0 nc=11 cg=19 tl=60 st=-0.0329704718 h=e44aab68 b=6a18157d rng=1334274173 crng=1770166070
+  ev spawn id=98 frame=1937
+f=1940 s=637.751025 th=1.11766506 v=5.5 vt=5.5 lv=3 wi=2 wl=13 fold=-30 w=0 al=1 nb=11 np=0 nc=11 cg=19 tl=60 st=-0.0265200298 h=4b9e6fd2 b=963be6a8 rng=1334274173 crng=1770166070
+  ev spawn id=99 frame=1940
+f=1942 s=638.585861 th=1.07149298 v=5.5 vt=5.5 lv=3 wi=2 wl=12 fold=-30 w=0 al=1 nb=12 np=0 nc=11 cg=19 tl=60 st=-0.206196745 h=fe54bd96 b=47fae07e rng=1334274173 crng=1770166070
+  ev spawn id=100 frame=1942
+f=1956 s=644.429707 th=0.721960552 v=5.5 vt=5.5 lv=3 wi=2 wl=11 fold=-30 w=0 al=1 nb=10 np=0 nc=10 cg=19 tl=60 st=-0.0746522816 h=f70d9d97 b=0cd55e57 rng=3101898789 crng=2338060543
+  ev spawn id=101 frame=1956
+f=1980 s=654.447728 th=0.324821976 v=5.5 vt=5.5 lv=3 wi=2 wl=11 fold=-30 w=0 al=1 nb=9 np=0 nc=10 cg=19 tl=60 st=0.0748084731 h=c9f41f65 b=97f3e976 rng=4237687735 crng=3473849489
+f=1985 s=656.534816 th=0.385312068 v=5.5 vt=5.5 lv=3 wi=2 wl=10 fold=-30 w=0 al=1 nb=9 np=0 nc=10 cg=19 tl=60 st=0.0520433847 h=b9075261 b=687a59de rng=510614912 crng=2842013819
+  ev spawn id=102 frame=1985
+f=2001 s=663.213498 th=0.469764513 v=5.5 vt=5.5 lv=3 wi=2 wl=10 fold=-30 w=0 al=1 nb=9 np=0 nc=8 cg=20 tl=60 st=0.0188419919 h=ebe599c6 b=5a9cee5f rng=1014568188 crng=946506809
+  ev coin combo=0 lane=1 k=664 frame=2001
+f=2002 s=663.630915 th=0.469764513 v=5.5 vt=5.5 lv=3 wi=2 wl=9 fold=-30 w=0 al=1 nb=10 np=0 nc=8 cg=20 tl=60 st=0.0188419919 h=bec5abfd b=e485a912 rng=1014568188 crng=2778072622
+  ev spawn id=103 frame=2002
+f=2003 s=664.048333 th=0.469764513 v=5.5 vt=5.5 lv=3 wi=2 wl=9 fold=-30 w=0 al=1 nb=9 np=0 nc=7 cg=21 tl=60 st=0.0188419919 h=5a430313 b=737f31ac rng=1014568188 crng=2778072622
+  ev coin combo=1 lane=1 k=665 frame=2003
+f=2004 s=664.46575 th=0.469764513 v=5.5 vt=5.5 lv=3 wi=2 wl=8 fold=-30 w=0 al=1 nb=10 np=0 nc=7 cg=21 tl=60 st=0.0188419919 h=25f8ae2d b=4baae053 rng=1014568188 crng=314671139
+  ev spawn id=104 frame=2004
+f=2007 s=665.718003 th=0.469764513 v=5.5 vt=5.5 lv=3 wi=2 wl=7 fold=-30 w=0 al=1 nb=10 np=0 nc=6 cg=21 tl=60 st=0.0188419919 h=d65c8905 b=55e9c098 rng=1014568188 crng=2146236952
+  ev spawn id=105 frame=2007
+f=2009 s=666.552838 th=0.469764513 v=5.5 vt=5.5 lv=3 wi=2 wl=6 fold=-30 w=0 al=1 nb=10 np=0 nc=5 cg=21 tl=60 st=0.0188419919 h=c3ceb1e4 b=c175e4b0 rng=1014568188 crng=3977802765
+  ev spawn id=106 frame=2009
+f=2024 s=672.814102 th=0.615247606 v=5.5 vt=5.5 lv=3 wi=2 wl=5 fold=-30 w=0 al=1 nb=7 np=0 nc=0 cg=21 tl=60 st=0.162561807 h=3e2c384d b=c7a3ec88 rng=2782192804 crng=2082295755
+  ev spawn id=107 frame=2024
+f=2040 s=679.492783 th=0.641754055 v=5.5 vt=5.5 lv=3 wi=2 wl=5 fold=-30 w=0 al=1 nb=6 np=0 nc=1 cg=21 tl=60 st=-0.0444670405 h=0148dfb6 b=4abba57c rng=1454580267 crng=3218084701
+f=2055 s=685.754047 th=0.27545665 v=5.5 vt=5.5 lv=3 wi=2 wl=4 fold=-30 w=0 al=1 nb=7 np=0 nc=5 cg=21 tl=60 st=-0.103666481 h=07c3c6f3 b=9f5a3ff2 rng=758803400 crng=2586249031
+  ev spawn id=108 frame=2055
+f=2064 s=689.510805 th=0.143350693 v=5.5 vt=5.5 lv=3 wi=2 wl=3 fold=-30 w=0 al=1 nb=7 np=0 nc=5 cg=21 tl=60 st=-0.0539491857 h=70da11cb b=62f921e9 rng=63026533 crng=1322577691
+  ev spawn id=109 frame=2064
+f=2067 s=690.763058 th=0.115305134 v=5.5 vt=5.5 lv=3 wi=2 wl=2 fold=-30 w=0 al=1 nb=8 np=0 nc=5 cg=21 tl=60 st=-0.0433944051 h=de0a348a b=a4eef3da rng=63026533 crng=3154143504
+  ev spawn id=110 frame=2067
+f=2069 s=691.597893 th=0.0997274101 v=5.5 vt=5.5 lv=3 wi=2 wl=1 fold=-30 w=0 al=1 nb=9 np=0 nc=5 cg=21 tl=60 st=-0.037531821 h=f8be18a9 b=f715a716 rng=63026533 crng=690742021
+  ev spawn id=111 frame=2069
+f=2071 s=692.432728 th=0.086254237 v=5.5 vt=5.5 lv=3 wi=2 wl=0 fold=-30 w=0 al=1 nb=10 np=0 nc=5 cg=21 tl=60 st=-0.032461272 h=7b588b34 b=cb65e3a7 rng=63026533 crng=2522307834
+  ev spawn id=112 frame=2071
+f=2074 s=693.684981 th=0.0693791993 v=5.5 vt=5.5 lv=3 wi=2 wl=-1 fold=-30 w=0 al=1 nb=11 np=0 nc=5 cg=21 tl=60 st=-0.0261104514 h=2193b0e7 b=aba39e40 rng=63026533 crng=58906351
+  ev spawn id=113 frame=2074
+f=2076 s=694.519816 th=0.0600060695 v=5.5 vt=5.5 lv=3 wi=2 wl=-2 fold=-30 w=0 al=1 nb=12 np=0 nc=5 cg=21 tl=60 st=-0.0225829294 h=9e1924de b=6a7316fb rng=63026533 crng=1890472164
+  ev spawn id=114 frame=2076
+f=2079 s=695.772068 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=2 wl=-3 fold=-30 w=0 al=1 nb=12 np=0 nc=5 cg=21 tl=60 st=-0.0181647373 h=57ccf9fe b=ffed98db rng=63026533 crng=3722037977
+  ev spawn id=115 frame=2079
+f=2083 s=697.441739 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=3 wl=50 fold=-30 w=0 al=1 nb=10 np=0 nc=5 cg=21 tl=60 st=-0.0181647373 h=7e3f6388 b=bffabba7 rng=63026533 crng=3090202307
+  ev wave wave=3 frame=2083
+f=2100 s=704.537838 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=3 wl=50 fold=-30 w=0 al=1 nb=8 np=0 nc=5 cg=21 tl=60 st=-0.0181647373 h=2bd48f43 b=9a528a1d rng=63026533 crng=3026261110
+f=2131 s=717.477782 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=3 wl=49 fold=-30 w=0 al=1 nb=8 np=0 nc=1 cg=21 tl=60 st=-0.0181647373 h=e774630a b=cb0762ae rng=1830651149 crng=2266543046
+  ev spawn id=116 frame=2131
+f=2134 s=718.730035 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=3 wl=48 fold=-30 w=0 al=1 nb=9 np=0 nc=2 cg=21 tl=60 st=-0.0181647373 h=af557463 b=cc43b926 rng=1830651149 crng=2266543046
+  ev spawn id=117 frame=2134
+f=2141 s=721.651958 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=3 wl=47 fold=-30 w=0 al=1 nb=9 np=0 nc=5 cg=21 tl=60 st=-0.0181647373 h=1bbb7c42 b=15f43146 rng=4230111435 crng=2266543046
+  ev spawn id=118 frame=2141
+f=2153 s=726.660969 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=3 wl=46 fold=-30 w=0 al=1 nb=5 np=0 nc=6 cg=21 tl=60 st=-0.0181647373 h=689217af b=a2373a90 rng=3534334568 crng=1002871706
+  ev spawn id=119 frame=2153
+f=2155 s=727.495804 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=3 wl=45 fold=-30 w=0 al=1 nb=5 np=0 nc=6 cg=21 tl=60 st=-0.0181647373 h=ea7b6985 b=d17f164e rng=4102229041 crng=2834437519
+  ev spawn id=120 frame=2155
+f=2158 s=728.748057 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=3 wl=44 fold=-30 w=0 al=1 nb=6 np=0 nc=6 cg=21 tl=60 st=-0.0181647373 h=12f17bdd b=ee417fff rng=375156218 crng=371036036
+  ev spawn id=121 frame=2158
+f=2160 s=729.582892 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=3 wl=44 fold=-30 w=0 al=1 nb=6 np=0 nc=7 cg=21 tl=60 st=-0.0181647373 h=56f66b29 b=1a850dc0 rng=2206722031 crng=938930509
+f=2162 s=730.417727 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=3 wl=43 fold=-30 w=0 al=1 nb=7 np=0 nc=8 cg=21 tl=60 st=-0.0181647373 h=c59f266b b=e0d97247 rng=2774616504 crng=938930509
+  ev spawn id=122 frame=2162
+f=2165 s=731.66998 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=3 wl=42 fold=-30 w=0 al=1 nb=8 np=0 nc=9 cg=21 tl=60 st=-0.0181647373 h=72526b0e b=6b24390f rng=3342510977 crng=938930509
+  ev spawn id=123 frame=2165
+f=2174 s=735.426738 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=3 wl=41 fold=-30 w=0 al=1 nb=9 np=0 nc=12 cg=21 tl=60 st=-0.0181647373 h=6a352e96 b=d7ed997e rng=815168297 crng=3338390795
+  ev spawn id=124 frame=2174
+f=2182 s=738.766079 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=3 wl=40 fold=-30 w=0 al=1 nb=10 np=0 nc=14 cg=21 tl=60 st=-0.0181647373 h=dbd02193 b=3d0a2879 rng=751227100 crng=3338390795
+  ev spawn id=125 frame=2182
+f=2184 s=739.600914 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=3 wl=39 fold=-30 w=0 al=1 nb=11 np=0 nc=14 cg=21 tl=60 st=-0.0181647373 h=7a6e493d b=ccdd4812 rng=1319121573 crng=3338390795
+  ev spawn id=126 frame=2184
+f=2186 s=740.435749 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=3 wl=38 fold=-30 w=0 al=1 nb=12 np=0 nc=15 cg=21 tl=60 st=-0.0181647373 h=3c9091f2 b=622e83c2 rng=1887016046 crng=3338390795
+  ev spawn id=127 frame=2186
+f=2191 s=742.522837 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=3 wl=37 fold=-30 w=0 al=1 nb=13 np=0 nc=17 cg=21 tl=60 st=-0.0181647373 h=34764c9b b=428272ed rng=4286476332 crng=3338390795
+  ev spawn id=128 frame=2191
+f=2194 s=743.77509 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=3 wl=36 fold=-30 w=0 al=1 nb=14 np=0 nc=17 cg=21 tl=60 st=-0.0181647373 h=b790a2fc b=10c3c7bd rng=559403509 crng=874989312
+  ev spawn id=129 frame=2194
+f=2196 s=744.609925 th=0.0518992495 v=5.5 vt=5.5 lv=3 wi=3 wl=35 fold=-30 w=0 al=1 nb=15 np=0 nc=18 cg=21 tl=60 st=-0.0181647373 h=e36a973f b=547fbab6 rng=1127297982 crng=3906285268
+  ev spawn id=130 frame=2196
+f=2208 s=749.618936 th=0.0849182163 v=5.5 vt=5.5 lv=3 wi=3 wl=34 fold=-30 w=0 al=1 nb=15 np=0 nc=21 cg=21 tl=60 st=0.165094834 h=8b25d84c b=c05706df rng=431521115 crng=1442883785
+  ev spawn id=131 frame=2208
+f=2218 s=753.793111 th=0.311285146 v=5.5 vt=5.5 lv=3 wi=3 wl=33 fold=-30 w=0 al=1 nb=14 np=0 nc=17 cg=21 tl=60 st=0.0799029787 h=fd72fd8e b=5414a61d rng=1567310061 crng=179212445
+  ev spawn id=132 frame=2218
+f=2220 s=754.627947 th=0.339968718 v=5.5 vt=5.5 lv=3 wi=3 wl=32 fold=-30 w=0 al=1 nb=15 np=0 nc=16 cg=21 tl=60 st=0.0691080863 h=9104b362 b=161daf7b rng=1567310061 crng=2010778258
+  ev spawn id=133 frame=2220
+f=2230 s=758.802122 th=0.434725077 v=5.5 vt=5.5 lv=3 wi=3 wl=31 fold=-30 w=0 al=1 nb=15 np=0 nc=16 cg=21 tl=60 st=0.0334470911 h=7402d8d7 b=863e753d rng=1503368864 crng=747106918
+  ev spawn id=134 frame=2230
+f=2232 s=759.636958 th=0.446731913 v=5.5 vt=5.5 lv=3 wi=3 wl=30 fold=-30 w=0 al=1 nb=15 np=0 nc=16 cg=21 tl=60 st=0.0289283891 h=feb1adfc b=e750be8f rng=3902829150 crng=2578672731
+  ev spawn id=135 frame=2232
+f=2237 s=761.724045 th=0.470123393 v=5.5 vt=5.5 lv=3 wi=3 wl=29 fold=-30 w=0 al=1 nb=15 np=0 nc=15 cg=21 tl=60 st=0.0201251438 h=9df0a11e b=213db2c3 rng=2007322140 crng=1946837061
+  ev spawn id=136 frame=2237
+f=2242 s=763.811133 th=0.615516068 v=5.5 vt=5.5 lv=3 wi=3 wl=28 fold=-30 w=0 al=1 nb=14 np=0 nc=13 cg=21 tl=60 st=0.162460773 h=5e0fed73 b=0d1f71e3 rng=111815130 crng=1315001391
+  ev spawn id=137 frame=2242
+f=2251 s=767.567891 th=0.720107288 v=5.5 vt=5.5 lv=3 wi=3 wl=27 fold=-30 w=0 al=1 nb=14 np=0 nc=10 cg=21 tl=60 st=-0.0739548163 h=4a2f325b b=07a80fe0 rng=1247604076 crng=51330051
+  ev spawn id=138 frame=2251
+f=2254 s=768.820144 th=0.681661773 v=5.5 vt=5.5 lv=3 wi=3 wl=26 fold=-30 w=0 al=1 nb=15 np=0 nc=9 cg=21 tl=60 st=-0.0594860742 h=b3c7f9ad b=0304a3ca rng=1247604076 crng=1882895864
+  ev spawn id=139 frame=2254
+f=2262 s=772.159485 th=0.612047954 v=5.5 vt=5.5 lv=3 wi=3 wl=26 fold=-30 w=0 al=1 nb=12 np=0 nc=7 cg=22 tl=60 st=-0.033287325 h=900aabfd b=f4d3aa96 rng=615768406 crng=3082626007
+  ev coin combo=0 lane=1 k=773 frame=2262
+f=2264 s=772.99432 th=0.60009847 v=5.5 vt=5.5 lv=3 wi=3 wl=26 fold=-30 w=0 al=1 nb=12 np=0 nc=7 cg=23 tl=60 st=-0.0287902074 h=f1bbe502 b=398dea0c rng=2447334219 crng=619224524
+  ev coin combo=1 lane=1 k=774 frame=2264
+f=2267 s=774.246573 th=0.58513184 v=5.5 vt=5.5 lv=3 wi=3 wl=26 fold=-30 w=0 al=1 nb=11 np=0 nc=5 cg=24 tl=60 st=-0.0231576049 h=f4497fb4 b=23078948 rng=4214958835 crng=2450790337
+  ev coin combo=2 lane=1 k=775 frame=2267
+f=2268 s=774.66399 th=0.580824525 v=5.5 vt=5.5 lv=3 wi=3 wl=25 fold=-30 w=0 al=1 nb=12 np=0 nc=5 cg=24 tl=60 st=-0.0215365725 h=48daa558 b=46f9facb rng=4214958835 crng=4282356150
+  ev spawn id=140 frame=2268
+f=2269 s=775.081408 th=0.576818723 v=5.5 vt=5.5 lv=3 wi=3 wl=25 fold=-30 w=0 al=1 nb=11 np=0 nc=5 cg=25 tl=60 st=-0.0200290125 h=91a1eb80 b=25e877f1 rng=4214958835 crng=4282356150
+  ev coin combo=3 lane=1 k=776 frame=2269
+f=2270 s=775.498825 th=0.576818723 v=5.5 vt=5.5 lv=3 wi=3 wl=24 fold=-30 w=0 al=1 nb=12 np=0 nc=5 cg=25 tl=60 st=-0.0186269816 h=acd8e79b b=ae7835d7 rng=4214958835 crng=1818954667
+  ev spawn id=141 frame=2270
+f=2272 s=776.333661 th=0.576818723 v=5.5 vt=5.5 lv=3 wi=3 wl=24 fold=-30 w=0 al=1 nb=11 np=0 nc=4 cg=26 tl=60 st=-0.0186269816 h=59c2044e b=14044533 rng=4214958835 crng=1818954667
+  ev coin combo=4 lane=1 k=777 frame=2272
+f=2275 s=777.585913 th=0.576818723 v=5.5 vt=5.5 lv=3 wi=3 wl=23 fold=-30 w=0 al=1 nb=12 np=0 nc=3 cg=26 tl=60 st=-0.0186269816 h=f2058e13 b=960b0ff1 rng=2319451825 crng=1187118997
+  ev spawn id=142 frame=2275
+f=2280 s=779.673001 th=0.576818723 v=5.5 vt=5.5 lv=3 wi=3 wl=23 fold=-30 w=0 al=1 nb=12 np=0 nc=1 cg=26 tl=60 st=-0.0186269816 h=c28c7fea b=a0a9d7b2 rng=1687616155 crng=555283327
+f=2285 s=781.760089 th=0.576818723 v=5.5 vt=5.5 lv=3 wi=3 wl=22 fold=-30 w=0 al=1 nb=12 np=0 nc=0 cg=26 tl=60 st=-0.0186269816 h=5c990282 b=ae27db13 rng=4087076441 crng=4218414953
+  ev spawn id=143 frame=2285
+f=2289 s=783.429759 th=0.576818723 v=5.5 vt=5.5 lv=3 wi=3 wl=21 fold=-30 w=0 al=1 nb=13 np=0 nc=1 cg=26 tl=60 st=-0.0186269816 h=06c59c3e b=01a26d41 rng=1559733761 crng=2322907943
+  ev spawn id=144 frame=2289
+f=2292 s=784.682012 th=0.576818723 v=5.5 vt=5.5 lv=3 wi=3 wl=20 fold=-30 w=0 al=1 nb=14 np=0 nc=2 cg=26 tl=60 st=-0.0186269816 h=567caded b=8d790de6 rng=1559733761 crng=2322907943
+  ev spawn id=145 frame=2292
+f=2301 s=788.43877 th=0.576818723 v=5.5 vt=5.5 lv=3 wi=3 wl=19 fold=-30 w=0 al=1 nb=13 np=0 nc=6 cg=26 tl=60 st=-0.0186269816 h=2b2dd1cb b=77e2a50c rng=863956894 crng=2322907943
+  ev spawn id=146 frame=2301
+f=2304 s=789.691023 th=0.609745241 v=5.5 vt=5.5 lv=3 wi=3 wl=18 fold=-30 w=0 al=1 nb=14 np=0 nc=7 cg=26 tl=60 st=0.16463259 h=cf15b8a3 b=179b3e49 rng=863956894 crng=2322907943
+  ev spawn id=147 frame=2304
+f=2321 s=796.787122 th=0.668532741 v=5.5 vt=5.5 lv=3 wi=3 wl=17 fold=-30 w=0 al=1 nb=11 np=0 nc=8 cg=26 tl=60 st=0.142508262 h=42808250 b=ef70987c rng=1999745840 crng=427400933
+  ev spawn id=148 frame=2321
+f=2330 s=800.54388 th=0.850136187 v=5.5 vt=5.5 lv=3 wi=3 wl=16 fold=-30 w=0 al=1 nb=10 np=0 nc=8 cg=26 tl=60 st=0.0741628788 h=5ec9daa7 b=6d00d03c rng=1303968973 crng=363459736
+  ev spawn id=149 frame=2330
+f=2337 s=803.465803 th=0.928625557 v=5.5 vt=5.5 lv=3 wi=3 wl=15 fold=-30 w=0 al=1 nb=11 np=0 nc=9 cg=26 tl=60 st=0.0446238688 h=f1474bc5 b=6b3ce5cb rng=1240027776 crng=363459736
+  ev spawn id=150 frame=2337
+f=2340 s=804.718056 th=0.988475252 v=5.5 vt=5.5 lv=3 wi=3 wl=15 fold=-30 w=0 al=1 nb=11 np=0 nc=10 cg=26 tl=60 st=0.219153093 h=855e57cf b=8810726e rng=3071593589 crng=363459736
+f=2345 s=806.805144 th=1.16568233 v=5.5 vt=5.5 lv=3 wi=3 wl=14 fold=-30 w=0 al=1 nb=11 np=0 nc=10 cg=26 tl=60 st=0.152462258 h=64b18b10 b=762d17bc rng=3575546865 crng=4026591362
+  ev spawn id=151 frame=2345
+f=2347 s=807.639979 th=1.22041323 v=5.5 vt=5.5 lv=3 wi=3 wl=13 fold=-30 w=0 al=1 nb=11 np=0 nc=10 cg=26 tl=60 st=0.131864607 h=bb6b4ebd b=bf4cf458 rng=3575546865 crng=1563189879
+  ev spawn id=152 frame=2347
+f=2364 s=814.736077 th=1.46876036 v=5.5 vt=5.5 lv=3 wi=3 wl=12 fold=-30 w=0 al=1 nb=10 np=0 nc=10 cg=26 tl=60 st=0.0384006317 h=cd927c0f b=8fc1d526 rng=2247934328 crng=1499248682
+  ev spawn id=153 frame=2364
+f=2369 s=816.823165 th=1.49981109 v=5.5 vt=5.5 lv=3 wi=3 wl=11 fold=-30 w=0 al=1 nb=9 np=0 nc=8 cg=26 tl=60 st=0.0267148729 h=69768288 b=765a3c68 rng=352427318 crng=867413012
+  ev spawn id=154 frame=2369
+f=2378 s=820.579924 th=1.51769568 v=5.5 vt=5.5 lv=3 wi=3 wl=10 fold=-30 w=0 al=1 nb=9 np=0 nc=4 cg=26 tl=60 st=0.0185852263 h=829bc574 b=b5aec617 rng=1488216264 crng=3898708968
+  ev spawn id=155 frame=2378
+f=2381 s=821.832176 th=1.51769568 v=5.5 vt=5.5 lv=3 wi=3 wl=9 fold=-30 w=0 al=1 nb=9 np=0 nc=3 cg=26 tl=60 st=0.0185852263 h=423af94a b=65cfb909 rng=1488216264 crng=1435307485
+  ev spawn id=156 frame=2381
+f=2392 s=826.42377 th=1.51769568 v=5.5 vt=5.5 lv=3 wi=3 wl=8 fold=-30 w=0 al=1 nb=10 np=0 nc=4 cg=26 tl=60 st=0.0185852263 h=f5348fd3 b=a9868214 rng=3255840880 crng=3202932101
+  ev spawn id=157 frame=2392
+f=2397 s=828.510857 th=1.63052289 v=5.5 vt=5.5 lv=3 wi=3 wl=7 fold=-30 w=0 al=1 nb=10 np=0 nc=6 cg=26 tl=60 st=0.174575566 h=751baff1 b=2d06c352 rng=728498200 crng=3202932101
+  ev spawn id=158 frame=2397
+f=2400 s=829.76311 th=1.72127624 v=5.5 vt=5.5 lv=3 wi=3 wl=6 fold=-30 w=0 al=1 nb=11 np=0 nc=7 cg=26 tl=60 st=0.140421078 h=dc126cdb b=c2363e35 rng=728498200 crng=3202932101
+  ev spawn id=159 frame=2400
+f=2424 s=839.781132 th=1.62314356 v=5.5 vt=5.5 lv=3 wi=3 wl=5 fold=-30 w=0 al=1 nb=8 np=0 nc=15 cg=26 tl=60 st=-0.0183215326 h=c92df385 b=d1f539a3 rng=3064017289 crng=3770826574
+  ev spawn id=160 frame=2424
+f=2431 s=842.703055 th=1.62314356 v=5.5 vt=5.5 lv=3 wi=3 wl=4 fold=-30 w=0 al=1 nb=9 np=0 nc=15 cg=26 tl=60 st=-0.0183215326 h=0fa11fec b=abbaa0e9 rng=536674609 crng=675589421
+  ev spawn id=161 frame=2431
+f=2436 s=844.790143 th=1.62314356 v=5.5 vt=5.5 lv=3 wi=3 wl=3 fold=-30 w=0 al=1 nb=10 np=0 nc=15 cg=26 tl=60 st=-0.0183215326 h=bf92e323 b=4261f5df rng=2936134895 crng=43753751
+  ev spawn id=162 frame=2436
+f=2438 s=845.624978 th=1.62314356 v=5.5 vt=5.5 lv=3 wi=3 wl=2 fold=-30 w=0 al=1 nb=11 np=0 nc=15 cg=26 tl=60 st=-0.0183215326 h=ca1565e1 b=0a3617f2 rng=3504029368 crng=1875319564
+  ev spawn id=163 frame=2438
+f=2440 s=846.459813 th=1.62314356 v=5.5 vt=5.5 lv=3 wi=3 wl=1 fold=-30 w=0 al=1 nb=11 np=0 nc=15 cg=26 tl=60 st=-0.0183215326 h=dc5a6e53 b=cf5ed30c rng=4071923841 crng=3706885377
+  ev spawn id=164 frame=2440
+f=2443 s=847.712066 th=1.62314356 v=5.5 vt=5.5 lv=3 wi=3 wl=0 fold=-30 w=0 al=1 nb=12 np=0 nc=15 cg=26 tl=60 st=-0.0183215326 h=a55ee4eb b=78fafff1 rng=344851018 crng=1243483894
+  ev spawn id=165 frame=2443
+f=2445 s=848.546901 th=1.62314356 v=5.5 vt=5.5 lv=3 wi=4 wl=50 fold=-30 w=0 al=1 nb=11 np=0 nc=15 cg=26 tl=60 st=-0.0183215326 h=0d5256c9 b=4e24dc46 rng=344851018 crng=3075049707
+  ev wave wave=4 frame=2445
+f=2460 s=854.808165 th=1.62314356 v=5.5 vt=5.5 lv=3 wi=4 wl=50 fold=-30 w=0 al=1 nb=9 np=0 nc=16 cg=26 tl=60 st=-0.0183215326 h=c646f26c b=8f97994d rng=344851018 crng=4210838653
+f=2463 s=856.060417 th=1.62314356 v=5.5 vt=5.5 lv=3 wi=4 wl=50 fold=-30 w=0 al=1 nb=9 np=0 nc=17 cg=27 tl=60 st=-0.0183215326 h=cff41c21 b=ba578432 rng=344851018 crng=4210838653
+  ev coin combo=0 lane=3 k=857 frame=2463
+f=2466 s=857.31267 th=1.62314356 v=5.5 vt=5.5 lv=3 wi=4 wl=50 fold=-30 w=0 al=1 nb=9 np=0 nc=17 cg=28 tl=60 st=-0.0183215326 h=39f20c5d b=46ecedf0 rng=344851018 crng=4210838653
+  ev coin combo=1 lane=3 k=858 frame=2466
+f=2490 s=867.330692 th=1.62314356 v=5.5 vt=5.5 lv=3 wi=4 wl=50 fold=-30 w=0 al=1 nb=6 np=0 nc=11 cg=29 tl=60 st=-0.0183215326 h=f1b1f522 b=97fa9c83 rng=3376146974 crng=2315331643
+  ev coin combo=2 lane=3 k=868 frame=2490
+f=2493 s=868.582945 th=1.62314356 v=5.5 vt=5.5 lv=3 wi=4 wl=49 fold=-30 w=0 al=1 nb=7 np=0 nc=10 cg=29 tl=60 st=-0.0183215326 h=8cf6ec62 b=24f72335 rng=3944041447 crng=1683495973
+  ev spawn id=166 frame=2493
+f=2495 s=869.41778 th=1.62314356 v=5.5 vt=5.5 lv=3 wi=4 wl=48 fold=-30 w=0 al=1 nb=8 np=0 nc=9 cg=29 tl=60 st=-0.0183215326 h=179e777f b=da64a68c rng=2680370107 crng=3515061786
+  ev spawn id=167 frame=2495
+f=2503 s=872.75712 th=1.65613117 v=5.5 vt=5.5 lv=3 wi=4 wl=47 fold=-30 w=0 al=1 nb=8 np=0 nc=8 cg=29 tl=60 st=0.164938039 h=4644988a b=6fa7a8e9 rng=784863097 crng=1619554776
+  ev spawn id=168 frame=2503
+f=2512 s=876.513879 th=1.8663177 v=5.5 vt=5.5 lv=3 wi=4 wl=46 fold=-30 w=0 al=1 nb=7 np=0 nc=11 cg=29 tl=60 st=0.0858355834 h=3d71faa2 b=72390d62 rng=720921900 crng=1619554776
+  ev spawn id=169 frame=2512
+f=2515 s=877.766131 th=1.91093944 v=5.5 vt=5.5 lv=3 wi=4 wl=45 fold=-30 w=0 al=1 nb=7 np=0 nc=11 cg=29 tl=60 st=0.0690424524 h=30b4c7cf b=c603f0bf rng=3752217856 crng=1619554776
+  ev spawn id=170 frame=2515
+f=2517 s=878.600967 th=1.9357243 v=5.5 vt=5.5 lv=3 wi=4 wl=44 fold=-30 w=0 al=1 nb=7 np=0 nc=11 cg=29 tl=60 st=0.0597148171 h=f733bf6a b=c22a6bd6 rng=2488546516 crng=1619554776
+  ev spawn id=171 frame=2517
+f=2520 s=879.853219 th=1.96676713 v=5.5 vt=5.5 lv=3 wi=4 wl=44 fold=-30 w=0 al=1 nb=6 np=0 nc=12 cg=29 tl=60 st=0.0480320311 h=3550652d b=4a479304 rng=25145033 crng=1619554776
+f=2524 s=881.52289 th=1.99892274 v=5.5 vt=5.5 lv=3 wi=4 wl=43 fold=-30 w=0 al=1 nb=7 np=0 nc=12 cg=29 tl=60 st=0.0359304574 h=62bbeba1 b=d6694d56 rng=593039506 crng=987719106
+  ev spawn id=172 frame=2524
+f=2527 s=882.775142 th=2.01760124 v=5.5 vt=5.5 lv=3 wi=4 wl=42 fold=-30 w=0 al=1 nb=8 np=0 nc=13 cg=29 tl=60 st=0.0289009149 h=5edcf009 b=ed0d4638 rng=3624335462 crng=4019015062
+  ev spawn id=173 frame=2527
+f=2533 s=885.279648 th=2.04097051 v=5.5 vt=5.5 lv=3 wi=4 wl=42 fold=-30 w=0 al=1 nb=8 np=0 nc=15 cg=30 tl=60 st=0.0186986083 h=013384ff b=b20d53fc rng=2992499792 crng=4019015062
+  ev coin combo=0 lane=4 k=886 frame=2533
+f=2535 s=886.114483 th=2.04097051 v=5.5 vt=5.5 lv=3 wi=4 wl=42 fold=-30 w=0 al=1 nb=8 np=0 nc=15 cg=31 tl=60 st=0.0186986083 h=f0499b4a b=872a63d5 rng=529098309 crng=4019015062
+  ev coin combo=1 lane=4 k=887 frame=2535
+f=2536 s=886.5319 th=2.04097051 v=5.5 vt=5.5 lv=3 wi=4 wl=41 fold=-30 w=0 al=1 nb=9 np=0 nc=16 cg=31 tl=60 st=0.0186986083 h=5396ee4e b=a02a0a03 rng=3560394265 crng=4019015062
+  ev spawn id=174 frame=2536
+f=2546 s=890.706076 th=2.04097051 v=5.5 vt=5.5 lv=3 wi=4 wl=40 fold=-30 w=0 al=1 nb=10 np=0 nc=16 cg=31 tl=60 st=0.0186986083 h=9fa1eb5a b=fdb7d167 rng=3496453068 crng=4019015062
+  ev spawn id=175 frame=2546
+f=2548 s=891.540911 th=2.04097051 v=5.5 vt=5.5 lv=3 wi=4 wl=39 fold=-30 w=0 al=1 nb=11 np=0 nc=15 cg=31 tl=60 st=0.0186986083 h=81f2df52 b=d6c7eda7 rng=2232781728 crng=1555613579
+  ev spawn id=176 frame=2548
+f=2555 s=894.462834 th=2.04097051 v=5.5 vt=5.5 lv=3 wi=4 wl=38 fold=-30 w=0 al=1 nb=12 np=0 nc=14 cg=31 tl=60 st=0.0186986083 h=3d7fe34a b=79d70c7f rng=337274718 crng=2755343722
+  ev spawn id=177 frame=2555
+f=2558 s=895.715087 th=2.04097051 v=5.5 vt=5.5 lv=3 wi=4 wl=37 fold=-30 w=0 al=1 nb=13 np=0 nc=14 cg=31 tl=60 st=0.0186986083 h=26748a90 b=4bcf1e35 rng=3368570674 crng=291942239
+  ev spawn id=178 frame=2558
+f=2563 s=897.460652 th=1.66367165 v=1.025 vt=2 lv=0 wi=4 wl=37 fold=-30 w=0 al=1 nb=13 np=0 nc=14 cg=31 tl=60 st=-0.429059684 h=422d7dfd b=77af6cf9 rng=2736735004 crng=3955073865
+  ev crash id=166 lane=3 k=897 fatal=0 frame=2563
+f=2580 s=899.005828 th=0.855602334 v=1.36600901 vt=2 lv=0 wi=4 wl=37 fold=-30 w=0 al=1 nb=13 np=0 nc=15 cg=31 tl=60 st=-0.124947576 h=77b7297d b=3e600336 rng=3936465147 crng=2691402525
+f=2615 s=903.187206 th=0.537262084 v=1.73863668 vt=2 lv=0 wi=4 wl=36 fold=-30 w=0 al=1 nb=12 np=0 nc=20 cg=31 tl=60 st=-0.202195408 h=948055b7 b=9bc1d3f6 rng=145451127 crng=2691402525
+  ev spawn id=179 frame=2615
+f=2637 s=906.187693 th=0.108845646 v=1.85025712 vt=2 lv=0 wi=4 wl=35 fold=-30 w=0 al=1 nb=12 np=0 nc=19 cg=31 tl=60 st=-0.0409634151 h=c3a09afd b=fb3acc97 rng=1281240073 crng=228001042
+  ev spawn id=180 frame=2637
+f=2640 s=906.609809 th=0.0875507572 v=1.86120941 vt=2 lv=0 wi=4 wl=35 fold=-30 w=0 al=1 nb=12 np=0 nc=19 cg=31 tl=60 st=-0.0329492097 h=c3a09afd b=9cacb9e8 rng=1281240073 crng=228001042
+f=2644 s=907.176382 th=0.0654925199 v=1.87457662 vt=2 lv=0 wi=4 wl=34 fold=-30 w=0 al=1 nb=13 np=0 nc=18 cg=31 tl=60 st=-0.0246477225 h=23581fe7 b=9f1b0ebf rng=1849134546 crng=2059566855
+  ev spawn id=181 frame=2644
+f=2651 s=908.177062 th=0.0526793668 v=1.89494643 vt=2 lv=0 wi=4 wl=33 fold=-30 w=0 al=1 nb=13 np=0 nc=18 cg=31 tl=60 st=-0.0184377784 h=28a7d48d b=882c8d7e rng=2417029019 crng=3891132668
+  ev spawn id=182 frame=2651
+f=2658 s=909.187784 th=0.0526793668 v=1.91200802 vt=2 lv=0 wi=4 wl=32 fold=-30 w=0 al=1 nb=13 np=0 nc=18 cg=31 tl=60 st=-0.0184377784 h=e71666fa b=dda0c6d0 rng=521522009 crng=1427731185
+  ev spawn id=183 frame=2658
+f=2699 s=915.23858 th=0.0526793668 v=1.9688375 vt=2 lv=0 wi=4 wl=31 fold=-30 w=0 al=1 nb=11 np=0 nc=15 cg=31 tl=60 st=-0.0184377784 h=c147209c b=4e2c24ac rng=2225205428 crng=3827191471
+  ev spawn id=184 frame=2699
+f=2700 s=915.388003 th=0.0526793668 v=1.96961656 vt=2 lv=0 wi=4 wl=31 fold=-30 w=0 al=1 nb=11 np=0 nc=15 cg=31 tl=60 st=-0.0184377784 h=c147209c b=f38f4b66 rng=2225205428 crng=3827191471
+f=2706 s=916.285733 th=0.0526793668 v=1.97389855 vt=2 lv=0 wi=4 wl=30 fold=-30 w=0 al=1 nb=12 np=0 nc=14 cg=31 tl=60 st=-0.0184377784 h=9bc49a59 b=84769ad6 rng=2793099901 crng=1363789988
+  ev spawn id=185 frame=2706
+f=2712 s=917.185295 th=0.0526793668 v=1.97757707 vt=2 lv=0 wi=4 wl=29 fold=-30 w=0 al=1 nb=13 np=0 nc=13 cg=31 tl=60 st=-0.0184377784 h=ee197ae8 b=dbc236a6 rng=3360994374 crng=3195355801
+  ev spawn id=186 frame=2712
+f=2739 s=921.249869 th=5.8851242 v=1.98868077 vt=2 lv=0 wi=4 wl=28 fold=-30 w=0 al=1 nb=13 np=0 nc=9 cg=31 tl=60 st=-0.04724536 h=1d96c7a0 b=f90d0d6f rng=2033381837 crng=1931684461
+  ev spawn id=187 frame=2739
+f=2760 s=924.423251 th=5.53582176 v=1.99334859 vt=2 lv=0 wi=4 wl=28 fold=-30 w=0 al=1 nb=11 np=0 nc=8 cg=31 tl=60 st=-0.112840754 h=67e7f28f b=818b6315 rng=137874827 crng=3131414604
+f=2765 s=925.179791 th=5.44457878 v=1.99413947 vt=2 lv=0 wi=4 wl=27 fold=-30 w=0 al=1 nb=12 np=0 nc=8 cg=31 tl=60 st=-0.0785019998 h=51b92bfb b=57780995 rng=705769300 crng=668013121
+  ev spawn id=188 frame=2765
+f=2779 s=927.299516 th=5.31150687 v=1.99588849 vt=2 lv=0 wi=4 wl=26 fold=-30 w=0 al=1 nb=11 np=3 nc=8 cg=31 tl=60 st=-0.0284211731 h=ee626577 b=41942a40 rng=9992433 crng=36177451
+  ev spawn id=189 frame=2779
+f=2785 s=928.208486 th=5.28852553 v=1.99646793 vt=2 lv=0 wi=4 wl=25 fold=-30 w=0 al=1 nb=12 np=3 nc=8 cg=31 tl=60 st=-0.01838822 h=25134582 b=a36d07be rng=2409452719 crng=1867743264
+  ev spawn id=190 frame=2785
+f=2798 s=930.178726 th=5.28852553 v=1.9974585 vt=2 lv=0 wi=4 wl=24 fold=-30 w=0 al=1 nb=13 np=3 nc=7 cg=31 tl=60 st=-0.01838822 h=d75b6aa0 b=9f1e027d rng=2345511522 crng=1235907594
+  ev spawn id=191 frame=2798
+f=2805 s=931.23999 th=5.28852553 v=1.99787126 vt=2 lv=0 wi=4 wl=23 fold=-30 w=0 al=1 nb=14 np=3 nc=6 cg=31 tl=60 st=-0.01838822 h=8215cfad b=11b92ea0 rng=2913405995 crng=3067473407
+  ev spawn id=192 frame=2805
+f=2812 s=932.301458 th=5.35815171 v=1.99821699 vt=2 lv=0 wi=4 wl=22 fold=-30 w=0 al=1 nb=15 np=3 nc=5 cg=31 tl=60 st=0.348130923 h=a1f35238 b=dff7222c rng=3481300468 crng=604071924
+  ev spawn id=193 frame=2812
+f=2818 s=933.211425 th=5.68469765 v=1.99846827 vt=2 lv=0 wi=4 wl=21 fold=-30 w=0 al=1 nb=16 np=3 nc=4 cg=31 tl=60 st=0.22523729 h=30973a48 b=fc347f32 rng=4049194941 crng=2435637737
+  ev spawn id=194 frame=2818
+f=2820 s=933.514772 th=5.76555333 v=1.9985439 vt=2 lv=0 wi=4 wl=21 fold=-30 w=0 al=1 nb=16 np=3 nc=4 cg=31 tl=60 st=0.194807732 h=30973a48 b=140e302a rng=4049194941 crng=2435637737
+f=2837 s=935.941911 th=0.341495756 v=1 vt=2 lv=0 wi=4 wl=21 fold=-30 w=0 al=0 nb=15 np=3 nc=2 cg=31 tl=60 st=0.4302552 h=9f5fcd03 b=fa65a194 rng=2785523601 crng=1803802067
+  ev crash id=181 lane=1 k=936 fatal=1 frame=2837
+  ev death id=181 frame=2837
+f=2880 s=938.01948 th=0.341495756 v=0.38421185 vt=2 lv=0 wi=4 wl=21 fold=-30 w=0 al=0 nb=15 np=3 nc=2 cg=31 tl=60 st=0.5 h=9f5fcd03 b=58597c53 rng=3985253744 crng=1803802067
+f=2940 s=938.974535 th=0.341495756 v=0.101135131 vt=2 lv=0 wi=4 wl=21 fold=-30 w=0 al=0 nb=15 np=3 nc=2 cg=31 tl=60 st=0.5 h=9f5fcd03 b=4f04900a rng=3985253744 crng=1803802067
+end frame=2957 alive=0 dist=3740 coins=31 crashes=1 waveIdx=4

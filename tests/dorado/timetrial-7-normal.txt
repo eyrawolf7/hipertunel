@@ -1,0 +1,37 @@
+start mode=timetrial seed=7 waves=34 rng=752141771 crng=2654435774 lastLoc=10
+f=1 s=0.151788209 th=0 v=2 vt=2 lv=0 wi=0 wl=14 fold=30 w=0 al=1 nb=1 np=0 nc=0 cg=0 tl=59.9833333 st=0 h=8366697a b=52f8dd21 rng=1951871914 crng=191034291
+  ev spawn id=1 frame=1
+f=8 s=1.21430567 th=0 v=2 vt=2 lv=0 wi=0 wl=13 fold=30 w=0 al=1 nb=2 np=0 nc=0 cg=0 tl=59.8666667 st=0 h=3fbfc56f b=79a07b11 rng=688200574 crng=2022600104
+  ev spawn id=2 frame=8
+f=34 s=5.16079912 th=0 v=2 vt=2 lv=0 wi=0 wl=12 fold=30 w=0 al=1 nb=3 np=0 nc=0 cg=0 tl=59.4333333 st=0 h=bc0eb768 b=ff628d7d rng=1823989520 crng=758928764
+  ev spawn id=3 frame=34
+f=60 s=9.10729256 th=0 v=2 vt=2 lv=0 wi=0 wl=12 fold=30 w=0 al=1 nb=3 np=0 nc=0 cg=0 tl=59 st=0 h=bc0eb768 b=9e5b5c2b rng=1760048323 crng=1958658907
+f=100 s=15.1788209 th=0 v=2 vt=2 lv=0 wi=0 wl=11 fold=30 w=0 al=1 nb=4 np=0 nc=0 cg=0 tl=58.3333333 st=0 h=6f907851 b=b545d227 rng=2200060402 crng=1894717710
+  ev spawn id=4 frame=100
+f=120 s=18.2145851 th=0 v=2 vt=2 lv=0 wi=0 wl=11 fold=30 w=0 al=1 nb=4 np=0 nc=0 cg=0 tl=58 st=0 h=6f907851 b=5f9d7958 rng=304553392 crng=3094447853
+f=146 s=22.1610786 th=0.334033013 v=2 vt=2 lv=0 wi=0 wl=10 fold=30 w=0 al=1 nb=5 np=0 nc=1 cg=0 tl=57.5666667 st=0.0713419536 h=76222949 b=60bb9671 rng=176670998 crng=567105173
+  ev spawn id=5 frame=146
+f=180 s=27.3218777 th=0.472259117 v=2 vt=2 lv=0 wi=0 wl=10 fold=30 w=0 al=1 nb=5 np=0 nc=5 cg=0 tl=57 st=0.0179688805 h=310fa48b b=c6f643b4 rng=1312459944 crng=2398670986
+f=193 s=29.2951244 th=0.472259117 v=2 vt=2 lv=0 wi=0 wl=9 fold=30 w=0 al=1 nb=6 np=0 nc=5 cg=0 tl=56.7833333 st=0.0179688805 h=5bb5bdb2 b=438ac892 rng=3711920230 crng=1766835316
+  ev spawn id=6 frame=193
+f=199 s=30.2058537 th=0.472259117 v=2 vt=2 lv=0 wi=0 wl=8 fold=30 w=0 al=1 nb=7 np=0 nc=5 cg=0 tl=56.6833333 st=0.0179688805 h=a7fff9bc b=94fa683f rng=2448248890 crng=3598401129
+  ev spawn id=7 frame=199
+f=206 s=31.2683711 th=0.472259117 v=2 vt=2 lv=0 wi=0 wl=7 fold=30 w=0 al=1 nb=8 np=0 nc=5 cg=0 tl=56.5666667 st=0.0179688805 h=ecc67161 b=1ac27b7f rng=1184577550 crng=1134999646
+  ev spawn id=8 frame=206
+f=212 s=32.1791004 th=0.512504807 v=2 vt=2 lv=0 wi=0 wl=6 fold=30 w=0 al=1 nb=8 np=0 nc=5 cg=0 tl=56.4666667 st=0.201228452 h=e79944e5 b=c2d14f5b rng=4215873506 crng=2966565459
+  ev spawn id=9 frame=212
+f=219 s=33.2416178 th=0.725472462 v=2 vt=2 lv=0 wi=0 wl=5 fold=30 w=0 al=1 nb=8 np=0 nc=5 cg=0 tl=56.35 st=0.121079335 h=017960a4 b=c7867c0e rng=2952202166 crng=503163976
+  ev spawn id=10 frame=219
+f=240 s=36.4291702 th=0.977112265 v=2 vt=2 lv=0 wi=0 wl=5 fold=30 w=0 al=1 nb=8 np=0 nc=5 cg=0 tl=56 st=0.0263761829 h=017960a4 b=1d03906f rng=1056695156 crng=1702894119
+f=265 s=40.2238755 th=0.994770112 v=2 vt=2 lv=0 wi=0 wl=4 fold=30 w=0 al=1 nb=8 np=0 nc=5 cg=0 tl=55.5833333 st=0.0183496037 h=dceeee77 b=ea064297 rng=2192484102 crng=439222779
+  ev spawn id=11 frame=265
+f=300 s=45.5364628 th=0.994770112 v=2 vt=2 lv=0 wi=0 wl=4 fold=30 w=0 al=1 nb=8 np=2 nc=5 cg=0 tl=55 st=0.0183496037 h=ad72e38d b=40e34c92 rng=2696437378 crng=1007117252
+f=360 s=54.6437553 th=0.994770112 v=2 vt=2 lv=0 wi=0 wl=4 fold=30 w=0 al=1 nb=6 np=2 nc=4 cg=0 tl=54 st=0.0183496037 h=04c6bdec b=a084ab5b rng=1304883644 crng=311340385
+f=370 s=56.1616374 th=0.894770112 v=2 vt=2 lv=0 wi=0 wl=3 fold=30 w=0 al=1 nb=7 np=2 nc=2 cg=0 tl=53.8333333 st=-0.5 h=4aef899f b=23f11947 rng=3704343930 crng=3974472011
+  ev spawn id=12 frame=370
+f=380 s=57.5277313 th=0.214536113 v=1 vt=2 lv=0 wi=0 wl=3 fold=30 w=0 al=0 nb=7 np=2 nc=1 cg=0 tl=53.6666667 st=-0.258347211 h=e6cd4c7e b=e8c8298e rng=3072508260 crng=1511070528
+  ev crash id=6 lane=1 k=58 fatal=1 frame=380
+  ev death id=6 frame=380
+f=420 s=59.5158399 th=0.214536113 v=0.410727888 vt=2 lv=0 wi=0 wl=3 fold=30 w=0 al=0 nb=7 np=2 nc=1 cg=0 tl=53.6666667 st=-0.258347211 h=e6cd4c7e b=65b46b00 rng=2440672590 crng=1511070528
+f=480 s=60.5368072 th=0.214536113 v=0.108114882 vt=2 lv=0 wi=0 wl=3 fold=30 w=0 al=0 nb=7 np=2 nc=1 cg=0 tl=53.6666667 st=-0.258347211 h=e6cd4c7e b=27ff7f68 rng=4272238403 crng=1511070528
+end frame=500 alive=0 dist=228 coins=0 crashes=0 waveIdx=0

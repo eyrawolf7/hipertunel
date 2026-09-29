@@ -5,6 +5,7 @@ tests/shots/
 tests/base-v031/
 # carpetas de capturas de trabajo (npm run compare / partida): solo se guardan los scripts
 tests/*/
+!tests/dorado/
 !tests/*.js
 dist/
 __pycache__/
