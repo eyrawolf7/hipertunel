@@ -521,35 +521,36 @@ def build_stone_textures():
 
 
 def build_crystal_textures(seed=5):
+    """Cristal de aviso: paneles limpios (3 a lo largo, como la geometría) con el centro más
+    oscuro, el canto luminoso y un filete interior; abombado suave para que pille los brillos.
+    (Antes eran facetas de Voronoi y se leían como plástico roto.)"""
     n = 512
     dx, dz = W / n, L / n
-    X = (np.arange(n) + 0.5) * dx
+    X = (np.arange(n) + 0.5) * dx - HW
     Z = (np.arange(n) + 0.5) * dz
     XX, ZZ = np.meshgrid(X, Z)
-    rng = np.random.default_rng(seed)
-    K = 30
-    sx, sz = rng.uniform(0, W, K), rng.uniform(0, L, K)
-    d1 = np.full(XX.shape, 9.0)
-    d2 = np.full(XX.shape, 9.0)
-    idn = np.zeros(XX.shape, np.int32)
-    for i in range(K):
-        d = np.hypot(wrapd(XX - sx[i], W), wrapd(ZZ - sz[i], L))
-        closer = d < d1
-        d2 = np.where(closer, d1, np.minimum(d2, d))
-        idn = np.where(closer, i, idn)
-        d1 = np.where(closer, d, d1)
-    w = d2 - d1
-    slx, slz = rng.normal(0, 0.07, K), rng.normal(0, 0.07, K)
-    groove = -0.004 * np.exp(-w / 0.01)
-    gx = (np.roll(groove, -1, 1) - np.roll(groove, 1, 1)) / (2 * dx) + slx[idn]
-    gz = (np.roll(groove, -1, 0) - np.roll(groove, 1, 0)) / (2 * dz) + slz[idn]
+    m = 0.05
+    k = np.clip(np.floor(ZZ / (2 * CL)), 0, 2)
+    cz = (k + 0.5) * 2 * CL
+    hz = CL - m
+    hx = HW - m
+    # distancia al borde del panel (en metros) y posición normalizada
+    ex = hx - np.abs(XX)
+    ez = hz - np.abs(ZZ - cz)
+    e = np.minimum(ex, ez)
+    ux, uz = XX / hx, (ZZ - cz) / hz
+    rim = np.exp(-np.clip(e, 0, None) / 0.07)                      # canto luminoso
+    inset = np.exp(-((e - 0.16) / 0.012) ** 2)                      # filete interior
+    centre = np.clip(1 - np.maximum(np.abs(ux), np.abs(uz)), 0, 1)
+    alb = 0.62 + 0.1 * (1 - centre) + 0.3 * rim + 0.14 * inset
+    save_jpg(os.path.join(KIT, 'crystal_albedo.jpg'), np.repeat(np.clip(alb, 0, 1)[..., None], 3, -1), 90)
+    # abombado: altura suave con máximo en el centro, y una ranura en el filete
+    Hh = 0.012 * (1 - ux ** 2) * (1 - uz ** 2) - 0.0015 * inset
+    gx = np.gradient(Hh, dx, axis=1)
+    gz = np.gradient(Hh, dz, axis=0)
     N = np.stack([-gx, -gz, np.ones_like(gx)], -1)
     N /= np.linalg.norm(N, axis=-1, keepdims=True)
     save_png(os.path.join(KIT, 'crystal_normal.png'), N * 0.5 + 0.5)
-    bright = rng.uniform(0.78, 0.95, K)
-    alb = bright[idn] + 0.18 * np.exp(-w / 0.006)
-    alb = np.clip(alb, 0, 1)
-    save_jpg(os.path.join(KIT, 'crystal_albedo.jpg'), np.repeat(alb[..., None], 3, -1), 90)
 
 
 # ------------------------------------------------------------------ guardar imágenes

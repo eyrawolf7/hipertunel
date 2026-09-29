@@ -12,7 +12,8 @@ import { ROW_M } from '../sim/game.js';
 import { loadModel, loadTexture } from './assets.js';
 import { stylize } from './stylize.js';
 
-const MAXI = (ROWS + 4) * LANES;
+const MAXI = (ROWS + 4) * (LANES + 2);          // + los dos faldones de la lámina abierta
+const SKIRT_H = 1.5;                            // alto del faldón de piedra bajo cada borde
 const HALF_W = 1.035, LEN = 4.0;
 
 function patch(mat, crystal) {
@@ -21,7 +22,7 @@ function patch(mat, crystal) {
       .replace('#include <common>', `#include <common>
 attribute vec3 aC0; attribute vec3 aC1; attribute vec3 aC2; attribute vec3 aC3;
 attribute vec3 aN0; attribute vec3 aN1; attribute vec4 aWarn;
-varying vec4 vWarn; varying float vFacet;
+varying vec4 vWarn; varying float vFacet; varying float vTile;
 vec3 cellPos(vec3 p, out vec3 Tx, out vec3 Ny, out vec3 Tz){
   // X del kit va de C1 a C0 (no al revés): así la base (X, Y hacia dentro, Z adelante) es
   // dextrógira y la losa no sale reflejada (se verían sus caras de abajo)
@@ -38,13 +39,15 @@ vec3 objectNormal = normalize(_tx * normal.x + _ny * normal.y + _tz * normal.z);
 vec3 objectTangent = normalize(_tx * tangent.x + _ny * tangent.y + _tz * tangent.z);
 #endif`)
       .replace('#include <begin_vertex>', `vec3 transformed = cellPos(position, _tx, _ny, _tz);
-vWarn = aWarn; vFacet = fract(sin(dot(position.xz, vec2(12.9898, 78.233))) * 43758.5453);`);
+vWarn = aWarn; vTile = fract(sin(dot(aC0, vec3(12.9898, 78.233, 37.719))) * 43758.5453); vFacet = fract(sin(dot(position.xz, vec2(12.9898, 78.233))) * 43758.5453);`);
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec4 vWarn; varying float vFacet;\nuniform float uGlowK;')
+      .replace('#include <common>', '#include <common>\nvarying vec4 vWarn; varying float vFacet; varying float vTile;\nuniform float uGlowK;')
       .replace('#include <color_fragment>', crystal ? `#include <color_fragment>
 // cristal del aviso: apagado = pastel, encendido = color vivo
 float on = clamp((vWarn.a - 0.42) / 0.58, 0.0, 1.0);
-diffuseColor.rgb *= mix(mix(vWarn.rgb, vec3(1.0), 0.35), vWarn.rgb * mix(vec3(1.0), vWarn.rgb, 0.6), on);` : '#include <color_fragment>')
+diffuseColor.rgb *= mix(mix(vWarn.rgb, vec3(1.0), 0.35), vWarn.rgb * mix(vec3(1.0), vWarn.rgb, 0.6), on);` : `#include <color_fragment>
+// cada losa con su tono (±6 %) y alguna algo más verdosa, como piedra de verdad
+diffuseColor.rgb *= (0.94 + 0.12 * vTile) * mix(vec3(1.0), vec3(0.93, 1.02, 0.9), step(0.82, fract(vTile * 7.13)));`)
       .replace('#include <emissivemap_fragment>', crystal ? `#include <emissivemap_fragment>
 totalEmissiveRadiance += vWarn.rgb * (0.08 + 0.35 * on) * uGlowK;` : '#include <emissivemap_fragment>');
     sh.uniforms.uGlowK = mat.userData.uGlowK;
@@ -109,6 +112,7 @@ export class TunnelKit {
     const sec = section(game.fold);
     const lit = game.litStrips();
     const kNear = Math.floor(game.s) - 2;
+    const closed = game.fold === 30 || game.fold === -30;
     const cnt = { tile_stone: 0, tile_arch: 0, tile_crystal: 0, tile_crystal_arch: 0 };
     const v = this._v, n = this._n;
     if (this.stoneMat) this.stoneMat.color.copy(tint);
@@ -142,6 +146,29 @@ export class TunnelKit {
         n.copy(ra.X).multiplyScalar(nx).addScaledVector(ra.U, ny); g.aN0.setXYZ(i, n.x, n.y, n.z);
         n.copy(rb.X).multiplyScalar(nx).addScaledVector(rb.U, ny); g.aN1.setXYZ(i, n.x, n.y, n.z);
         g.aWarn.setXYZW(i, wr, wg, wb, wa);
+      }
+      // lámina abierta: un faldón de sillería cuelga de cada borde, así la pista tiene grosor de
+      // obra (como el anillo del concepto C·3) y no es una cinta de papel. Usa la losa lisa del
+      // kit con las esquinas en el borde y 1,5 m por debajo; la base queda dextrógira igual que en
+      // la calzada (X = C0 − C1, Y = normal de la cara, Z = adelante).
+      if (!closed && this.meshes.tile_stone) {
+        const vm = this.meshes.tile_stone, g = vm.attrs, b = sec.b, d = sec.d;
+        for (const side of [0, 1]) {
+          const c = side ? LANES - 1 : 0;
+          const vx = b[side ? LANES * 2 : 0], vy = b[side ? LANES * 2 + 1 : 1];
+          const tx = d[c * 2], ty = d[c * 2 + 1], nx = -ty, ny = tx;            // tangente y normal del carril del borde
+          const lx = vx - nx * SKIRT_H, ly = vy - ny * SKIRT_H;                  // pie del faldón
+          const [ax, ay, bx, by] = side ? [vx, vy, lx, ly] : [lx, ly, vx, vy];   // C0, C1
+          const ox = side ? tx : -tx, oy = side ? ty : -ty;                      // hacia fuera de la pista
+          const i = cnt.tile_stone++;
+          toWorld(ra, ax, ay, v); g.aC0.setXYZ(i, v.x, v.y, v.z);
+          toWorld(ra, bx, by, v); g.aC1.setXYZ(i, v.x, v.y, v.z);
+          toWorld(rb, bx, by, v); g.aC2.setXYZ(i, v.x, v.y, v.z);
+          toWorld(rb, ax, ay, v); g.aC3.setXYZ(i, v.x, v.y, v.z);
+          n.copy(ra.X).multiplyScalar(ox).addScaledVector(ra.U, oy); g.aN0.setXYZ(i, n.x, n.y, n.z);
+          n.copy(rb.X).multiplyScalar(ox).addScaledVector(rb.U, oy); g.aN1.setXYZ(i, n.x, n.y, n.z);
+          g.aWarn.setXYZW(i, 0, 0, 0, 0);
+        }
       }
     }
     for (const [key, vm] of Object.entries(this.meshes)) {

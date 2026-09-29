@@ -34,22 +34,24 @@ export class TunnelProps {
   constructor(scene) {
     this.scene = scene; this.ready = false;
     this.m = new THREE.Matrix4(); this.T = new THREE.Vector3(); this.N = new THREE.Vector3(); this.O = new THREE.Vector3(); this.p = new THREE.Vector3(); this.q = new THREE.Vector3();
-    Promise.all(['rib_stone', 'crystal_cluster', 'vine_edge'].map((n) => loadModel(n))).then(([rib, cry, vine]) => {
+    Promise.all(['rib_stone', 'crystal_cluster', 'vine_edge', 'vine_hang'].map((n) => loadModel(n))).then(([rib, cry, vine, hang]) => {
       if (rib) this.rib = instanced(rib, 12 * 6, scene);
-      if (cry) this.cry = instanced(cry, 12 * 6, scene);
+      if (cry) this.cry = instanced(cry, 12 * 6 + 40, scene);
       if (vine) this.vine = instanced(vine, 160, scene);
+      if (hang) { hang.traverse((o) => { if (o.isMesh) o.material.side = THREE.DoubleSide; }); this.hang = instanced(hang, 80, scene); }
       this.ready = !!(rib || cry || vine);
     });
   }
 
-  setVisible(v) { for (const k of ['rib', 'cry', 'vine']) this[k] && this[k].setVisible(v); }
+  setVisible(v) { for (const k of ['rib', 'cry', 'vine', 'hang']) this[k] && this[k].setVisible(v); }
 
   update(game, track) {
     if (!this.ready) return;
     const sec = section(game.fold);
     const { m, T, N, O, p, q } = this;
     const kNear = Math.floor(game.s) - 2;
-    this.rib && this.rib.begin(); this.cry && this.cry.begin(); this.vine && this.vine.begin();
+    this.rib && this.rib.begin(); this.cry && this.cry.begin(); this.vine && this.vine.begin(); this.hang && this.hang.begin();
+    const closed = game.fold === 30 || game.fold === -30;
     for (let k = kNear; k <= game.kLast; k++) {
       const r = track.rings.get(k); if (!r || game.inGap(k)) continue;
       const rib = k % 8 === 0;
@@ -80,7 +82,31 @@ export class TunnelProps {
           this.vine.add(m);
         }
       }
+      // lámina abierta: enredaderas que cuelgan por el faldón de cada borde y algún cristal en el
+      // canto, siempre por fuera de la calzada (nada que invada un carril)
+      if (!closed) {
+        const b = sec.b, d = sec.d;
+        for (const side of [0, 1]) {
+          const c = side ? LANES - 1 : 0;
+          const tx = d[c * 2], ty = d[c * 2 + 1], sg = side ? 1 : -1;
+          N.copy(r.X).multiplyScalar(-ty).addScaledVector(r.U, tx);                 // normal de la calzada
+          T.copy(r.X).multiplyScalar(tx * sg).addScaledVector(r.U, ty * sg);         // hacia fuera
+          toWorld(r, b[side ? LANES * 2 : 0], b[side ? LANES * 2 + 1 : 1], p);
+          if (this.hang && h(k, 20 + side) < 0.6) {
+            O.crossVectors(r.F, N).normalize();
+            m.makeBasis(r.F, N, O); m.scale(q.set(2.2, 1.0 + 0.9 * h(k, 30 + side), 2.2));
+            m.setPosition(q.copy(p).addScaledVector(T, 0.06).addScaledVector(N, 0.02));
+            this.hang.add(m);
+          }
+          if (this.cry && k % 6 === side * 3) {
+            O.crossVectors(T, r.F).normalize();
+            m.makeBasis(O, T, r.F); m.scale(q.set(1.8, 1.8, 1.8));
+            m.setPosition(q.copy(p).addScaledVector(N, -0.5).addScaledVector(T, 0.1));
+            this.cry.add(m);
+          }
+        }
+      }
     }
-    this.rib && this.rib.end(); this.cry && this.cry.end(); this.vine && this.vine.end();
+    this.rib && this.rib.end(); this.cry && this.cry.end(); this.vine && this.vine.end(); this.hang && this.hang.end();
   }
 }
