@@ -41,7 +41,8 @@ void main(){
   // panorama del mundo, orientado con el 'arriba' de la pista
   vec3 up = normalize(uUp); vec3 fw = normalize(uFwd - up * dot(uFwd, up)); vec3 rt = cross(fw, up);
   float lon = atan(dot(d, rt), dot(d, fw)); float lat = asin(clamp(h, -1.0, 1.0));
-  vec2 puv = vec2(lon / 6.2831853 + 0.5, 0.5 + lat / 3.14159265);
+  // el paisaje gira muy despacio: las nubes y las islas del fondo no se quedan congeladas
+  vec2 puv = vec2(lon / 6.2831853 + 0.5 + uTime * 0.0015, 0.5 + lat / 3.14159265);
   vec3 pa = texture2D(uPanoA, puv).rgb, pb = texture2D(uPanoB, puv).rgb;
   vec3 pano = mix(pa, pb, uPanoT); float hasP = mix(uHasA, uHasB, uPanoT);
   // lo de muy abajo del panorama (primer plano de la imagen) sale ampliado y borroso: bruma

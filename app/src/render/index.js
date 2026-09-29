@@ -19,6 +19,7 @@ import { Coins } from './coins.js';
 import { Streaks } from './streaks.js';
 import { TunnelKit } from './tunnelkit.js';
 import { TunnelProps } from './tunnelprops.js';
+import { Life } from './life.js';
 import { styleUniforms } from './stylize.js';
 import { THEMES, BOX_COLORS } from './worlds.js';
 
@@ -74,7 +75,7 @@ export class Renderer {
     this.tunnel = new Tunnel(this.scene);
     this.kit = new TunnelKit(this.scene);
     this.kit.onReady = () => this.warmup();
-    this.props = new TunnelProps(this.scene);
+    this.props = new TunnelProps(this.scene); this.life = new Life(this.scene);
     this.scene.fog = new THREE.Fog(0xffffff, 40, 120);
     this.stoneTint = new THREE.Color(1, 1, 1);
     this.boxes = new Boxes(this.scene);
@@ -320,6 +321,7 @@ export class Renderer {
     this.fx.update(dt);
     this.sky.update(cam, this.fr.U, outside ? 1 : 0, dt, this.cam.invert, this.fr.F);
     this.decor.update(game, tr, cam, true, dt);   // se ve también por los arcos del túnel
+    this.life.update(cam, this.look, this.upS, outside, this.themeIdx, dt, this.quality !== 'baja' && !reduceFx, this.cam.invert);
     this.renderer.setClearColor(this.fogColor, 1);
 
     // impulso: 0,4 s de azul eléctrico en juntas y anillos (nunca en los carriles)
