@@ -24,7 +24,7 @@ varying vec3 vDir;
 void main(){ vDir = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); gl_Position.z = gl_Position.w; }`;
 const frag = /* glsl */`
 uniform vec3 uTop; uniform vec3 uMid; uniform vec3 uBot; uniform vec3 uSun; uniform vec3 uUp; uniform vec3 uSunDir;
-uniform float uStars; uniform float uTime; uniform float uInvert;
+uniform float uStars; uniform float uTime; uniform float uInvert; uniform float uIn;
 uniform sampler2D uPanoA; uniform sampler2D uPanoB; uniform float uHasA; uniform float uHasB; uniform float uPanoT; uniform vec3 uFwd;
 varying vec3 vDir;
 float hash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
@@ -49,6 +49,9 @@ void main(){
   // borroso de los pintados; solo un toque muy abajo, cerca del polo)
   pano = mix(pano, uMid, smoothstep(-0.6, -0.9, h) * 0.5);
   col = mix(col, pano * 1.05 + uSun * pow(sd, 900.0) * 2.0, hasP);
+  // dentro del túnel, lo que se ve por los arcos tira hacia el tono del horizonte del mundo (el
+  // cielo pálido parecía un agujero en la pared)
+  col = mix(col, mix(uMid, uTop, 0.55) * 0.85, uIn * 0.5);
   vec3 night = mix(vec3(0.02, 0.015, 0.06), vec3(0.09, 0.04, 0.16), smoothstep(-0.3, 0.6, h)) + vec3(st) * 1.2;
   col = mix(col, night, uInvert);
   gl_FragColor = vec4(col, 1.0);
@@ -82,7 +85,7 @@ export class Sky {
     this.u = {
       uTop: { value: new THREE.Color() }, uMid: { value: new THREE.Color() }, uBot: { value: new THREE.Color() },
       uSun: { value: new THREE.Color() }, uUp: { value: new THREE.Vector3(0, 1, 0) }, uSunDir: { value: new THREE.Vector3(-0.4, 0.5, -1).normalize() },
-      uStars: { value: 0 }, uTime: { value: 0 }, uInvert: { value: 0 },
+      uStars: { value: 0 }, uTime: { value: 0 }, uInvert: { value: 0 }, uIn: { value: 1 },
       uPanoA: { value: null }, uPanoB: { value: null }, uHasA: { value: 0 }, uHasB: { value: 0 }, uPanoT: { value: 0 }, uFwd: { value: new THREE.Vector3(0, 0, -1) },
     };
     this.mesh = new THREE.Mesh(new THREE.SphereGeometry(800, 48, 24), new THREE.ShaderMaterial({ vertexShader: vert, fragmentShader: frag, uniforms: this.u, side: THREE.BackSide, depthWrite: false, fog: false }));
@@ -120,6 +123,7 @@ export class Sky {
     this.u.uUp.value.lerp(up, Math.min(1, dt * 1.5)).normalize();
     this.u.uTime.value += dt;
     this.u.uInvert.value = invert;
+    this.u.uIn.value += ((outside ? 0 : 1) - this.u.uIn.value) * Math.min(1, dt * 2);
     // el túnel de piedra tiene arcos abiertos: el cielo se ve siempre
     this.vis = 1;
     this.mesh.visible = true;

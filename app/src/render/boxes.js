@@ -83,12 +83,22 @@ export class Boxes {
     // borde luminoso del color de la caja (fresnel) y núcleo algo más oscuro: se lee como un bloque
     // con luz dentro, no como plástico macizo, y el bloom recoge el contorno
     stoneM.onBeforeCompile = (sh) => {
+      // posición local en el cubo unidad (cada bloque de una caja larga tiene la suya): de ahí salen
+      // las aristas, que se encienden con el color de la caja
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vBoxL;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBoxL = position;');
       sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nvarying vec3 vBoxL;')
         .replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb *= 0.8;')
         .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
   #ifdef USE_INSTANCING_COLOR
   float boxFres = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 3.0);
-  totalEmissiveRadiance += vColor * boxFres * 0.6;
+  vec3 bq = abs(vBoxL);
+  float bMid = bq.x + bq.y + bq.z - max(bq.x, max(bq.y, bq.z)) - min(bq.x, min(bq.y, bq.z));
+  float boxEdge = smoothstep(0.34, 0.44, bMid);
+  // núcleo con algo de luz propia, aristas encendidas y borde fresnel: bloque con luz dentro
+  totalEmissiveRadiance += vColor * (0.14 + boxEdge * 1.0 + boxFres * 0.45);
   #endif`);
     };
     const stone = stylize(stoneM, { rim: 0.35, key: 'box-stone2' });
