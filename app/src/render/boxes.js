@@ -65,6 +65,7 @@ export class Boxes {
     this.carton = new Carton(scene);           // bloque rompible del muro del Arcade
     this.cartonMats = new Map();               // id -> matriz (para la rotura)
     this.kraft = new THREE.Color(0xc8894a);
+    this.wallStone = new THREE.Color(0xd8c8a8).multiplyScalar(0.75);   // muro del Arcade: piedra, no cristal
     this.nShadow = 0;
     this.outline.frustumCulled = false; this.outline.count = 0;
     scene.add(this.outline);
@@ -153,7 +154,7 @@ export class Boxes {
       B.copy(fr.F).negate();
       const cx = sp.x, cy = sp.y;
       // un pelín más ancha que el carril: la caja choca a ±22,5°, más que el medio carril (15°)
-      const w = CELL_W * (b.fixed ? 1.02 : 1.1);
+      const w = CELL_W * (b.carton ? 1.12 : b.fixed ? 1.02 : 1.1);   // el cartón algo mayor: se lee de lejos
       let h = tall ? 2 * R * Math.cos(Math.PI / LANES) - 0.02 : (b.tall ? R : SHORT_H * M_PER_UNIT);
       const len = ROW_M * (b.joined ? 1.02 : 0.9);
       h *= b.grow < 1 ? easeOut(b.grow) : 1;
@@ -185,7 +186,7 @@ export class Boxes {
       this.glowBy.set(b.id, g1);
       this.glow[n] = g1;
       if (flashId === b.id) { this.mesh.setColorAt(n, this.col.setRGB(1, 1, 1)); this.glow[n] = 2; }
-      else this.mesh.setColorAt(n, b.carton ? this.kraft : colors[b.color]);
+      else this.mesh.setColorAt(n, b.carton ? this.kraft : b.wall ? this.wallStone : colors[b.color]);
       this.types[n] = b.carton && this.carton.ready ? 2 : b.fixed ? 0 : 1;
       if (b.carton) this.cartonMats.set(b.id, m.clone());
       this.dims[n * 3] = w; this.dims[n * 3 + 1] = h; this.dims[n * 3 + 2] = len;

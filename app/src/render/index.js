@@ -130,7 +130,7 @@ export class Renderer {
     this.camera.updateProjectionMatrix();
   }
 
-  reset() { this.boxes?.carton?.reset(); this.introT = -1; this.deadT = 0; this.heroMood = null; this.track.reset(); this.fx.reset(); this.cam.shake = 0; this.cam.kick = 0; this.cam.roll = 0; this.cam.rollAmp = 0; this.deathFocus = null; this.themeIdx = this.themeBase || 0; this.pendingTheme = 0; this.applyTheme(this.themeIdx, this.themeIdx, 1); this.look.set(0, 0, -1); this.upS.set(0, 1, 0); this.firstFrame = true; }
+  reset() { this.boxes?.carton?.reset(); this.deadS = null; this.introT = -1; this.deadT = 0; this.heroMood = null; this.track.reset(); this.fx.reset(); this.cam.shake = 0; this.cam.kick = 0; this.cam.roll = 0; this.cam.rollAmp = 0; this.deathFocus = null; this.themeIdx = this.themeBase || 0; this.pendingTheme = 0; this.applyTheme(this.themeIdx, this.themeIdx, 1); this.look.set(0, 0, -1); this.upS.set(0, 1, 0); this.firstFrame = true; }
 
   applyTheme(from, to, t) {
     const A = THEMES[from % THEMES.length], B = THEMES[to % THEMES.length];
@@ -166,7 +166,7 @@ export class Renderer {
         const bc = this.colors[(game.boxes.find((b) => b.id === e.id) || { color: 0 }).color];
         if (p) this.fx.explode(p, bc, 80, this.look, 60, 1.5);
         this.cam.shake = 0.5; this.cam.shakeDecay = 1.4; this.cam.rollShake = 0.25; this.cam.vigT = 0.15; this.cam.vigCol = bc.clone();
-        if (e.fatal) { this.flash(0xff3040, 0.55); this.deathFocus = p ? p.clone() : null; }
+        if (e.fatal) { this.flash(0xff3040, 0.35); this.deathFocus = p ? p.clone() : null; this.deadS = game.s; }
         else this.flash(bc.getHex(), 0.3);
         this.cam.hit = 1;
       }
@@ -176,7 +176,7 @@ export class Renderer {
         const m = this.boxes.cartonMats.get(e.id), p = this.boxes.positions.get(e.id);
         const camDir = new THREE.Vector3(); this.camera.getWorldDirection(camDir);
         if (m) this.boxes.carton.smash(m, this.look, game.speedMS, this.camera.position, camDir);
-        if (p) for (const [hex, n] of [[0xc8894a, 26], [0xffffff, 10], [0xffc21a, 8], [0xff4b4b, 6], [0x5cc85a, 6]]) this.fx.explode(p, new THREE.Color(hex), n, this.look, game.speedMS, 0.8);
+        if (p) for (const [hex, n] of [[0xc8894a, 16], [0xffffff, 8], [0xffc21a, 6], [0xff4b4b, 5], [0x5cc85a, 5]]) this.fx.explode(p, new THREE.Color(hex), n, this.look, game.speedMS, 0.8);
         this.cam.vigT = 0.08; this.cam.vigCol = new THREE.Color(0xc8894a).multiplyScalar(0.25);
         this.cam.smashFov = 0.15; this.cam.shake = Math.max(this.cam.shake, 0.06); this.cam.shakeDecay = 0.5;
         this.hero.once('smash');
@@ -240,9 +240,10 @@ export class Renderer {
       if (t > 2.4) { this.introT = -1; return null; }
       // 0-1 s: plano de tres cuartos por delante; 1-2,2 s: vuelo hasta la nuca (easeInOutCubic)
       const f = Math.min(1, Math.max(0, (t - 1.0) / 1.2)), k = f < 0.5 ? 4 * f * f * f : 1 - Math.pow(-2 * f + 2, 3) / 2;
-      // (de lado y algo alto: detrás del zorro se ve el túnel, no la boca vacía del arranque)
-      const yaw = t < 1 ? 128 - 16 * t : 112 * (1 - k);
-      return { e: 1 - k, yaw: yaw * DEG, dist: 3.0, h: 1.3 * (1 - k * 0.3), aim: 0.7, shift: 0, fov: 50, intro: true };
+      // (de lado mirando hacia delante: detrás del zorro se ve el túnel, no la boca vacía del
+      // arranque; el zorro en el tercio izquierdo para que la cuenta atrás no le caiga encima)
+      const yaw = t < 1 ? 62 - 10 * t : 52 * (1 - k);
+      return { e: 1 - k, yaw: yaw * DEG, dist: 3.0, h: 1.3 * (1 - k * 0.3), aim: 0.7, shift: 0.9 * (1 - k), fov: 50, intro: true };
     }
     // pirueta en el salto entre mundos: la cámara se retira 2,5 m (atrás y arriba) en 0,25 s y
     // vuelve a la cabeza en 0,3 s, siempre al menos 0,25 s antes de aterrizar; en vuelos cortos
@@ -255,7 +256,7 @@ export class Renderer {
       this.trickCam = Math.max(0, Math.min(1, (this.trickCam || 0) + Math.sign(want - (this.trickCam || 0)) * Math.min(Math.abs(want - (this.trickCam || 0)), dt / (want > (this.trickCam || 0) ? 0.25 : 0.3))));
       if (this.trickCam > 0) {
         const k = this.trickCam, e = 1 - Math.pow(1 - k, 3);
-        return { e, yaw: 0, dist: 2.5, h: 1.1, aim: 0.4, ahead: 7, shift: 0, fov: null, twist: game.trickT >= 0 ? game.trickT / 0.4 : 0 };
+        return { e, yaw: 0, dist: 2.5, h: 1.8, aim: -0.2, ahead: 12, shift: 0, fov: null, twist: game.trickT >= 0 ? game.trickT / 0.4 : 0 };
       }
     } else this.trickCam = 0;
     if (!game.alive) {
@@ -267,10 +268,12 @@ export class Renderer {
       if (hitBox && t0 < 0.75 && t >= 0.75) this.hero.once('land');
       // durante la caída el zorro va algo a la izquierda; cuando sale la tarjeta final (al centro)
       // la cámara se desliza hasta dejarlo en la franja izquierda (x ≈ −0,64 en pantalla)
-      const side = 4.4 * 0.64 * Math.tan(29 * DEG) * this.camera.aspect, g = Math.min(1, Math.max(0, (t - 0.95) / 0.6));
-      const shift = 1.25 + (side - 1.25) * g * g * (3 - 2 * g);
+      // y girando hasta verlo de tres cuartos de frente
+      const g0 = Math.min(1, Math.max(0, (t - 0.95) / 0.6)), g = g0 * g0 * (3 - 2 * g0);
+      const dist = 4.4 + 0.8 * g, side = dist * 0.72 * Math.tan(29 * DEG) * this.camera.aspect;
+      const shift = 1.25 + (side - 1.25) * g;
       const arc = hitBox ? 1.7 * Math.sin(Math.PI * a) : 0;
-      return { e, yaw: 26 * DEG, dist: 4.4, h: 1.9, aim: 0.7 + arc * 0.7, shift, fov: 58, arc, spin: hitBox ? -Math.PI * 2 * (1 - (1 - a) * (1 - a)) : 0 };
+      return { e, yaw: (26 + 124 * g) * DEG, dist, h: 1.9, aim: 0.7 + arc * 0.7, shift, fov: 58, arc, spin: hitBox ? -Math.PI * 2 * (1 - (1 - a) * (1 - a)) : 0 };
     }
     this.deadT = 0;
     return null;
@@ -287,7 +290,7 @@ export class Renderer {
     const landing = gapAhead ? gapAhead.to + 1 : -1;
     if (this.pendingTheme && (!gapAhead || s >= landing - 0.5)) {
       this.themeFrom = this.themeIdx; this.themeIdx += this.pendingTheme; this.pendingTheme = 0; this.themeBlend = 0;
-      if (gapAhead || this.wasFlying) { this.flash(THEMES[this.themeIdx % THEMES.length].glow, 0.3); this.landT = 1.5; this.landed = true; this.cam.worldFov = 0.4; }
+      if (gapAhead || this.wasFlying) { this.flash(THEMES[this.themeIdx % THEMES.length].glow, 0.3); this.landT = 1.5; this.landed = true; this.cam.worldFov = 0.63; }
     }
     this.wasFlying = game.jumpAt(s) > 0.2;
     const inv = game.inverted || (this.pendingTheme > 0) ? 1 : 0;
@@ -314,7 +317,7 @@ export class Renderer {
     const V = this.outView(game, dt);
     if (this.third || V) {
       // tercera persona: el zorro va donde iría la cámara (en s), y la cámara detrás y por encima
-      tr.frameAt(s, this.frH || (this.frH = makeFrame()));
+      tr.frameAt(!game.alive && this.deadS != null ? this.deadS : s, this.frH || (this.frH = makeFrame()));
       const spH = surfSmooth(sec, u, closed, this.spH || (this.spH = {}));
       heroN = new THREE.Vector3().copy(this.frH.X).multiplyScalar(spH.nx).addScaledVector(this.frH.U, spH.ny);
       heroAt = this.heroPos.copy(this.frH.P).addScaledVector(this.frH.X, spH.x).addScaledVector(this.frH.U, spH.y).addScaledVector(heroN, 0.02 + game.jumpAt(s));
@@ -370,8 +373,9 @@ export class Renderer {
     const sp01 = Math.min(1, Math.max(0, (game.speedMS - 36) / 64));
     const fov = this.baseFov + (this.third ? 6 : 0) + iq * 18 + sp01 * 14 + easeKick(c.kick) * (reduceFx ? 4 : 12) * (c.kickAmp || 1) + (c.foldFov > 0 ? Math.sin(Math.min(1, (1.2 - c.foldFov) / 1.2) * Math.PI) * 8 : 0);
     if (c.foldFov > 0) c.foldFov -= dt;
-    // aterrizaje en un mundo nuevo: pulso de +6° en 0,4 s
-    let fovF = fov + (c.worldFov > 0 ? Math.sin(Math.PI * (1 - c.worldFov / 0.4)) * 6 * (reduceFx ? 0.4 : 1) : 0);
+    // aterrizaje en un mundo nuevo: pulso de campo de visión
+    let fovF = fov;
+    if (c.worldFov > 0) { const t = 0.63 - c.worldFov, w = t < 0.1 ? 0 : t < 0.18 ? (t - 0.1) / 0.08 : 1 - (t - 0.18) / 0.45; fovF += Math.max(0, w) * 10 * (reduceFx ? 0.4 : 1); }
     if (c.worldFov > 0) c.worldFov -= dt;
     if (c.smashFov > 0) { fovF += 4 * (c.smashFov / 0.15) * (reduceFx ? 0.4 : 1); c.smashFov -= dt; }
     if (V && V.e > 0 && V.fov) fovF += (V.fov - fovF) * V.e;
@@ -381,7 +385,7 @@ export class Renderer {
 
     // ---- el zorro: en tercera persona, en la vista de fuera y de mascota en el título
     if (this.third) this.hero.update(true, heroAt, heroN, this.look, game.alive ? game.omega : 0, game.jumpAt(s) > 0.15, game.level, dt);
-    else if (V && V.e > 0.25) {
+    else if (V && V.e > (V.intro ? 0.2 : 0.25)) {
       this.hero.update(true, this._hp.copy(heroAt).addScaledVector(heroN, V.arc || 0), heroN, this.frH.F, game.alive ? game.omega : 0, false, game.level, dt, V.spin || 0, this.heroMood, 1, V.twist || 0);
       this.heroShown = true;
     } else if (mascot) {
@@ -394,7 +398,7 @@ export class Renderer {
       this.hero.update(true, at, camUp, fwd, game.omega, false, 0, dt, 0, null, k);
     } else {
       // al entrar en su cabeza en el arranque: velo breve para no ver el interior del modelo
-      if (this.heroShown && V && V.intro) this.flash(this.fogColor.getHex(), 0.3);
+      if (this.heroShown && V && V.intro) this.flash(this.fogColor.getHex(), 0.15);
       this.heroShown = false;
       this.hero.update(false);
     }
@@ -436,7 +440,7 @@ export class Renderer {
     if (this.quality !== 'baja') this.props.update(game, tr);
     const tu = this.tunnel.uniforms;
     this.scene.fog.color.copy(tu.uFog.value); this.scene.fog.near = tu.uFogNear.value; this.scene.fog.far = tu.uFogFar.value;
-    this.boxes.update(game, tr, this.colors, dt, !game.alive && this.deathT > 0 && Math.floor(this.deathT * 10) % 2 ? game.killer : 0, cam.position);
+    this.boxes.update(game, tr, this.colors, dt, !game.alive && this.deathT > 0 && this.deathT < 0.3 ? game.killer : 0, cam.position);
     this.tunnel.uniforms.uOutside.value += ((game.fold < 29 ? 1 : 0) - this.tunnel.uniforms.uOutside.value) * Math.min(1, dt * 2);
     this.tunnel.uniforms.uSkyFill.value.copy(this.sky.u.uTop.value);
     this.streaks.outside = outside;

@@ -107,7 +107,9 @@ export class Arcade extends Game {
   }
 
   // los carriles del muro se encienden (viene una caja); el del cartón se queda apagado
-  // (y si detrás del muro hay otra caja en ese carril, el aviso empieza pasado el muro)
+  // (y si detrás del muro hay otra caja en ese carril, el aviso empieza pasado el muro). Los
+  // carriles del muro solo se encienden en sus últimas 8 filas: 11 carriles encendidos a la vez
+  // teñían el túnel entero.
   litStrips() {
     const out = super.litStrips();
     for (const [lane, list] of out) {
@@ -116,6 +118,7 @@ export class Arcade extends Game {
       for (const x of list) {
         const b = this.boxes.find((y) => y.id === x.id);
         if (b && b.carton) continue;
+        if (b && b.wall) { if (b.k - x.from <= 8) keep.push(x); else keep.push({ ...x, from: b.k - 8 }); continue; }
         if (hole && x.to > hole.k) keep.push({ ...x, from: Math.max(x.from, hole.k + 1) });
         else if (!hole || x.to < hole.k) keep.push(x);
       }

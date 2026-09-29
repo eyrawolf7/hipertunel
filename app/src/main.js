@@ -385,7 +385,9 @@ function stepSim() {
     const fl = !!game.flight();
     if (fl) flightT = 0.5; else flightT -= STEP;
     input.trickArm = flightT > 0;
+    // al despegar se quitan los avisos; al aterrizar, solo la pista de la pirueta
     if (fl && !wasFlight) document.querySelectorAll('.toast').forEach((t) => t.remove());
+    if (!fl && wasFlight) document.querySelectorAll('.toast').forEach((t) => { if (/pirueta!/i.test(t.textContent) && !/\+/.test(t.textContent)) t.remove(); });
     if (fl && !wasFlight && trickHints < 3 && !game.tricksTotal) { trickHints++; try { localStorage.setItem('hipertunel-pistas-pirueta', String(trickHints)); } catch (e) {} toastOk = true; ui.toast(COARSE ? '¡Toca para hacer una pirueta!' : '¡Pirueta! Pulsa Espacio o X', 'boost'); toastOk = false; }
     wasFlight = fl;
   } else input.trickArm = false;
@@ -410,7 +412,7 @@ function stepSim() {
     else if (e.type === 'jump') { audio.play('jump'); buzz(12); }
     else if (e.type === 'wallSoon') { if (wallHints < 3) { wallHints++; try { localStorage.setItem('hipertunel-pistas-muro', String(wallHints)); } catch (x) {} ui.toast('¡Viene un muro! Busca el bloque de cartón y atraviésalo', 'boost'); } }
     else if (e.type === 'smash') { coins = game.coinsGot; audio.play('smash'); buzz([20, 15, 30]); ui.toast('¡Cartón roto! +5', 'mission'); }
-    else if (e.type === 'trick') { audio.play('whiff'); buzz(8); }
+    else if (e.type === 'trick') { audio.play('whiff'); buzz(8); if (e.n === 1) document.querySelectorAll('.toast').forEach((t) => t.remove()); }
     else if (e.type === 'trickDone') { toastOk = true; coins = game.coinsGot; audio.play('coin', { combo: e.perfect ? 8 : 4 }); buzz(e.perfect ? [15, 30, 15, 30, 30] : [12, 25, 12]); const why = e.perfect ? '¡Pirueta perfecta! +10' : e.n > 1 ? `Pirueta ×${e.n} +5` : 'Pirueta +5'; if (mult >= 5) ui.toast(why, 'mission'); else bumpMult(why); toastOk = false; }
     else if (e.type === 'trickFail') { coins = game.coinsGot; ui.toast(e.lost ? `¡Tropiezo! Pierdes ${e.lost} monedas${mult > 1 ? ` y la racha ×${mult}` : ''}` : mult > 1 ? `Tropiezo: racha perdida (×${mult})` : '¡Tropiezo! Acaba la pirueta antes de caer', 'info'); mult = 1; multDist = 0; audio.play('land'); buzz([40, 30, 40]); renderer.stumble?.(); }
     else if (e.type === 'noJump') { audio.play('whiff'); ui.jumpDenied?.(); }

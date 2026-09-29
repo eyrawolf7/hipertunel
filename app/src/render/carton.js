@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { loadModel } from './assets.js';
 import { stylize } from './stylize.js';
 
-const LIFE = 0.45;
+const LIFE = 0.35;
 const POOL = 3;                 // roturas a la vez
 
 export class Carton {
@@ -71,7 +71,8 @@ export class Carton {
       const rad = p.clone().sub(camPos); rad.addScaledVector(camDir, -rad.dot(camDir));
       if (rad.lengthSq() < 1e-4) rad.set(Math.random() - 0.5, 1, Math.random() - 0.5);
       rad.normalize().multiplyScalar(9 + Math.random() * 5);
-      const v = out.add(rad).addScaledVector(fwd, speed * (0.82 + Math.random() * 0.1));
+      // más lentos que tú hacia delante: la cámara los adelanta y se abren hacia los bordes
+      const v = out.add(rad).addScaledVector(fwd, speed * (0.55 + Math.random() * 0.1));
       const spin = new THREE.Vector3(Math.random() * 2 - 1, Math.random() * 2 - 1, Math.random() * 2 - 1).multiplyScalar(14);
       me.visible = true;
       parts.push({ me, p, v, spin, q0: rot.clone().multiply(s.q), scl: scl.clone() });
