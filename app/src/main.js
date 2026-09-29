@@ -117,7 +117,7 @@ function skipIntro() { renderer.skipIntro(); countdown = Math.min(countdown, 0.8
 input.onButton = (b) => {
   if (b === 'mute') { settings.sound = !settings.sound; audio.setMuted(!settings.sound); saveSettings(); ui.settings(settings); return; }
   if (state === 'play' && (b === 'pause' || b === 'back')) { pause(); return; }
-  if (state === 'over' && b === 'ok' && overT > 0.6) { startGame(mode, true); return; }
+  if (state === 'paused' && b === 'pause') { resume(); return; }
   if (state === 'countdown' && renderer.introOn && (b === 'ok' || b === 'back')) { skipIntro(); return; }
   if (state !== 'play' && state !== 'countdown') {
     if (b === 'up' || b === 'left' || b === 'down' || b === 'right') ui.navigate?.(b);
@@ -467,6 +467,7 @@ function frame(now) {
   let dt = (now - last) / 1000; last = now;
   if (!(dt > 0)) dt = 0; if (dt > 0.1) dt = 0.1;
   if (fps.el) { fps.buf.push(dt); if (fps.buf.length > 120) fps.buf.shift(); }
+  input.poll();
 
   if (state === 'countdown') {
     const before = Math.ceil(countdown);
