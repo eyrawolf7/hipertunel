@@ -773,3 +773,9 @@
 @keyframes padNudgeR { to { margin-right: .25em; } }
 .htui .pad-hint path { fill: #3fb6ff; stroke: var(--ink); stroke-width: 3; }
 .htui .pad-hint .ico { width: .9em; height: 1em; }
+.htui .card-daily { --c: #b58cff; --cd: #7a4fe0; --detail: #7a4fe0; }
+.htui .card-voyage { --c: #5fdf8f; --cd: #1fa25a; --detail: #1fa25a; }
+/* cinco modos: fila con desplazamiento lateral (en el móvil no caben en tres columnas) */
+.htui .scr-modes .cards { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(11.5em, 1fr); max-width: 64em; overflow-x: auto; scroll-snap-type: x mandatory; padding: .6em .4em 1em; }
+.htui .scr-modes .card { scroll-snap-align: center; }
+.htui .card.locked { filter: grayscale(.85); opacity: .7; }

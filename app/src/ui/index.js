@@ -17,6 +17,8 @@ const MODES = {
   classic: { name: 'Clásico', desc: 'Sin límite. Llega lo más lejos que puedas.', tag: 'Lo de siempre' },
   survival: { name: 'Supervivencia', desc: 'Sin impulsos y la velocidad no para de subir.', tag: 'Para valientes' },
   timetrial: { name: 'Contrarreloj', desc: '60 s. Cada impulso suma tiempo, cada choque resta.', tag: 'A toda prisa' },
+  daily: { name: 'Reto diario', desc: 'El mismo túnel para todos hoy. ¿Hasta dónde llegas?', tag: 'Hoy' },
+  voyage: { name: 'Viaje', desc: 'Empieza en el último mundo al que llegaste.', tag: 'Mundos', lockedDesc: 'Llega al mundo 2 para desbloquearlo.' },
 };
 const MODE_KEYS = Object.keys(MODES);
 const MENU_SCREENS = new Set(['title', 'modes', 'settings', 'pause', 'over']);
@@ -372,7 +374,10 @@ export function createUI(root, handlers = {}) {
     if (el.dataset.set) { setVal(el.dataset.set, !vals[el.dataset.set]); snd('menuOk'); return; }
     if (el.dataset.adjust === 'quality') { adjust('quality', 1, true); return; }
     if (el.dataset.adjust) return;
-    if (el.dataset.mode) { lastMode = el.dataset.mode; snd('menuOk'); call('onPlay', lastMode); return; }
+    if (el.dataset.mode) {
+      if (el.classList.contains('locked')) { snd('menuBack'); toast(MODES[el.dataset.mode].lockedDesc || 'Bloqueado', 'info'); return; }
+      lastMode = el.dataset.mode; snd('menuOk'); call('onPlay', lastMode); return;
+    }
     const act = el.dataset.act;
     if (!act) return;
     if (act === 'back') { back(); return; }
@@ -653,6 +658,8 @@ export function createUI(root, handlers = {}) {
 
   return {
     show, hud, toast, over, settings, tiltMeter, records: setRecords, missions,
+    // modos bloqueados: { voyage: true } → tarjeta en gris con su descripción de desbloqueo
+    locks(l = {}) { for (const k of MODE_KEYS) { const c = $(`.card-${k}`); if (!c) continue; c.classList.toggle('locked', !!l[k]); const d = $('.card-desc', c); if (d) d.textContent = l[k] && MODES[k].lockedDesc ? MODES[k].lockedDesc : MODES[k].desc; } },
     navigate, confirm, back,
     get screen() { return current; },
     root,

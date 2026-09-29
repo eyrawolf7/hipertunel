@@ -22,9 +22,15 @@ let settings = { ...DEFAULTS };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('hipertunel-ajustes') || '{}')); } catch (e) {}
 if (QS.get('q')) settings.quality = QS.get('q');
 const saveSettings = () => { try { localStorage.setItem('hipertunel-ajustes', JSON.stringify(settings)); } catch (e) {} };
-const loadTop = (mode) => { try { return JSON.parse(localStorage.getItem('hipertunel-top-' + mode) || '[]'); } catch (e) { return []; } };
-const saveTop = (mode, list) => { try { localStorage.setItem('hipertunel-top-' + mode, JSON.stringify(list)); } catch (e) {} };
+const loadTop = (mode) => { try { return JSON.parse(localStorage.getItem('hipertunel-top-' + topKey(mode)) || '[]'); } catch (e) { return []; } };
+const saveTop = (mode, list) => { try { localStorage.setItem('hipertunel-top-' + topKey(mode), JSON.stringify(list)); } catch (e) {} };
 // los récords van por distancia, como en Boost 2; los puntos (con monedas) son un dato aparte
+// modos que juegan con las reglas del clásico (Boost 2 exacto): cambia la semilla o el mundo visual
+const simMode = (m) => (m === 'daily' || m === 'voyage' ? 'classic' : m);
+const dayKey = () => { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; };
+const daySeed = (k) => { let h = 2166136261; for (const c of 'hipertunel-' + k) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; };
+const topKey = (m) => (m === 'daily' ? 'daily-' + dayKey() : m);
+const maxWorld = () => { try { return +(localStorage.getItem('hipertunel-mundo-max') || 0) || 0; } catch (e) { return 0; } };
 const bestOf = (mode) => { const t = loadTop(mode); return t.length ? (t[0].distM ?? t[0].score) : 0; };
 
 // ---------------------------------------------------------------- piezas
@@ -42,7 +48,8 @@ let game = null, mode = 'classic', state = 'attract';
 let acc = 0, prev = { s: 0, theta: 0 }, countdown = 0, overT = 0, pausedFrom = null;
 let pausedAt = -1e9;                 // cuándo se pausó con un toque (para no reanudar con el mismo)
 let coins = 0;
-let lostAt = -1, killBox = null, recAnnounced = false;   // para el resumen del fin de partida
+let worldBase = 0;                   // modo Viaje: mundo visual con el que se empieza
+let lostAt = -1, killBox = null, recAnnounced = false, visWorld = 1;   // visWorld: mundo que se ve (1, 2…)   // para el resumen del fin de partida
 const bestAtStart = {};
 
 const ui = createUI($('ui'), {
@@ -64,7 +71,7 @@ const ui = createUI($('ui'), {
   keyboard: false,
 });
 const pushMissions = () => ui.missions?.(missions.list(), missions.rank());
-const pushRecords = () => ui.records?.({ classic: bestOf('classic'), survival: bestOf('survival'), timetrial: bestOf('timetrial') });
+const pushRecords = () => { ui.records?.({ classic: bestOf('classic'), survival: bestOf('survival'), timetrial: bestOf('timetrial'), daily: bestOf('daily'), voyage: bestOf('voyage') }); ui.locks?.({ voyage: maxWorld() < 1 }); };
 pushRecords();
 pushMissions();
 ui.settings(settings);
@@ -101,7 +108,10 @@ function goLandscape() {
 
 // ---------------------------------------------------------------- estados
 function newGame(m, seed) {
-  game = new Game({ mode: m, seed: seed ?? ((Math.random() * 1e9) | 0) });
+  if (m === 'daily' && seed === undefined) seed = daySeed(dayKey());
+  game = new Game({ mode: simMode(m), seed: seed ?? ((Math.random() * 1e9) | 0) });
+  worldBase = m === 'voyage' ? maxWorld() : 0;
+  renderer.themeBase = worldBase;
   renderer.reset();
   prev = { s: game.s, theta: game.theta };
   acc = 0;
@@ -128,12 +138,12 @@ function startGame(m, quick = false) {
   newGame(m);
   coins = 0;
   bestAtStart[m] = bestOf(m);
-  missions.start(); missDist = 0; lostAt = -1; killBox = null; recAnnounced = false;
+  missions.start(); missDist = 0; lostAt = -1; killBox = null; recAnnounced = false; visWorld = 1;
   renderer.setRecordRow?.(bestAtStart[m] > 0 ? Math.round(bestAtStart[m] / 4) : -1);
   // reintento rápido: sin 3-2-1, solo un instante antes del ¡YA!
   state = 'countdown'; countdown = quick ? 0.6 : 3; pendingChime = false; nearT = 0;
   ui.show('hud');
-  audio.setWorld(0);
+  audio.setWorld(worldBase * 2);
   audio.play('countdown');
   let seen = 0; try { seen = +(localStorage.getItem('hipertunel-partidas') || 0); localStorage.setItem('hipertunel-partidas', String(seen + 1)); } catch (e) {}
   if (seen < 3) setTimeout(() => ui.toast(input.hasTilt ? 'Inclina el móvil para girar · toca la pantalla para pausar' : (COARSE ? 'Toca a la izquierda o a la derecha para girar' : 'Gira con ← →'), 'info'), 300);
@@ -158,6 +168,7 @@ function finish() {
   list.push(me); list.sort((a, b) => (b.distM ?? b.score) - (a.distM ?? a.score));
   const top = list.slice(0, 5); saveTop(mode, top);
   const isRecord = top[0] === me && list.length > 1;
+  try { const w = worldBase + visWorld - 1; if (w > maxWorld()) localStorage.setItem('hipertunel-mundo-max', String(Math.min(w, 4))); } catch (e) {}
   const mr = missions.finish();
   const facts = endFacts(distM, bestAtStart[mode] || 0, isRecord);
   pushMissions();
@@ -188,7 +199,7 @@ function endFacts(distM, best, isRecord) {
   else if (killBox && !killBox.fixed) out.push('Te pilló una caja rodante: fíjate hacia dónde gira');
   else if (killBox && killBox.tall) out.push('Los pilares cruzan el túnel: esquívalos por un lado');
   else if (game.level === 0 && distM < 400) out.push('Pisa las flechas azules: con impulso, un choque no te elimina');
-  if (out.length < 2 && game.world > 0) out.push(`Llegaste al mundo ${game.world + 1}`);
+  if (out.length < 2 && visWorld > 1) out.push(`Llegaste al mundo ${visWorld}`);
   return { headline, lines: out.slice(0, 2) };
 }
 const fmtN = (n) => n.toLocaleString('es-ES');
@@ -252,11 +263,12 @@ function stepSim() {
       // desde fuera, el plegado hacia dentro lleva a un mundo nuevo: se avisa con la distancia
       // aproximada (32 filas de recta + unos 600 fotogramas de plegado + 24 filas de tránsito)
       const rows = 56 + 600 * game.v / 13.176;
-      ui.toast(`Mundo ${game.world + 2} a unos ${fmtN(Math.round(rows * 4 / 100) * 100)} m`, 'mission');
+      ui.toast(`Mundo ${visWorld + 1} a unos ${fmtN(Math.round(rows * 4 / 100) * 100)} m`, 'mission');
     }
     else if (e.type === 'foldEnd') { audio.play('foldEnd'); buzz(25); }
     else if (e.type === 'world') {
-      audio.setWorld(game.world);
+      if (!game.inverted) { visWorld++; e.visWorld = visWorld; }
+      audio.setWorld(game.world + worldBase * 2);
       // la campanilla del mundo nuevo suena al aterrizar del salto, si lo hay
       if (!game.inverted) { if (game.gaps.some((g) => g.to + 1 > game.s)) pendingChime = true; else audio.play('world'); }
     }

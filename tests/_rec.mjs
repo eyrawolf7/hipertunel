@@ -1,0 +1,18 @@
+import puppeteer from 'puppeteer';
+const b = await puppeteer.launch({ headless: 'new', args: ['--use-angle=metal', '--ignore-gpu-blocklist'] });
+const p = await b.newPage(); await p.setViewport({ width: 1280, height: 720 });
+const errs = []; p.on('pageerror', (e) => errs.push(String(e)));
+await p.goto('http://localhost:5173/', { waitUntil: 'networkidle0' });
+await p.waitForFunction(() => window.__hip && window.__hip.game);
+await p.evaluate(() => localStorage.setItem('hipertunel-top-classic', JSON.stringify([{ score: 700, distM: 700, coins: 0, time: 30, date: Date.now() }])));
+await p.reload({ waitUntil: 'networkidle0' }); await p.waitForFunction(() => window.__hip && window.__hip.game);
+await p.evaluate(() => { const h = window.__hip; h.start('classic', 3); window.__freeze = true; h.renderer.setRecordRow(167); h.skipTo(160); h.step(10); });
+await new Promise((r) => setTimeout(r, 400));
+await p.screenshot({ path: '/private/tmp/rec-marca.png' });
+await p.evaluate(() => { window.__freeze = false; const h = window.__hip; h.input.steer = () => h.bot(h.game); });
+await new Promise((r) => setTimeout(r, 6000));
+await p.evaluate(() => { const g = window.__hip.game; g.invul = 0; g.boostOn = false; g.crash({ id: -1, hit: false, fixed: true }); });
+await new Promise((r) => setTimeout(r, 2500));
+await p.screenshot({ path: '/private/tmp/rec-fin.png' });
+console.log('errores', errs);
+await b.close();

@@ -76,7 +76,7 @@ export function createMissions() {
       else if (e.type === 'boost') { run.pads++; if (e.level === 3) run.maxSpeed++; }
       else if (e.type === 'crash' && !e.fatal) { run.saves++; run.clean = 0; }
       else if (e.type === 'foldEnd' && game && game.fold < 0) run.folds++;
-      else if (e.type === 'world' && game) run.world = Math.max(run.world, game.world + 1);
+      else if (e.type === 'world' && e.visWorld) run.world = Math.max(run.world, e.visWorld);
       else if (e.type === 'near') run.near++;
       return check();
     },

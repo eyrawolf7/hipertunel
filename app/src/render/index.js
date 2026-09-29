@@ -128,7 +128,7 @@ export class Renderer {
     this.camera.updateProjectionMatrix();
   }
 
-  reset() { this.track.reset(); this.fx.reset(); this.cam.shake = 0; this.cam.kick = 0; this.cam.roll = 0; this.cam.rollAmp = 0; this.deathFocus = null; this.themeIdx = 0; this.pendingTheme = 0; this.applyTheme(0, 0, 1); this.look.set(0, 0, -1); this.upS.set(0, 1, 0); this.firstFrame = true; }
+  reset() { this.track.reset(); this.fx.reset(); this.cam.shake = 0; this.cam.kick = 0; this.cam.roll = 0; this.cam.rollAmp = 0; this.deathFocus = null; this.themeIdx = this.themeBase || 0; this.pendingTheme = 0; this.applyTheme(this.themeIdx, this.themeIdx, 1); this.look.set(0, 0, -1); this.upS.set(0, 1, 0); this.firstFrame = true; }
 
   applyTheme(from, to, t) {
     const A = THEMES[from % THEMES.length], B = THEMES[to % THEMES.length];
