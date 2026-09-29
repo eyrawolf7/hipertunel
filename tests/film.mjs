@@ -42,7 +42,7 @@ const page = await browser.newPage();
 await page.setViewport({ width: W, height: H });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
-await page.goto(opt.url || 'http://localhost:5173/', { waitUntil: 'networkidle0' });
+await page.goto(opt.url || (process.env.HIP_URL || 'http://localhost:5173/'), { waitUntil: 'networkidle0' });
 await page.waitForFunction(() => window.__hip && window.__hip.game);
 await page.evaluate((m, seed, skill, start, invul) => {
   const h = window.__hip; h.start(m, seed);

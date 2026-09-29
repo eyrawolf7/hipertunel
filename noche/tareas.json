@@ -1,0 +1,429 @@
+{
+ "nota": "Lista validada por Víctor el 2026-09-30. tipo 'segura' = se fusiona en la rama de integración si pasa la puerta y el crítico; 'propuesta' = mecánica o función nueva: se queda en su rama, sin fusionar, para que Víctor la pruebe. Métricas del Arcade de partida (crítico jugador, 40 partidas por nivel): mediana novato 25 s (peor 10 %: 8 s), medio 60 s, bueno 53 s, experto 65 s; primer choque a los 6 s; cajas altas = 29 % de las cajas y 50 % de las muertes; el novato llega al mundo 2 en el 30 %.",
+ "tareas": [
+  {
+   "id": "mando",
+   "prioridad": 0,
+   "tipo": "segura",
+   "titulo": "Mando en todos los estados",
+   "descripcion": "pollPad() solo se llama desde input.steer(), que solo corre en play/attract/dying: en pausa, fin de partida y cuenta atrás el mando no se lee (grave para Switch y Android). Leer el mando una vez por fotograma en frame() de main.js y que Start en pausa reanude, A confirme y B vuelva en todos los menús.",
+   "criterio_hecho": "node tests/qa-noche.mjs --only=f pasa entero y el mando rearranca desde el fin de partida; qa.mjs en verde.",
+   "verificacion": [
+    "node tests/qa-noche.mjs --only=f",
+    "sh noche/puerta.sh"
+   ],
+   "critico": "qa-jugador",
+   "depende": [],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "bot-pro",
+   "prioridad": 1,
+   "tipo": "segura",
+   "titulo": "Bot de pruebas fiable (nuevo, aparte del de la demo)",
+   "descripcion": "Crear tests/bot-pro.mjs (NO tocar app/src/sim/bot.js ni bot.c, que usan la demo y la paridad) con niveles novato/medio/bueno/experto (retardo de reacción y giro máximo realistas), que sepa que la caja alta choca una fila antes, busque el cartón del muro, evite la caja por acampar y haga piruetas en el salto. Añadir el modo arcade a tests/sim-bot.mjs (hoy revienta con 'modo desconocido').",
+   "criterio_hecho": "Con 40 semillas, la duración mediana en Arcade sube estrictamente de novato a medio, bueno y experto; con 'bueno' rompe el cartón en ≥80 % de los muros; npm run bot -- arcade 20 sale con 0.",
+   "verificacion": [
+    "node tests/bot-pro.mjs arcade 40",
+    "npm run bot -- arcade 20"
+   ],
+   "critico": "critico-jugador",
+   "depende": [],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "diversion",
+   "prioridad": 2,
+   "tipo": "segura",
+   "titulo": "Informe de diversión automático",
+   "descripcion": "tests/diversion.mjs: con bot-pro, saca en JSON por modo y nivel: duración mediana y peor 10 %, primer choque, llegan al mundo 2, tiempo con impulso, muertes por tipo de caja (frente a su parte en las que salen), momento especial más lejano (impulso, mundo, plegado, muro, pirueta), muros y cartón roto, misiones cumplidas por partida. Lo compara con .noche/metricas-base.json (lo crea la primera vez) y marca en rojo lo que empeore.",
+   "criterio_hecho": "Genera el JSON, dos pasadas dan lo mismo (determinista) y tarda < 60 s.",
+   "verificacion": [
+    "node tests/diversion.mjs"
+   ],
+   "critico": null,
+   "depende": [
+    "bot-pro"
+   ],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "injustas",
+   "prioridad": 3,
+   "tipo": "segura",
+   "titulo": "Detector de muertes injustas",
+   "descripcion": "En cada muerte, clonar el estado de la simulación 0,5 s antes y buscar si algún giro (bot perfecto) habría escapado. Añadirlo a diversion.mjs como % de muertes inevitables por modo.",
+   "criterio_hecho": "diversion.mjs da el % por modo; se documenta la cifra actual del Arcade (objetivo < 3 %) y la del Clásico.",
+   "verificacion": [
+    "node tests/diversion.mjs"
+   ],
+   "critico": "critico-jugador",
+   "depende": [
+    "diversion"
+   ],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "qa-nuevo",
+   "prioridad": 4,
+   "tipo": "segura",
+   "titulo": "QA de lo nuevo",
+   "descripcion": "Integrar tests/qa-noche.mjs en qa.mjs (secciones nuevas): piruetas (Espacio/X en el salto dan trickDone, fuera no, tropiezo resta monedas, tocar para pirueta no pausa), muro (wallSoon antes que wall, carril del cartón apagado, piedra sin impulso mata, cartón entero tras reiniciar), cámaras (zorro en el sitio del choque, sin NaN, en pantalla; intro se salta con A o toque), menús pintados (todas las imágenes cargan, foco por defecto en cada pantalla, navegación entera con mando y con teclado). Y que qa.mjs reintente la prueba si hay una recarga de Vite (HMR) a mitad.",
+   "criterio_hecho": "qa.mjs incluye las secciones nuevas y da 0 FAIL tres veces seguidas.",
+   "verificacion": [
+    "node tests/qa.mjs"
+   ],
+   "critico": "qa-jugador",
+   "depende": [
+    "mando"
+   ],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "rendimiento",
+   "prioridad": 5,
+   "tipo": "segura",
+   "titulo": "Rendimiento en una partida real de Arcade",
+   "descripcion": "Prueba con CPU ×4 (page.emulateCPUThrottling(4)) de una partida de Arcade con muro, salto entre mundos y piruetas, y 50 reintentos + 5 min con memoria. Si algo no llega, arreglarlo detrás del nivel de calidad.",
+   "criterio_hecho": "1 % peor ≥ 50 fps con CPU ×4 y ≤ 1 % de fotogramas de más de 33 ms; geometrías y texturas ±5 y montón +10 MB como mucho tras 50 reintentos.",
+   "verificacion": [
+    "node tests/qa.mjs"
+   ],
+   "critico": "qa-jugador",
+   "depende": [
+    "bot-pro"
+   ],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "avisos",
+   "prioridad": 6,
+   "tipo": "segura",
+   "titulo": "Avisos limpios",
+   "descripcion": "ui.toast: no repetir el mismo texto si hay otro igual de hace menos de 1,5 s, como mucho 2 a la vez, ocultos en pausa y en el fin de partida.",
+   "criterio_hecho": "Con 5 avisos seguidos hay ≤ 2 en el DOM y 0 visibles con la pausa abierta; qa en verde.",
+   "verificacion": [
+    "node tests/qa.mjs"
+   ],
+   "critico": "director-arte",
+   "depende": [],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "hud-desbordes",
+   "prioridad": 7,
+   "tipo": "segura",
+   "titulo": "HUD sin textos que se salgan",
+   "descripcion": "A 844×390, «164 pts» se sale de la placa ×1 y la distancia toca el borde. Ajustar chips y tamaños.",
+   "criterio_hecho": "Ningún .hud * con scrollWidth > clientWidth ni texto fuera de su marco (getBoundingClientRect) a 667×375, 844×390 y 1280×720, con 5 cifras de distancia y 6 de puntos.",
+   "verificacion": [
+    "node tests/qa.mjs"
+   ],
+   "critico": "director-arte",
+   "depende": [],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "fondo-menus",
+   "prioridad": 8,
+   "tipo": "segura",
+   "titulo": "Fondo de los menús cálido y desenfocado",
+   "descripcion": "Las maquetas (referencias/estilo-visual/maquetas-ui/) tienen detrás el túnel de arenisca dorada desenfocado; el juego lo tiene gris/morado y nítido. Desenfoque y tono cálido cuando hay un menú (render/index.js o backdrop-filter en ui.css), sin tocar la partida.",
+   "criterio_hecho": "Tono medio del fondo (sin el 30 % central) a < 15° del de portada.png, detalle (varianza del laplaciano) −60 % o más, ?fps ≥ 58 con ?q=media; director ≥ 8/10.",
+   "verificacion": [
+    "capturas de las 8 pantallas a 844×390 y 1280×720"
+   ],
+   "critico": "director-arte",
+   "depende": [],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "escala-portada",
+   "prioridad": 9,
+   "tipo": "segura",
+   "titulo": "Portada a la escala de la maqueta",
+   "descripcion": "El botón Jugar mide ~17 % del ancho (maqueta ~28 %) y el logo ~55 % (maqueta ~62 %). Ajustar .scr-title sin tapar el zorro (abajo a la derecha).",
+   "criterio_hecho": "Cajas de logo y Jugar a ±3 % de la maqueta en 844 y 1280; el zorro sigue entero y libre; director ≥ 8/10.",
+   "verificacion": [
+    "capturas del título a 844×390 y 1280×720"
+   ],
+   "critico": "director-arte",
+   "depende": [],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "zorro-fin",
+   "prioridad": 10,
+   "tipo": "segura",
+   "titulo": "Zorro entero en el fin de partida",
+   "descripcion": "A 844×390 el zorro del fin de partida puede quedar fuera o tapado por la tarjeta. Ajustar el encuadre (render/index.js, outView rama de muerte) y/o la posición de la tarjeta.",
+   "criterio_hecho": "Caja del zorro proyectada entera en pantalla, a la izquierda y sin solaparse con la tarjeta a 667×375, 844×390 y 1280×720 en 10 muertes distintas.",
+   "verificacion": [
+    "capturas del fin de partida"
+   ],
+   "critico": "director-arte",
+   "depende": [],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "modos-carrusel",
+   "prioridad": 11,
+   "tipo": "segura",
+   "titulo": "Elige modo: carrusel claro",
+   "descripcion": "A 844 caben 5,5 tarjetas y la última sale cortada sin pista de que se desliza. Flechas laterales como en la maqueta; ninguna tarjeta cortada sin indicarlo; «Recomendado» no se corta.",
+   "criterio_hecho": "En 1280 se ven las 8 enteras; en 844 hay flecha de carrusel y se navega con mando/teclado/toque; director ≥ 8/10.",
+   "verificacion": [
+    "capturas de Modos"
+   ],
+   "critico": "director-arte",
+   "depende": [],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "retoques",
+   "prioridad": 12,
+   "tipo": "segura",
+   "titulo": "Retoques de menús y HUD",
+   "descripcion": "Tramos bloqueados de Aventura menos grises (piedra cálida al 70 %); el título de Pausa no pisa el marco y cada misión tiene barra; flecha de impulso vacía en azul oscuro translúcido (es del impulso) y menos saturada que la llena; al reanudar en pleno salto el «1» de la cuenta atrás no tapa el centro; quitar «Esc volver» en pantallas táctiles.",
+   "criterio_hecho": "Cada punto comprobado en captura; luminancia de las bloqueadas ≥ 55 % de la desbloqueada; ningún cruce de cajas en Pausa; nada del HUD en el 20 % central durante el salto y la cuenta atrás; director ≥ 8/10.",
+   "verificacion": [
+    "capturas de Aventura, Pausa, HUD"
+   ],
+   "critico": "director-arte",
+   "depende": [],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "estudio-apk",
+   "prioridad": 13,
+   "tipo": "segura",
+   "titulo": "Estudio de los juegos de referencia (sala limpia)",
+   "descripcion": "Análisis ESTÁTICO de los APK de ~/Documents/Proyectos/apks-referencia/ (Sonic Dash xapk, WipEout Rush; el mod de Subway y 'sonic colors.apk' solo si se pueden leer sin ejecutarlos; NUNCA instalar ni ejecutar nada). Partir de referencias/analisis-runners.md (ya hecho). Sacar el FUNCIONAMIENTO, no el código: primer minuto y tutorial, curva de dificultad, recompensas/misiones/rachas diarias, poderes, sensación al chocar o recoger (juice), menús y flujo entre partidas, con cifras (tiempos, duraciones, probabilidades). Escribir referencias/fichas/<tema>.md (sin código copiado, redactado con nuestras palabras) y una lista de ideas para Hipertúnel ordenadas por impacto, marcando cuáles respetan las reglas de CLAUDE.md. Nada de modelos, animaciones, audio ni código de esos juegos entra en el nuestro.",
+   "criterio_hecho": "Fichas escritas en referencias/fichas/ y lista de ideas en .noche/INFORME.md; ningún archivo del juego cambiado en esta tarea.",
+   "verificacion": [
+    "git diff --stat main (solo referencias/ o nada)"
+   ],
+   "critico": null,
+   "depende": [],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "arranque-amable",
+   "prioridad": 14,
+   "tipo": "propuesta",
+   "titulo": "Arranque del Arcade más amable",
+   "descripcion": "Primer choque más tarde, pocas cajas altas en los primeros 20 s y el novato llegando antes al mundo 2 (solo en arcade.js + port a C; nada del Clásico).",
+   "criterio_hecho": "Novato: mediana ≥ 35 s, peor 10 % ≥ 15 s, primer choque ≥ 10 s, llega al mundo 2 en ≥ 50 %; experto no baja; paridad y dorado OK.",
+   "verificacion": [
+    "node tests/diversion.mjs",
+    "sh noche/puerta.sh"
+   ],
+   "critico": "critico-jugador",
+   "depende": [
+    "diversion"
+   ],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "acampar-aviso",
+   "prioridad": 15,
+   "tipo": "propuesta",
+   "titulo": "Aviso de la caja por acampar",
+   "descripcion": "La caja que te cae por quedarte en un carril mata casi sin aviso: que el carril se encienda antes o que caiga en el contiguo.",
+   "criterio_hecho": "< 5 % de las muertes llegan menos de 2 s después de la caja por acampar, y quedarse quieto sigue matando en < 12 s.",
+   "verificacion": [
+    "node tests/diversion.mjs"
+   ],
+   "critico": "critico-jugador",
+   "depende": [
+    "diversion"
+   ],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "reto-expertos",
+   "prioridad": 16,
+   "tipo": "propuesta",
+   "titulo": "Reto para los buenos",
+   "descripcion": "Tras el tope de densidad a los 4 min no hay nada nuevo: escalada en los mundos 3-4 con más rodantes y plegados.",
+   "criterio_hecho": "Experto: mediana 90-150 s y el 10 % mejor ≤ 300 s; novato y medio no cambian más de un 5 %.",
+   "verificacion": [
+    "node tests/diversion.mjs"
+   ],
+   "critico": "critico-jugador",
+   "depende": [
+    "diversion"
+   ],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "misiones-alcance",
+   "prioridad": 17,
+   "tipo": "propuesta",
+   "titulo": "Misiones al alcance",
+   "descripcion": "Que la primera misión de cada rango sea asequible y las nuevas (cartón, piruetas) salgan solo en modos donde se pueden cumplir.",
+   "criterio_hecho": "Con el bot medio se cumple al menos una misión por partida en ≥ 70 % de las partidas.",
+   "verificacion": [
+    "node tests/diversion.mjs"
+   ],
+   "critico": "critico-jugador",
+   "depende": [
+    "diversion"
+   ],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "roce",
+   "prioridad": 18,
+   "tipo": "propuesta",
+   "titulo": "Rozar da chispa y 1 moneda",
+   "descripcion": "El roce («¡Por los pelos!») da una chispa en el borde de la vista y 1 moneda (solo Arcade; lo que ya mide 'near').",
+   "criterio_hecho": "≥ 3 roces por minuto con el bot medio; nada en el centro de la vista; dorado y paridad OK.",
+   "verificacion": [
+    "node tests/diversion.mjs",
+    "capturas"
+   ],
+   "critico": "critico-jugador",
+   "depende": [
+    "diversion"
+   ],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "zen",
+   "prioridad": 19,
+   "tipo": "propuesta",
+   "titulo": "Modo Zen / práctica",
+   "descripcion": "Impulso infinito, sin récord, con tutorial del cartón y de las piruetas. Modo nuevo en su archivo (extends Arcade), con tarjeta en Elige modo.",
+   "criterio_hecho": "El modo existe, pasa el QA y el bot novato llega a 3 mundos.",
+   "verificacion": [
+    "node tests/qa.mjs",
+    "node tests/bot-pro.mjs zen 20"
+   ],
+   "critico": "critico-jugador",
+   "depende": [
+    "bot-pro"
+   ],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "fantasma-arcade",
+   "prioridad": 20,
+   "tipo": "propuesta",
+   "titulo": "Fantasma de tu mejor partida en Arcade",
+   "descripcion": "Guardar semilla y entradas de la mejor partida y pintarla como fantasma (como en Aventura).",
+   "criterio_hecho": "Reproducir las entradas da exactamente la misma distancia en 20 semillas; el fantasma se ve y no tapa el centro.",
+   "verificacion": [
+    "node tests/qa.mjs"
+   ],
+   "critico": "director-arte",
+   "depende": [],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "fases",
+   "prioridad": 21,
+   "tipo": "propuesta",
+   "titulo": "Fases: «Jugar» abre la Aventura con fase = mundo",
+   "descripcion": "Propuesta de Víctor y del crítico jugador. 5 fases, una por mundo (Islas del cielo, Selva, Noche con jefe, Templo, Fuego con jefe), de 60-90 s en 3 tramos, que se ganan llegando al portal (el salto entre mundos con piruetas; estrellas en el aire). Al morir, al último punto de control (inicio de cada tramo) con un impulso de regalo; nunca vuelves a la Fase 1. 3 estrellas (superarla, sin chocar, 35 % de monedas; la tercera solo sin puntos de control). 1 estrella abre la siguiente; con 15, 'Vuelta 2' (6 oleadas más tarde y +25 % de densidad). «Jugar» abre el mapa de fases (la primera vez, directo a la Fase 1); el Arcade infinito pasa a «Sin fin», bien visible, que se desbloquea al superar la Fase 1 y conserva su récord. Tras el portal el botón grande es «Siguiente fase». Todo encima de la simulación (adventure.js), sin tocar game.js ni waves.js; si toca app/src/sim/, portar a C.",
+   "criterio_hecho": "Bots de tests/aventura.mjs, 30 intentos: el novato supera la Fase 1 en ≤ 3 intentos en ≥ 70 % de las semillas; la tasa del bot medio no sube de una fase a la siguiente (±10 puntos) y el bueno nunca queda por debajo del medio; duración media de fase superada 60-90 s; el bueno supera la Fase 5 al primer intento en ≤ 60 %; el fantasma repite la partida; paridad, dorado y sim-checks OK; qa.mjs comprueba que «Jugar» abre la Fase 1 y que «Sin fin» se desbloquea.",
+   "verificacion": [
+    "node tests/aventura.mjs",
+    "sh noche/puerta.sh"
+   ],
+   "critico": "critico-jugador",
+   "depende": [
+    "bot-pro"
+   ],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  }
+ ]
+}

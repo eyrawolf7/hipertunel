@@ -12,7 +12,7 @@ const pos = args.filter((a) => !a.startsWith('--'));
 const dir = pos[0] || 'ultima';
 const rows = (pos.slice(1).length ? pos.slice(1) : ['20', '150', '400', '800']).map(Number);
 const W = +(opt.w || 1280), H = +(opt.h || 720);
-const url = opt.url || 'http://localhost:5173/';
+const url = opt.url || (process.env.HIP_URL || 'http://localhost:5173/');
 const out = new URL(`./shots/${dir}/`, import.meta.url).pathname;
 mkdirSync(out, { recursive: true });
 

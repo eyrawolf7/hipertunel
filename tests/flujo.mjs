@@ -7,7 +7,7 @@ const times = (process.argv.slice(2).length ? process.argv.slice(2) : ['300', '9
 const dir = new URL('./shots/flujo/', import.meta.url).pathname; mkdirSync(dir, { recursive: true });
 const b = await puppeteer.launch({ headless: 'new', args: ['--use-angle=metal'] });
 const p = await b.newPage(); await p.setViewport({ width: 844, height: 390, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
-await p.goto('http://localhost:5173/', { waitUntil: 'networkidle0' });
+await p.goto((process.env.HIP_URL || 'http://localhost:5173/'), { waitUntil: 'networkidle0' });
 await new Promise((r) => setTimeout(r, 1200));
 await p.evaluate(() => localStorage.removeItem('hipertunel-partidas'));
 const btn = await p.evaluateHandle(() => [...document.querySelectorAll('button')].find((x) => /Jugar/.test(x.textContent)));

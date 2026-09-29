@@ -8,7 +8,7 @@ const [world = 0, level = 2, speed = 80, secs = 10] = process.argv.slice(2).map(
 const dir = new URL('./shots/sonido/', import.meta.url).pathname; mkdirSync(dir, { recursive: true });
 const b = await puppeteer.launch({ headless: 'new' });
 const p = await b.newPage();
-await p.goto('http://localhost:5173/src/audio/demo.html', { waitUntil: 'networkidle0' });
+await p.goto((process.env.HIP_URL || 'http://localhost:5173/') + 'src/audio/demo.html', { waitUntil: 'networkidle0' });
 if (process.env.SIN_MUSICA) await p.evaluate(() => { window.__noMusic = true; });
 const zorro = !!process.env.ZORRO;
 if (zorro) await p.evaluate(() => { window.__zorro = true; });

@@ -1,6 +1,6 @@
 // Carga el juego y muestra los errores de consola y de página. Uso: node tests/errores.mjs [url]
 import puppeteer from 'puppeteer';
-const url = process.argv[2] || 'http://localhost:5173/';
+const url = process.argv[2] || (process.env.HIP_URL || 'http://localhost:5173/');
 const b = await puppeteer.launch({ headless: 'new', args: ['--use-angle=metal', '--ignore-gpu-blocklist'] });
 const p = await b.newPage(); await p.setViewport({ width: 960, height: 540 });
 const errs = [];

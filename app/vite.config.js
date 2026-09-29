@@ -15,5 +15,5 @@ export default defineConfig({
     assetsInlineLimit: 100000000,
     chunkSizeWarningLimit: 4000,
   },
-  server: { port: 5173, strictPort: true },
+  server: { port: +(process.env.HIP_PORT || 5173), strictPort: true },
 });

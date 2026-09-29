@@ -24,7 +24,7 @@ console.log('momentos', marks, 'tramos', segs);
 const dir = new URL('./shots/video/', import.meta.url).pathname; rmSync(dir, { recursive: true, force: true }); mkdirSync(dir, { recursive: true });
 const b = await puppeteer.launch({ headless: 'new', args: ['--use-angle=metal', '--ignore-gpu-blocklist'] });
 const p = await b.newPage(); await p.setViewport({ width: W, height: H });
-await p.goto('http://localhost:5173/', { waitUntil: 'networkidle0' });
+await p.goto((process.env.HIP_URL || 'http://localhost:5173/'), { waitUntil: 'networkidle0' });
 await p.waitForFunction(() => window.__hip && window.__hip.game);
 await p.evaluate(() => localStorage.setItem('hipertunel-partidas', '9'));
 await p.evaluate((seed) => { const h = window.__hip; h.start('classic', seed); window.__freeze = true; const g = h.game; g.crash = (b) => { g.invul = 1; b.hit = true; }; }, seed);

@@ -10,7 +10,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 
 const args = process.argv.slice(2);
 const opt = Object.fromEntries(args.filter((a) => a.startsWith('--')).map((a) => { const [k, v] = a.slice(2).split('='); return [k, v ?? '1']; }));
-const URL0 = opt.url || 'http://localhost:5173/';
+const URL0 = opt.url || (process.env.HIP_URL || 'http://localhost:5173/');
 const BUILT = opt.built || 'http://localhost:5190/';
 const ONLY = opt.only ? new Set(opt.only.split(',').map(Number)) : null;
 const PERF_S = +(opt.perf || 20);
