@@ -39,6 +39,7 @@ const sfx = [
   ['crash'], ['death'], ['foldStart'], ['foldEnd'], ['world'],
   ['coin', { combo: 0 }, 'coin'], ['coin', { combo: 3 }, 'coin x3'], ['coin', { combo: 9 }, 'coin x9'],
   ['menuMove'], ['menuOk'], ['menuBack'], ['countdown'], ['go'], ['record'], ['nearMiss'],
+  ['jump'], ['land'], ['smash'], ['whiff'], ['creak', { k: 0.8 }], ['collapse'],
 ];
 for (const [name, opts, label] of sfx) btn($('sfx'), label || name, () => audio.play(name, opts));
 btn($('sfx'), 'Cuenta atrás completa', () => {
@@ -46,7 +47,11 @@ btn($('sfx'), 'Cuenta atrás completa', () => {
   audio.play('go', { delay: 2.4 });
 });
 
+let hover = false;
+btn($('sfx'), 'Tabla (hover)', (b) => { hover = !hover; b.classList.toggle('on', hover); });
+
 (function loop() {
   audio.setSpeed(speed, level);
+  audio.setHover(hover, (speed - 18) / 82);
   requestAnimationFrame(loop);
 })();

@@ -11,6 +11,7 @@ import { createMissions } from './missions.js';
 import { createShop, SHOP } from './shop.js';
 import { Adventure, STAGES, packGhost, unpackGhost, quantSteer } from './sim/adventure.js';
 import { Arcade } from './sim/arcade.js';
+import { Zorro } from './sim/zorro.js';
 
 const VERSION = '0.50';
 const STEP = 1 / 60;
@@ -150,10 +151,12 @@ function newGame(m, seed, fromCp = false) {
       for (let i = 0; i < cpPrefix.length && game.alive; i++) { game.step({ steer: cpPrefix[i] }); if (ghostGame && ghostGame.alive) ghostGame.step({ steer: ghostSteers[ghostGame.frame] ?? 0 }); }
       advRec = Array.from(cpPrefix); game.fromCheckpoint = true; game.events = [];
     } else { cpFrame = -1; cpPrefix = null; }
-  } else if (m === 'arcade' || m === 'zorro') { game = new Arcade({ seed: seed ?? ((Math.random() * 1e9) | 0) }); ghostGame = null; ghostSteers = null; }
+  } else if (m === 'zorro') { game = new Zorro({ seed: seed ?? ((Math.random() * 1e9) | 0) }); ghostGame = null; ghostSteers = null; }
+  else if (m === 'arcade') { game = new Arcade({ seed: seed ?? ((Math.random() * 1e9) | 0) }); ghostGame = null; ghostSteers = null; }
   else { game = new Game({ mode: simMode(m), seed: seed ?? ((Math.random() * 1e9) | 0) }); ghostGame = null; ghostSteers = null; }
   renderer.ghostGame = ghostGame;
   renderer.third = m === 'zorro';
+  input.heroMode = m === 'zorro';
   worldBase = m === 'voyage' ? maxWorld() : m === 'adventure' ? STAGES[advStage].world : 0;
   renderer.themeBase = worldBase;
   renderer.reset();
@@ -191,7 +194,8 @@ function startGame(m, quick = false, fromCp = false) {
   audio.setWorld(worldBase * 2);
   audio.play('countdown');
   let seen = 0; try { seen = +(localStorage.getItem('hipertunel-partidas') || 0); localStorage.setItem('hipertunel-partidas', String(seen + 1)); } catch (e) {}
-  if (seen < 3) setTimeout(() => ui.toast(input.hasTilt ? 'Inclina el móvil para girar · toca la pantalla para pausar' : (COARSE ? 'Toca a la izquierda o a la derecha para girar' : 'Gira con ← →'), 'info'), 300);
+  if (m === 'zorro') setTimeout(() => ui.toast(input.hasTilt ? 'Toca la pantalla para saltar por encima de las cajas' : COARSE ? 'Desliza hacia arriba para saltar' : 'Salta con Espacio o ↑', 'mission'), 300);
+  else if (seen < 3) setTimeout(() => ui.toast(input.hasTilt ? 'Inclina el móvil para girar · toca la pantalla para pausar' : (COARSE ? 'Toca a la izquierda o a la derecha para girar' : 'Gira con ← →'), 'info'), 300);
   padHint = seen < 3;
   if (seen >= 3 && !input.hasTilt && settings.tilt && COARSE) setTimeout(() => { if (!input.hasTilt) ui.toast('Sin giroscopio: toca a izquierda o derecha', 'info'); }, 1500);
 }
@@ -360,7 +364,7 @@ function stepSim() {
     if (ghostGame && ghostGame.alive) { const gs = ghostSteers[ghostGame.frame]; ghostGame.step({ steer: gs === undefined ? 0 : gs }); }
   }
   else input.steer(STEP, game.theta, false);
-  const ev = game.step({ steer });
+  const ev = game.step({ steer, jump: state === 'play' && game.hero ? input.consumeJump() : false });
   renderer.onEvents(ev, game);
   for (const e of ev) {
     if (state === 'attract') continue;
@@ -379,6 +383,8 @@ function stepSim() {
     else if (e.type === 'power') { const n = { magnet: 'Imán', x2: 'Monedas ×2', shield: 'Escudo' }[e.kind]; ui.toast(`¡${n}!`, 'mission'); audio.play('world'); buzz([10, 20, 10]); }
     else if (e.type === 'shield') { ui.toast('El escudo te ha salvado', 'mission'); audio.play('crash'); renderer.flash(0xb58cff, 0.35); }
     else if (e.type === 'clear') { audio.play('record'); buzz([30, 40, 30, 40, 60]); }
+    else if (e.type === 'jump') { audio.play('jump'); buzz(12); }
+    else if (e.type === 'land') { audio.play('land'); buzz(18); }
     else if (e.type === 'foldStart') audio.play('foldStart');
     else if (e.type === 'foldOrder' && game.fold < 0) {
       // desde fuera, el plegado hacia dentro lleva a un mundo nuevo: se avisa con la distancia
@@ -456,6 +462,7 @@ function frame(now) {
   renderer.update(game, s, theta, dt, { reduceFx: settings.reduceFx, intro: state === 'countdown' && countdown > 0.6 ? Math.min(1, (countdown - 0.6) / 2.4) : 0 });
   renderer.render();
   audio.setSpeed(game.speedMS, game.level);
+  audio.setHover?.(!!game.hero && (state === 'play' || state === 'countdown') && game.alive, Math.min(1, game.speedMS / 100));
   if (state === 'play' || state === 'countdown' || state === 'dying') {
     ui.hud({ mult: game.variant === 'arcade' ? mult : 0, points: game.variant === 'arcade' ? Math.round(points + game.coinsGot * 10) : 0, adv: game.mode === 'adventure' ? { p: game.progress, power: game.power, powerT: game.powerT, shield: game.shield, n: advStage + 1 } : null, padDir: state === 'play' ? padDirection() : 0, distM: game.distanceM, speedMS: state === 'countdown' && game.frame === 0 ? 0 : game.speedMS, level: game.level, coins: game.coinsGot, timeLeft: mode === 'timetrial' ? game.timeLeft : null, mode, invul: game.invul > 0, best: bestAtStart[mode] || 0, countdown: state === 'countdown' ? Math.ceil(countdown) : 0 });
   }

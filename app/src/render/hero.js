@@ -56,9 +56,10 @@ export class Hero {
     this.group.visible = visible;
     if (!visible) return;
     this.t += dt;
-    // inclinación hacia el giro (suavizada): el cuerpo se tumba hasta ~22°
-    const target = Math.max(-0.38, Math.min(0.38, -omega * 5));
-    this.lean += (target - this.lean) * Math.min(1, dt * 10);
+    // inclinación hacia el giro (suavizada), hasta ~32° como la nave de WipEout; al soltar se
+    // endereza más despacio (0,3-0,4 s, la sensación de flotar de la tabla de Subway Surfers)
+    const target = Math.max(-0.56, Math.min(0.56, -omega * 7));
+    this.lean += (target - this.lean) * Math.min(1, dt * (Math.abs(target) > Math.abs(this.lean) ? 12 : 7));
     const x = this._x.crossVectors(fwd, up).normalize();   // derecha
     const z = this._z.copy(fwd).negate();                   // el modelo mira a −Z
     this._m.makeBasis(x, up, z);
@@ -68,8 +69,8 @@ export class Hero {
     this.group.rotateY(-this.lean * 0.35);
     if (this.mixer) {
       const L = this.actions.leanL, R = this.actions.leanR, B = this.actions.boost;
-      if (L) L.weight = Math.max(0, this.lean / 0.38);
-      if (R) R.weight = Math.max(0, -this.lean / 0.38);
+      if (L) L.weight = Math.max(0, this.lean / 0.56);
+      if (R) R.weight = Math.max(0, -this.lean / 0.56);
       if (B) B.weight += ((level >= 3 ? 0.8 : 0) - B.weight) * Math.min(1, dt * 4);
       if (air && !this.wasAir) this.once('jump');
       if (!air && this.wasAir) this.once('land');

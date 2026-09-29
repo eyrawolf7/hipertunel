@@ -259,7 +259,8 @@ export class Renderer {
     // en tercera persona la cámara gira con el tubo con algo más de retraso (sensación de inercia)
     this.upS.lerp(N, this.firstFrame ? 1 : Math.min(1, dt * (this.third ? 12 : 18))).normalize();
     if (this.third) {
-      pos = new THREE.Vector3().copy(heroAt).addScaledVector(this.look, -3.1).addScaledVector(this.upS, 1.45);
+      // la cámara sube solo la mitad del salto: así se ve al zorro elevarse sobre las cajas
+      pos = new THREE.Vector3().copy(heroAt).addScaledVector(this.look, -4.2).addScaledVector(this.upS, 2.0).addScaledVector(heroN, -0.55 * (game.airH || 0));
       this.hero.update(true, heroAt, heroN, this.look, game.alive ? game.omega : 0, game.jumpAt(s) > 0.15, game.level, dt);
     } else this.hero.update(false);
     this.firstFrame = false;
@@ -276,7 +277,8 @@ export class Renderer {
       c.shake = Math.max(0, c.shake - c.shakeDecay * dt);
     }
     // muerte: la cámara se gira hacia la caja que te ha dado
-    const target = this.third ? new THREE.Vector3().copy(heroAt).addScaledVector(this.look, 7).addScaledVector(this.upS, 0.55) : new THREE.Vector3().copy(pos).add(this.look);
+    // (como Sonic Dash: mira más lejos cuanto más rápido vas)
+    const target = this.third ? new THREE.Vector3().copy(heroAt).addScaledVector(this.look, 8 + 6 * Math.min(1, Math.max(0, (game.speedMS - 36) / 64))).addScaledVector(this.upS, 0.6) : new THREE.Vector3().copy(pos).add(this.look);
     if (!game.alive && this.deathFocus) { this.deathT = (this.deathT || 0) + dt; target.lerp(this.deathFocus, Math.min(1, this.deathT * 2) * 0.6); } else this.deathT = 0;
     cam.up.copy(this.upS);
     // giro del impulso (Camera::boostEffect): ±0,127 rad que se apaga

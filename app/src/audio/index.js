@@ -68,7 +68,7 @@ function createNoop() {
   const st = { muted: false };
   return {
     unlock() {}, setMuted(b) { st.muted = !!b; }, get muted() { return st.muted; },
-    setMusic() {}, setWorld() {}, setSpeed() {}, play() {}, pause() {},
+    setMusic() {}, setWorld() {}, setSpeed() {}, setHover() {}, play() {}, pause() {},
     get available() { return false; },
   };
 }
@@ -81,6 +81,7 @@ export function createAudio(options = {}) {
   const state = {
     muted: false, music: true, world: 0, paused: false,
     ms: 0, level: 0, lastSpeedT: -1,
+    hover: false, hoverSpeed: 0, lastHoverT: -1,
     step: 0, nextTime: 0, transitionT: -10,
   };
   let ctx = null, nodes = null, timer = null;
@@ -154,6 +155,29 @@ export function createAudio(options = {}) {
     n.eLfoG = ctx.createGain(); n.eLfoG.gain.value = 60;
     n.eLfo.connect(n.eLfoG); n.eLfoG.connect(n.eBP.frequency);
     n.eNoise.start(); n.eTone.start(); n.eTone2.start(); n.eLfo.start();
+
+    // ---------- tabla flotante (modo Zorro): dos senos graves con trémolo lento
+    // y un brillo cristalino tenue (quinta, senos puros) que sube con la velocidad.
+    // Va muy por debajo de la turbina; en reposo la ganancia es 0.
+    n.hover = ctx.createGain(); n.hover.gain.value = 0; n.hover.connect(n.master);
+    n.hTrem = ctx.createGain(); n.hTrem.gain.value = 0.75; n.hTrem.connect(n.hover);
+    n.hLfo = ctx.createOscillator(); n.hLfo.frequency.value = 3.2;
+    n.hLfoG = ctx.createGain(); n.hLfoG.gain.value = 0.25;
+    n.hLfo.connect(n.hLfoG); n.hLfoG.connect(n.hTrem.gain);
+    n.hLow = ctx.createOscillator(); n.hLow.type = 'sine'; n.hLow.frequency.value = 88;
+    n.hLow2 = ctx.createOscillator(); n.hLow2.type = 'sine'; n.hLow2.frequency.value = 132.6; // quinta, un pelín desafinada: batido suave
+    n.hLowG = ctx.createGain(); n.hLowG.gain.value = 0.6;
+    n.hLow2G = ctx.createGain(); n.hLow2G.gain.value = 0.3;
+    n.hLow.connect(n.hLowG); n.hLow2.connect(n.hLow2G); n.hLowG.connect(n.hTrem); n.hLow2G.connect(n.hTrem);
+    n.hGl = ctx.createOscillator(); n.hGl.type = 'sine'; n.hGl.frequency.value = 660;
+    n.hGl2 = ctx.createOscillator(); n.hGl2.type = 'sine'; n.hGl2.frequency.value = 990;
+    n.hGlG = ctx.createGain(); n.hGlG.gain.value = 0;
+    n.hGl.connect(n.hGlG); n.hGl2.connect(n.hGlG); n.hGlG.connect(n.hover);
+    // el brillo "centellea" (vaivén lento de amplitud), no es un pitido fijo
+    n.hGlLfo = ctx.createOscillator(); n.hGlLfo.frequency.value = 0.7;
+    n.hGlLfoG = ctx.createGain(); n.hGlLfoG.gain.value = 0;
+    n.hGlLfo.connect(n.hGlLfoG); n.hGlLfoG.connect(n.hGlG.gain);
+    n.hLfo.start(); n.hLow.start(); n.hLow2.start(); n.hGl.start(); n.hGl2.start(); n.hGlLfo.start();
 
     nodes = n;
     applyWorldTiming();
@@ -352,6 +376,24 @@ export function createAudio(options = {}) {
     n.eToneG.gain.setTargetAtTime(0.22 + 0.1 * t, now, tc);
   }
 
+  // ---------- tabla flotante
+  const HOVER_VOLUME = 0.02;
+  function updateHover(now, toggled) {
+    const n = nodes;
+    const on = state.hover && !state.paused;
+    const v = clamp(state.hoverSpeed, 0, 1);
+    const tc = toggled ? (on ? 0.12 : 0.25) : 0.1; // encendido rápido, apagado con fundido
+    n.hover.gain.setTargetAtTime(on ? HOVER_VOLUME * (0.8 + 0.2 * v) : 0, now, tc);
+    n.hLow.frequency.setTargetAtTime(84 + 24 * v, now, 0.15);
+    n.hLow2.frequency.setTargetAtTime((84 + 24 * v) * 1.506, now, 0.15);
+    n.hLfo.frequency.setTargetAtTime(2.6 + 2.4 * v, now, 0.2);
+    const g = 0.02 + 0.09 * v; // brillo: casi nada parado, algo más a tope
+    n.hGlG.gain.setTargetAtTime(g, now, 0.15);
+    n.hGlLfoG.gain.setTargetAtTime(g * 0.6, now, 0.15);
+    n.hGl.frequency.setTargetAtTime(620 + 260 * v, now, 0.15);
+    n.hGl2.frequency.setTargetAtTime((620 + 260 * v) * 1.5, now, 0.15);
+  }
+
   // ---------- efectos
   const SFX = {
     boost(t, o) {
@@ -456,7 +498,41 @@ export function createAudio(options = {}) {
       noiseHit(t, 0.5, 0.3, nodes.sfx, 'lowpass', 900, 120, 0.8, 0.005);
       sweep('sine', 180, 45, t, 0.45, 0.12, nodes.sfx, 0.005);
     },
-        nearMiss(t) {
+    // ---------- modo Zorro
+    // salto: soplo corto que sube + "pling" cristalino ascendente (~0,3 s)
+    jump(t) {
+      noiseHit(t, 0.2, 0.2, nodes.sfx, 'bandpass', 500, 2600, 1.3, 0.025);
+      sweep('sine', 170, 420, t, 0.14, 0.12, nodes.sfx, 0.01);
+      sweep('sine', 1047, 1568, t + 0.04, 0.28, 0.075, nodes.sfx, 0.004);
+      sweep('sine', 2094, 3136, t + 0.04, 0.1, 0.012, nodes.sfx, 0.004);
+      note('sine', 1568, t + 0.1, 0.03, 0.02, nodes.sfxDelay, { sus: 0.4, rel: 0.2 });
+    },
+    // aterrizaje: golpe grave amortiguado + roce breve (~0,2 s), sin chasquido de choque
+    land(t) {
+      sweep('sine', 125, 48, t, 0.17, 0.32, nodes.sfx, 0.006);
+      noiseHit(t, 0.12, 0.16, nodes.sfx, 'lowpass', 650, 160, 0.7, 0.006);
+      noiseHit(t + 0.025, 0.15, 0.045, nodes.sfx, 'bandpass', 1600, 800, 1.6, 0.015);
+    },
+    // bloque de cartón roto: "crac" en ráfaga, "pop" y campanita de premio (~0,5 s)
+    smash(t) {
+      const hits = [[0, 0.26, 1300], [0.018, 0.2, 950], [0.04, 0.17, 1500], [0.065, 0.12, 800]];
+      for (const [dt, pk, f] of hits) noiseHit(t + dt, 0.05, pk, nodes.sfx, 'bandpass', f, f * 0.6, 1.4, 0.001);
+      noiseHit(t, 0.16, 0.18, nodes.sfx, 'lowpass', 900, 200, 0.8, 0.003);
+      sweep('sine', 150, 60, t, 0.1, 0.22, nodes.sfx, 0.003);
+      sweep('sine', 520, 1100, t + 0.07, 0.05, 0.14, nodes.sfx, 0.002);
+      [0, 4, 7, 12].forEach((iv, i) => {
+        const tt = t + 0.13 + i * 0.05, f = mtof(79 + iv), last = i === 3;
+        note('sine', f, tt, 0.04, 0.075, nodes.sfx, { sus: 0.5, rel: last ? 0.3 : 0.12 });
+        note('triangle', f * 2, tt, 0.02, 0.012, nodes.sfx, { sus: 0.3, rel: last ? 0.15 : 0.06 });
+        if (last) note('sine', f, tt, 0.04, 0.025, nodes.sfxDelay, { sus: 0.5, rel: 0.3 });
+      });
+    },
+    // golpe al aire: soplo corto (~0,15 s)
+    whiff(t) {
+      noiseHit(t, 0.12, 0.3, nodes.sfx, 'bandpass', 700, 2200, 1.1, 0.03);
+      sweep('sine', 260, 150, t, 0.1, 0.06, nodes.sfx, 0.02);
+    },
+    nearMiss(t) {
       const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
       let dest = nodes.sfx;
       if (p) { p.pan.value = Math.random() < 0.5 ? -0.6 : 0.6; p.connect(nodes.sfx); dest = p; }
@@ -557,6 +633,18 @@ export function createAudio(options = {}) {
       nodes.musicGain.gain.setTargetAtTime(state.paused || !state.music ? 0 : MUSIC_VOLUME, now, 0.08);
       if (!state.paused) state.nextTime = now + 0.08;
       updateEngine(now);
+      updateHover(now, true);
+    }),
+    // modo Zorro: zumbido continuo de la tabla. on: bool, speed01: 0..1. Llamable cada fotograma.
+    setHover: safe(function (on, speed01) {
+      const was = state.hover;
+      state.hover = !!on;
+      state.hoverSpeed = clamp(+speed01 || 0, 0, 1);
+      if (!ctx) return;
+      const now = ctx.currentTime, toggled = was !== state.hover;
+      if (!toggled && now - state.lastHoverT < 0.033 && state.lastHoverT >= 0) return;
+      state.lastHoverT = now;
+      updateHover(now, toggled);
     }),
     get available() { return true; },
     // solo para pruebas: programar la música hasta t (OfflineAudioContext)

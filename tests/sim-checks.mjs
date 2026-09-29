@@ -73,6 +73,28 @@ console.log('Arcade (capa encima del clásico)');
   ok(t / 10 < 12, `quieto en un carril no aguantas (mueres a los ${(t / 10).toFixed(1)} s de media)`);
 }
 
+console.log('Zorro (salto)');
+{
+  const { Zorro, JUMP_T } = await import('../app/src/sim/zorro.js');
+  // quieto en el carril 0 y saltando justo antes de cada caja corta de ese carril: no debe chocar con ellas
+  const g = new Zorro({ seed: 11 });
+  let jumped = 0, hitShort = 0, hitTall = 0;
+  const lane0 = (b) => !b.hit && b.lane === 0;
+  for (let i = 0; i < 60 * 40 && g.alive; i++) {
+    const cur = g.s;
+    const next = g.boxes.filter(lane0).map((b) => b.k - cur).filter((d) => d > 0).sort((a, b) => a - b)[0];
+    // salta cuando la caja está a media duración de salto (en filas)
+    const rowsHalf = (g.v / 13.176) * 60 * JUMP_T * 0.5;
+    const jump = next !== undefined && next < rowsHalf + 0.3 && next > rowsHalf - 0.6 && !g.inAir;
+    const vBefore = g.v;
+    const ev = g.step({ steer: 0, jump });
+    for (const e of ev) { if (e.type === 'jump') jumped++; if (e.type === 'crash') { const b = g.boxes.find((x) => x.id === e.id); if (b && b.tall) hitTall++; else if (b && !b.joined && vBefore > 2.5) hitShort++; } }
+    g.invul = 0; g.boostOn = true; g.level = 1; g.alive = true;   // los pilares no acaban la prueba
+  }
+  ok(jumped > 5, `salta (${jumped} saltos)`);
+  ok(hitShort === 0, `saltando a tiempo no choca con las cajas cortas sueltas (a velocidad de juego) (choques cortos: ${hitShort}, pilares: ${hitTall})`);
+}
+
 console.log('Cámara (fluidez del giro)');
 {
   // Deslizándote a ritmo constante, la vista debe girar y avanzar a ritmo constante. Si la cámara

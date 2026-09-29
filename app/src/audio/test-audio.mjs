@@ -36,7 +36,7 @@ let fail = 0;
 const ok = (c, msg) => { console.log((c ? 'OK   ' : 'FALLO') + ' ' + msg); if (!c) fail++; };
 
 // ---- 1) API en tiempo real
-const names = ['boost', 'crash', 'death', 'foldStart', 'foldEnd', 'world', 'coin', 'menuMove', 'menuOk', 'menuBack', 'countdown', 'go', 'record', 'nearMiss'];
+const names = ['boost', 'crash', 'death', 'foldStart', 'foldEnd', 'world', 'coin', 'menuMove', 'menuOk', 'menuBack', 'countdown', 'go', 'record', 'nearMiss', 'collapse', 'jump', 'land', 'smash', 'whiff'];
 const rt = await page.evaluate(async (names) => {
   const { createAudio } = await import('/src/audio/index.js');
   const a = createAudio({ debug: true });
@@ -50,6 +50,7 @@ const rt = await page.evaluate(async (names) => {
   }
   for (const n of names) { a.play(n, { level: 3, combo: 12 }); await wait(30); }
   for (let l = 1; l <= 3; l++) a.play('boost', { level: l });
+  a.setHover(true, 0.2); for (let i = 0; i < 20; i++) { a.setHover(true, i / 19); await wait(16); } a.setHover(false); a.setHover(true, NaN); a.setHover(false, 2);
   a.play('nosuchsound');
   a.pause(true); a.play('menuMove'); await wait(100); a.pause(false);
   a.setMuted(true); const m1 = a.muted; a.setMuted(false); const m2 = a.muted;

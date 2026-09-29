@@ -11,6 +11,7 @@ export function createInput(target) {
     keys: new Set(), touches: new Map(), holdT: 0, dir: 0,
     pad: { x: 0, dl: false, dr: false, a: false, b: false, start: false, up: false, down: false, prev: {} },
     onButton: null, onTap: null,
+    heroMode: false, jumpQ: false, swipe: new Map(),   /* modo Zorro: saltar */
   };
   try { st.cal = +(localStorage.getItem('hipertunel-cal2') || 0) || 0; } catch (e) {}
 
@@ -56,12 +57,23 @@ export function createInput(target) {
 
   const el = target;
   el.addEventListener('pointerdown', (e) => {
+    // modo Zorro: con inclinación, tocar = saltar (la pausa va en su botón); sin sensor, los toques
+    // giran y el salto es deslizar hacia arriba
+    if (st.heroMode) {
+      st.swipe.set(e.pointerId, e.clientY);
+      if (e.pointerType === 'mouse' || (st.tiltOn && st.has)) { st.jumpQ = true; return; }
+    }
     // jugando con inclinación (o con ratón) la pantalla no sirve para girar: un toque pausa, por si
     // hay que parar. Sin sensor, los toques siguen girando (izquierda / derecha).
     if (e.pointerType === 'mouse' || (st.tiltOn && st.has)) { st.onTap && st.onTap(); return; }
     st.touches.set(e.pointerId, { d: e.clientX < innerWidth / 2 ? -1 : 1, t: 0 });
   });
   const end = (e) => st.touches.delete(e.pointerId);
+  el.addEventListener('pointermove', (e) => {
+    const y0 = st.swipe.get(e.pointerId);
+    if (st.heroMode && y0 !== undefined && y0 - e.clientY > 40) { st.jumpQ = true; st.swipe.delete(e.pointerId); st.touches.delete(e.pointerId); }
+  });
+  el.addEventListener('pointerup', (e) => st.swipe.delete(e.pointerId));
   el.addEventListener('pointerup', end); el.addEventListener('pointercancel', end); el.addEventListener('pointerleave', end);
 
   function pollPad() {
@@ -95,6 +107,9 @@ export function createInput(target) {
     get state() { return st; },
     set onButton(fn) { st.onButton = fn; },
     set onTap(fn) { st.onTap = fn; },
+    set heroMode(v) { st.heroMode = !!v; st.jumpQ = false; },
+    // salto pedido desde el último paso (toque, deslizar, Espacio/↑/W o botón A del mando)
+    consumeJump() { const j = st.jumpQ || ((st.keys.has('Space') || st.keys.has('ArrowUp') || st.keys.has('KeyW') || st.pad.a) && !st.jumpHeld); st.jumpHeld = st.keys.has('Space') || st.keys.has('ArrowUp') || st.keys.has('KeyW') || st.pad.a; st.jumpQ = false; return j; },
     configure({ tilt, invert, sens }) { if (tilt !== undefined) st.tiltOn = tilt; if (invert !== undefined) st.invert = invert; if (sens !== undefined) st.sens = sens; },
     calibrate() { st.cal = st.raw; try { localStorage.setItem('hipertunel-cal2', String(st.cal)); } catch (e) {} },
     get tiltValue() { return st.raw - st.cal; },
