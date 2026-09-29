@@ -199,6 +199,8 @@ export class Renderer {
     return { x: (v.x * 0.5 + 0.5) * w, y: (-v.y * 0.5 + 0.5) * h };
   }
 
+  setRecordRow(k) { this.kit.recordRow = k; }
+
   consumeLanding() { const l = !!this.landed; this.landed = false; return l; }
 
   flash(hex, a) { this.cam.flashCol.set(hex); this.cam.flash = Math.max(this.cam.flash, a); }

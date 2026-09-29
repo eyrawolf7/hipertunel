@@ -55,8 +55,11 @@ diffuseColor.rgb *= mix(mix(vWarn.rgb, vec3(1.0), 0.35), vWarn.rgb * mix(vec3(1.
 diffuseColor.rgb *= (0.94 + 0.12 * vTile) * mix(vec3(1.0), vec3(0.93, 1.02, 0.9), step(0.82, fract(vTile * 7.13)));
 // anillo tallado cada 8 filas (vWarn.x = 1 en esas losas): franja más oscura a ras de la losa con
 // una incrustación luminosa en medio. Da el ritmo de C1 sin nada que sobresalga en la calzada.
-float ribBand = vWarn.x * (1.0 - smoothstep(0.075, 0.09, vKz));
-float ribInlay = vWarn.x * smoothstep(0.022, 0.03, vKz) * (1.0 - smoothstep(0.05, 0.058, vKz));
+float isRec = step(1.5, vWarn.x);            // fila de tu récord: franja dorada ancha
+float ribBand = min(vWarn.x, 1.0) * (1.0 - isRec) * (1.0 - smoothstep(0.075, 0.09, vKz));
+float ribInlay = min(vWarn.x, 1.0) * (1.0 - isRec) * smoothstep(0.022, 0.03, vKz) * (1.0 - smoothstep(0.05, 0.058, vKz));
+float recBand = isRec * (smoothstep(0.02, 0.05, vKz) * (1.0 - smoothstep(0.3, 0.33, vKz)) + smoothstep(0.62, 0.65, vKz) * (1.0 - smoothstep(0.95, 0.98, vKz)) * 0.6);
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0, 0.82, 0.3), recBand * 0.7);
 diffuseColor.rgb *= 1.0 - 0.28 * ribBand;
 // juntas: máscara sacada de la textura (la junta es lo más oscuro de la losa)
 float seamM = (1.0 - smoothstep(0.1, 0.15, dot(texture2D(map, vMapUv).rgb, vec3(0.2126, 0.7152, 0.0722)))) * step(0.13, vMapUv.y);   // solo la cara (las jambas de los arcos usan la franja de arriba del atlas, v < 0,13)`)
@@ -64,7 +67,7 @@ float seamM = (1.0 - smoothstep(0.1, 0.15, dot(texture2D(map, vMapUv).rgb, vec3(
 float fresC = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 3.0);
 vec3 glowC = mix(vWarn.rgb, vec3(1.0), 0.35);
 totalEmissiveRadiance += (vWarn.rgb * (0.06 + 0.3 * on) + glowC * vRimC * (0.1 + 0.3 * on) + glowC * fresC * (0.08 + 0.15 * on)) * uGlowK;` : `#include <emissivemap_fragment>
-totalEmissiveRadiance += uInlay * ribInlay * 1.4 + uSeamGlow * seamM;`);
+totalEmissiveRadiance += uInlay * ribInlay * 1.4 + uSeamGlow * seamM + vec3(1.0, 0.75, 0.2) * recBand * 1.1;`);
     sh.uniforms.uGlowK = mat.userData.uGlowK; sh.uniforms.uInlay = kitU.uInlay; sh.uniforms.uSeamGlow = kitU.uSeamGlow;
   };
   mat.userData.uGlowK = { value: 1 };
@@ -78,6 +81,7 @@ export class TunnelKit {
     this.meshes = {};
     this._v = new THREE.Vector3(); this._n = new THREE.Vector3();
     this.laneGlow = new Float32Array(LANES);
+    this.recordRow = -1;                // fila de tu récord (marca dorada en el túnel)
     this.load();
   }
 
@@ -160,7 +164,7 @@ export class TunnelKit {
         const nx = -d[c * 2 + 1], ny = d[c * 2];
         n.copy(ra.X).multiplyScalar(nx).addScaledVector(ra.U, ny); g.aN0.setXYZ(i, n.x, n.y, n.z);
         n.copy(rb.X).multiplyScalar(nx).addScaledVector(rb.U, ny); g.aN1.setXYZ(i, n.x, n.y, n.z);
-        if (wa > 0) g.aWarn.setXYZW(i, wr, wg, wb, wa); else g.aWarn.setXYZW(i, (k & 7) === 0 ? 1 : 0, 0, 0, 0);
+        if (wa > 0) g.aWarn.setXYZW(i, wr, wg, wb, wa); else g.aWarn.setXYZW(i, k === this.recordRow ? 2 : (k & 7) === 0 ? 1 : 0, 0, 0, 0);
       }
       // lámina abierta: un faldón de sillería cuelga de cada borde, así la pista tiene grosor de
       // obra (como el anillo del concepto C·3) y no es una cinta de papel. Usa la losa lisa del

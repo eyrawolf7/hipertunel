@@ -212,6 +212,7 @@ function overHTML() {
         <div class="oc-lbl">Distancia</div>
         <div class="oc-dist"><b data-bind="dist">0</b><span>m</span></div>
         <div class="oc-best">${ICON.trophy}<span>Mejor</span><b data-bind="bestO">—</b></div>
+        <ul class="oc-facts" data-bind="facts"></ul>
         <div class="oc-stats">
           <div class="stat">${ICON.coin}<b data-bind="coins">0</b><small>monedas</small></div>
           <div class="stat stat-score"><span class="st-ico">${ICON.sparkle}</span><b data-bind="score">0</b><small>puntos</small></div>
@@ -246,6 +247,8 @@ function hudHTML() {
     <div class="hud-speed"><b data-hud="speed">0</b> km/h</div>
   </div>
   <div class="hud-count" data-hud="count"></div>
+  <div class="pad-hint pad-l" data-hud="padL">${ICON.chevron}<span>placa</span></div>
+  <div class="pad-hint pad-r" data-hud="padR"><span>placa</span>${ICON.chevron}</div>
   <div class="hud-br" data-hud="chevs">
     <span class="chev" data-c="0">${ICON.chevron}</span><span class="chev" data-c="1">${ICON.chevron}</span><span class="chev" data-c="2">${ICON.chevron}</span>
   </div>
@@ -496,7 +499,7 @@ export function createUI(root, handlers = {}) {
   const hudEl = {
     coins: $('[data-hud="coins"]'), timer: $('[data-hud="timer"]'), timerBox: $('[data-hud="timerBox"]'),
     dist: $('[data-hud="dist"]'), speed: $('[data-hud="speed"]'), chevs: $('[data-hud="chevs"]'),
-    chev: $$('.chev'), distBox: $('.hud-dist'),
+    chev: $$('.chev'), distBox: $('.hud-dist'), padL: $('[data-hud="padL"]'), padR: $('[data-hud="padR"]'),
   };
   const last = {};
   function hudReset() {
@@ -513,6 +516,9 @@ export function createUI(root, handlers = {}) {
       const beyond = st.best > 0 && dist > st.best;
       if (beyond !== last.beyond) { last.beyond = beyond; hudEl.distBox.classList.toggle('gold', beyond); }
     }
+    // flecha hacia la placa más cercana tras perder los impulsos (en el borde, nunca en el centro)
+    const pd = st.padDir | 0;
+    if (pd !== last.pd) { last.pd = pd; hudEl.padL.classList.toggle('on', pd < 0); hudEl.padR.classList.toggle('on', pd > 0); }
     const spd = Math.round((st.speedMS || 0) * 3.6);
     if (spd !== last.spd) { last.spd = spd; hudEl.speed.textContent = spd; }
     const coins = st.coins | 0;
@@ -583,7 +589,7 @@ export function createUI(root, handlers = {}) {
     scr.dataset.mode = mode;
     scr.classList.toggle('record', !!r.isRecord);
     bind('mode').textContent = MODES[mode].name;
-    bind('headline').textContent = r.isRecord ? '¡Increíble!' : pick(mode === 'timetrial' ? ['¡Se acabó el tiempo!'] : ['¡Buena carrera!', '¡Casi!', '¡Qué viaje!', '¡Uf, por poco!']);
+    bind('headline').textContent = r.headline ? r.headline : r.isRecord ? '¡Increíble!' : pick(mode === 'timetrial' ? ['¡Se acabó el tiempo!'] : ['¡Buena carrera!', '¡Casi!', '¡Qué viaje!', '¡Uf, por poco!']);
     bind('dist').textContent = fmtInt(r.distM);
     bind('bestO').textContent = r.best > 0 ? `${fmtInt(r.best)} m` : '—';
     bind('coins').textContent = fmtInt(r.coins);
@@ -603,6 +609,7 @@ export function createUI(root, handlers = {}) {
       rows.push(`<li class="${me ? 'me' : ''} r${i + 1}"><i>${i + 1}</i><b>${fmtInt(v)} m</b>${when}</li>`);
     }
     bind('top').innerHTML = rows.join('');
+    bind('facts').innerHTML = (r.facts && r.facts.lines ? r.facts.lines : []).map((t) => `<li>${esc(t)}</li>`).join('');
     // misiones cumplidas en esta partida (ya sustituidas en la lista por las nuevas)
     const done = Array.isArray(r.missionsDone) ? r.missionsDone : [];
     bind('missDone').innerHTML = done.map((m) => `<div class="md">✔ ${esc(m.text)}</div>`).join('');

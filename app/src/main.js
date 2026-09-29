@@ -42,6 +42,7 @@ let game = null, mode = 'classic', state = 'attract';
 let acc = 0, prev = { s: 0, theta: 0 }, countdown = 0, overT = 0, pausedFrom = null;
 let pausedAt = -1e9;                 // cuándo se pausó con un toque (para no reanudar con el mismo)
 let coins = 0;
+let lostAt = -1, killBox = null, recAnnounced = false;   // para el resumen del fin de partida
 const bestAtStart = {};
 
 const ui = createUI($('ui'), {
@@ -127,7 +128,8 @@ function startGame(m, quick = false) {
   newGame(m);
   coins = 0;
   bestAtStart[m] = bestOf(m);
-  missions.start(); missDist = 0;
+  missions.start(); missDist = 0; lostAt = -1; killBox = null; recAnnounced = false;
+  renderer.setRecordRow?.(bestAtStart[m] > 0 ? Math.round(bestAtStart[m] / 4) : -1);
   // reintento rápido: sin 3-2-1, solo un instante antes del ¡YA!
   state = 'countdown'; countdown = quick ? 0.6 : 3; pendingChime = false; nearT = 0;
   ui.show('hud');
@@ -157,12 +159,56 @@ function finish() {
   const top = list.slice(0, 5); saveTop(mode, top);
   const isRecord = top[0] === me && list.length > 1;
   const mr = missions.finish();
+  const facts = endFacts(distM, bestAtStart[mode] || 0, isRecord);
   pushMissions();
-  ui.over({ mode, distM, coins, score, best: top[0].distM ?? top[0].score, isRecord, time: game.time, maxBoostTime: mode === 'classic' ? game.boostTotal : game.maxBoostTime, top: top.map((e) => ({ ...e, me: e === me })), missionsDone: mr.completed, rankUp: mr.rankUp, rank: missions.rank() });
+  ui.over({ mode, distM, coins, score, best: top[0].distM ?? top[0].score, isRecord, time: game.time, maxBoostTime: mode === 'classic' ? game.boostTotal : game.maxBoostTime, top: top.map((e) => ({ ...e, me: e === me })), missionsDone: mr.completed, facts, headline: facts.headline, rankUp: mr.rankUp, rank: missions.rank() });
   if (mr.rankUp) setTimeout(() => { audio.play('record'); ui.toast(`¡Rango ${missions.rank().level}: ${missions.rank().name}!`, 'mission'); }, 700);
   ui.show('over');
   if (isRecord) audio.play('record');
   pushRecords();
+}
+
+// Resumen de la partida para la tarjeta final: titular según cómo haya ido y uno o dos datos útiles
+// (qué te mató, cuánto te faltó), en vez de un titular al azar.
+function endFacts(distM, best, isRecord) {
+  const out = [];
+  let headline;
+  const first = best <= 0;
+  const diff = Math.round(best - distM);
+  if (isRecord) headline = '¡Increíble!';
+  else if (first) headline = '¡Primera carrera!';
+  else if (diff > 0 && diff <= Math.max(150, best * 0.12)) headline = '¡Por muy poco!';
+  else if (distM < 300) headline = '¡Arranque complicado!';
+  else if (distM > best * 0.6) headline = '¡Buena carrera!';
+  else headline = '¡Otra más!';
+  if (isRecord && best > 0) out.push(`Has superado tu récord en ${fmtN(Math.round(distM - best))} m`);
+  else if (!first && diff > 0) out.push(`Te faltaron ${fmtN(diff)} m para tu récord`);
+  const since = lostAt >= 0 ? game.time - lostAt : -1;
+  if (since >= 0 && since < 8) out.push(`Caíste ${since.toFixed(1).replace('.', ',')} s después de perder los impulsos: busca una placa azul`);
+  else if (killBox && !killBox.fixed) out.push('Te pilló una caja rodante: fíjate hacia dónde gira');
+  else if (killBox && killBox.tall) out.push('Los pilares cruzan el túnel: esquívalos por un lado');
+  else if (game.level === 0 && distM < 400) out.push('Pisa las flechas azules: con impulso, un choque no te elimina');
+  if (out.length < 2 && game.world > 0) out.push(`Llegaste al mundo ${game.world + 1}`);
+  return { headline, lines: out.slice(0, 2) };
+}
+const fmtN = (n) => n.toLocaleString('es-ES');
+
+// sin impulsos: hacia qué lado queda la placa más cercana por delante (−1, 0, 1). Solo es una
+// pista en pantalla; no cambia nada de la partida.
+function padDirection() {
+  if (!game.alive || game.level > 0 || game.mode === 'survival') return 0;
+  let best = null;
+  for (const p of game.pads) {
+    const d = p.k - game.s;
+    if (p.taken || d < 2 || d > 26) continue;
+    if (!best || d < best.d) best = { d, lane: p.lane };
+  }
+  if (!best) return 0;
+  const open = game.fold !== 30 && game.fold !== -30;
+  let da = best.lane * Math.PI / 6 - game.theta;
+  if (!open) da = Math.atan2(Math.sin(da), Math.cos(da));
+  if (Math.abs(da) < Math.PI / 12) return 0;       // ya vas por su carril
+  return da > 0 ? 1 : -1;                          // girar a la derecha sube theta
 }
 
 // vibración (móvil): se apaga con "Reducir efectos"
@@ -197,9 +243,17 @@ function stepSim() {
   for (const e of ev) {
     if (state === 'attract') continue;
     if (e.type === 'boost') { audio.play('boost', { level: e.level }); buzz(e.level === 3 ? [15, 40, 30] : [14 + e.level * 4]); if (e.level === 3) ui.toast('¡Velocidad máxima!', 'boost'); }
-    else if (e.type === 'crash') { audio.play(e.fatal ? 'death' : 'crash'); buzz(e.fatal ? [120, 60, 200] : [40, 30, 60]); if (!e.fatal) { ui.toast('¡Impulsos perdidos!', 'info'); hitstop = settings.reduceFx ? 0 : 0.07; } }
+    else if (e.type === 'crash') {
+      if (!e.fatal) lostAt = game.time; else killBox = game.boxes.find((b) => b.id === e.id) || null;
+      audio.play(e.fatal ? 'death' : 'crash'); buzz(e.fatal ? [120, 60, 200] : [40, 30, 60]); if (!e.fatal) { ui.toast('¡Impulsos perdidos!', 'info'); hitstop = settings.reduceFx ? 0 : 0.07; } }
     else if (e.type === 'coin') { coins = game.coinsGot; audio.play('coin', { combo: e.combo }); if (e.combo >= 3) buzz(8); coinFly(e); }
     else if (e.type === 'foldStart') audio.play('foldStart');
+    else if (e.type === 'foldOrder' && game.fold < 0) {
+      // desde fuera, el plegado hacia dentro lleva a un mundo nuevo: se avisa con la distancia
+      // aproximada (32 filas de recta + unos 600 fotogramas de plegado + 24 filas de tránsito)
+      const rows = 56 + 600 * game.v / 13.176;
+      ui.toast(`Mundo ${game.world + 2} a unos ${fmtN(Math.round(rows * 4 / 100) * 100)} m`, 'mission');
+    }
     else if (e.type === 'foldEnd') { audio.play('foldEnd'); buzz(25); }
     else if (e.type === 'world') {
       audio.setWorld(game.world);
@@ -223,6 +277,8 @@ function stepSim() {
       if (Math.abs(d) > hw * 0.8 && Math.abs(d) < hw * 1.6) { audio.play('nearMiss'); buzz(10); nearT = 0.4; for (const f of missions.event({ type: 'near' }, game)) ui.toast('Misión cumplida: ' + f.text, 'mission'); break; }
     }
   }
+  // pasar tu récord se celebra en el momento (la marca dorada del túnel está en esa fila)
+  if (state === 'play' && !recAnnounced && bestAtStart[mode] > 0 && game.distanceM > bestAtStart[mode]) { recAnnounced = true; ui.toast('¡Récord superado!', 'mission'); audio.play('record'); buzz([20, 30, 20, 30, 40]); }
   if (padHint && state === 'play' && game.pads.some((p) => !p.taken && (p.k - game.s) / Math.max(1e-3, game.v / 13.176 * 60) < 1.6 && p.k > game.s)) { padHint = false; ui.toast('Pisa las flechas azules para acelerar', 'boost'); }
   if (pendingChime && renderer.consumeLanding()) { pendingChime = false; audio.play('world'); buzz(30); }
   if (state === 'attract' && (!game.alive || game.s > 4000)) attractGame((Math.random() * 1e9) | 0);
@@ -262,7 +318,7 @@ function frame(now) {
   renderer.render();
   audio.setSpeed(game.speedMS, game.level);
   if (state === 'play' || state === 'countdown' || state === 'dying') {
-    ui.hud({ distM: game.distanceM, speedMS: state === 'countdown' && game.frame === 0 ? 0 : game.speedMS, level: game.level, coins: game.coinsGot, timeLeft: mode === 'timetrial' ? game.timeLeft : null, mode, invul: game.invul > 0, best: bestAtStart[mode] || 0, countdown: state === 'countdown' ? Math.ceil(countdown) : 0 });
+    ui.hud({ padDir: state === 'play' ? padDirection() : 0, distM: game.distanceM, speedMS: state === 'countdown' && game.frame === 0 ? 0 : game.speedMS, level: game.level, coins: game.coinsGot, timeLeft: mode === 'timetrial' ? game.timeLeft : null, mode, invul: game.invul > 0, best: bestAtStart[mode] || 0, countdown: state === 'countdown' ? Math.ceil(countdown) : 0 });
   }
   // en la web desde Android se ofrece la app; dentro de la app (Capacitor) no
   const apk = $('apk'); if (apk) apk.hidden = !(IS_ANDROID_WEB && state === 'attract');
@@ -280,5 +336,5 @@ window.__hip = {
   start: (m = 'classic', seed) => { startGame(m); if (seed !== undefined) newGame(m, seed); state = 'play'; },
   skipTo(rows) { while (game.s < rows && game.alive) { game.step({ steer: botSteer(game) }); renderer.track.sync(game); } prev = { s: game.s, theta: game.theta }; },
   step(n = 1, steer = null) { for (let i = 0; i < n; i++) { prev.s = game.s; prev.theta = game.theta; const ev = game.step({ steer: steer ?? botSteer(game) }); renderer.onEvents(ev, game); renderer.track.sync(game); } },
-  bot: botSteer,
+  bot: botSteer, padDirection: () => padDirection(),
 };
