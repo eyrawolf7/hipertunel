@@ -11,6 +11,8 @@ import { loadModel, loadTexture } from './assets.js';
 const MAX = 40;
 const DEG = Math.PI / 180;
 
+const KIT_SUB = 12;
+
 export class Boxes {
   constructor(scene, envMap) {
     this.geo = new RoundedBoxGeometry(1, 1, 1, 3, 0.14);
@@ -57,7 +59,7 @@ export class Boxes {
     this.shadow.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     scene.add(this.shadow);
     this.sm = new THREE.Matrix4(); this.sp2 = new THREE.Vector3(); this.ssc = new THREE.Vector3();
-    this.types = new Uint8Array(MAX); this.cols = []; this._rc = new THREE.Color();
+    this.types = new Uint8Array(MAX); this.dims = new Float32Array(MAX * 3); this.cols = []; this._rc = new THREE.Color();
     this.loadKit(scene);
     this.nShadow = 0;
     this.outline.frustumCulled = false; this.outline.count = 0;
@@ -91,7 +93,7 @@ export class Boxes {
         if (mat !== crystal && g.attributes.color) g.deleteAttribute('color');
         if (g.attributes.uv && !g.attributes.uv1) g.setAttribute('uv1', g.attributes.uv);
         g.computeBoundingBox(); const bb = g.boundingBox, sz = new THREE.Vector3(); bb.getSize(sz);
-        const im = new THREE.InstancedMesh(g, mat, MAX); im.frustumCulled = false; im.count = 0;
+        const im = new THREE.InstancedMesh(g, mat, MAX * KIT_SUB); im.frustumCulled = false; im.count = 0;
         im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
         im.userData.isRune = mat === rune;
         scene.add(im); out.push(im);
@@ -159,6 +161,7 @@ export class Boxes {
       if (flashId === b.id) { this.mesh.setColorAt(n, this.col.setRGB(1, 1, 1)); this.glow[n] = 2; }
       else this.mesh.setColorAt(n, colors[b.color]);
       this.types[n] = b.fixed ? 0 : 1;
+      this.dims[n * 3] = w; this.dims[n * 3 + 1] = h; this.dims[n * 3 + 2] = len;
       this.positions.set(b.id, p.clone());
       // con invulnerabilidad atraviesas las cajas: la que tienes encima no debe llenar la pantalla
       if (game.invul > 0 && camPos && p.distanceToSquared(camPos) < 9) { this.mesh.setMatrixAt(n, m.makeScale(0, 0, 0)); }
@@ -169,16 +172,24 @@ export class Boxes {
     this.outline.count = n;
     if (this.kitBlock && this.kitBlock.length) {
       let nb = 0, nc = 0;
-      const tm = new THREE.Matrix4(), tc = new THREE.Color();
+      const tm = new THREE.Matrix4(), tc = new THREE.Color(), sub = new THREE.Matrix4(), cm = new THREE.Matrix4();
       for (let i = 0; i < n; i++) {
         this.mesh.getMatrixAt(i, tm); this.mesh.getColorAt(i, tc);
         const list = this.types[i] === 0 ? this.kitBlock : (this.kitCrystal.length ? this.kitCrystal : this.kitBlock);
-        const j = list === this.kitBlock ? nb++ : nc++;
-        for (const im of list) {
-          im.setMatrixAt(j, tm);
-          // la runa brilla con el color de la caja (más cuanto más cerca estás de su carril)
-          if (im.userData.isRune) im.setColorAt(j, this._rc.copy(tc).multiplyScalar(1.6 + this.glow[i] * 1.4));
-          else im.setColorAt(j, tc);
+        // la pieza del kit es un cubo: una caja alargada (o un pilar) se monta con varios bloques
+        // casi cúbicos apilados, en vez de estirar uno (la runa saldría deformada)
+        const w = this.dims[i * 3], hh = this.dims[i * 3 + 1], ll = this.dims[i * 3 + 2];
+        const nH = Math.max(1, Math.min(4, Math.round(hh / w))), nL = Math.max(1, Math.min(3, Math.round(ll / w)));
+        for (let a = 0; a < nH; a++) for (let c = 0; c < nL; c++) {
+          const j = list === this.kitBlock ? nb++ : nc++;
+          sub.makeScale(1, 1 / nH, 1 / nL).setPosition(0, (a + 0.5) / nH - 0.5, (c + 0.5) / nL - 0.5);
+          cm.multiplyMatrices(tm, sub);
+          for (const im of list) {
+            im.setMatrixAt(j, cm);
+            // la runa brilla con el color de la caja (más cuanto más cerca estás de su carril)
+            if (im.userData.isRune) im.setColorAt(j, this._rc.copy(tc).multiplyScalar(1.6 + this.glow[i] * 1.4));
+            else im.setColorAt(j, tc);
+          }
         }
       }
       for (const im of this.kitBlock) { im.count = nb; im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; }
