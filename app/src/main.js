@@ -37,6 +37,7 @@ input.configure(settings);
 
 let game = null, mode = 'classic', state = 'attract';
 let acc = 0, prev = { s: 0, theta: 0 }, countdown = 0, overT = 0, pausedFrom = null;
+let pausedAt = -1e9;                 // cuándo se pausó con un toque (para no reanudar con el mismo)
 let coins = 0;
 const bestAtStart = {};
 
@@ -63,6 +64,8 @@ pushRecords();
 ui.settings(settings);
 audio.setMusic(settings.music); audio.setMuted(!settings.sound);
 
+// tocar la pantalla mientras juegas = pausa (el botón de continuar sale en el centro)
+input.onTap = () => { if (state === 'play') { pause(); pausedAt = performance.now(); } };
 input.onButton = (b) => {
   if (b === 'mute') { settings.sound = !settings.sound; audio.setMuted(!settings.sound); saveSettings(); ui.settings(settings); return; }
   if (state === 'play' && (b === 'pause' || b === 'back')) { pause(); return; }
@@ -125,13 +128,16 @@ function startGame(m, quick = false) {
   audio.setWorld(0);
   audio.play('countdown');
   let seen = 0; try { seen = +(localStorage.getItem('hipertunel-partidas') || 0); localStorage.setItem('hipertunel-partidas', String(seen + 1)); } catch (e) {}
-  if (seen < 3) setTimeout(() => ui.toast(input.hasTilt ? 'Inclina el móvil para girar' : (COARSE ? 'Toca a la izquierda o a la derecha para girar' : 'Gira con ← →'), 'info'), 300);
+  if (seen < 3) setTimeout(() => ui.toast(input.hasTilt ? 'Inclina el móvil para girar · toca la pantalla para pausar' : (COARSE ? 'Toca a la izquierda o a la derecha para girar' : 'Gira con ← →'), 'info'), 300);
   padHint = seen < 3;
   if (seen >= 3 && !input.hasTilt && settings.tilt && COARSE) setTimeout(() => { if (!input.hasTilt) ui.toast('Sin giroscopio: toca a izquierda o derecha', 'info'); }, 1500);
 }
 
 function pause() { if (state !== 'play') return; pausedFrom = state; state = 'paused'; ui.show('pause'); audio.pause(true); }
-function resume() { if (state !== 'paused') return; state = 'countdown'; countdown = 1.0; ui.show('hud'); audio.pause(false); audio.play('countdown'); }
+function resume() {
+  // el mismo toque que ha pausado no debe pulsar también "Continuar", que sale debajo del dedo
+  if (state !== 'paused' || performance.now() - pausedAt < 450) return;
+  pausedAt = -1e9; state = 'countdown'; countdown = 1.0; ui.show('hud'); audio.pause(false); audio.play('countdown'); }
 function toMenu() { audio.pause(false); attract(); }
 
 function finish() {

@@ -35,7 +35,10 @@ async function open(viewport = DESKTOP, url = URL0, { clearStorage = true } = {}
   const errors = [];
   page.on('pageerror', (e) => errors.push('pageerror: ' + String(e)));
   page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
-  page.on('requestfailed', (r) => errors.push('requestfailed: ' + r.url() + ' ' + (r.failure()?.errorText || '')));
+  // las cancelaciones (ERR_ABORTED) mientras se abre la página son de un intento de carga anterior
+  // o de una recarga del servidor de desarrollo, no fallos del juego
+  let opening = true;
+  page.on('requestfailed', (r) => { const t = r.failure()?.errorText || ''; if (opening && /ERR_ABORTED/.test(t)) return; errors.push('requestfailed: ' + r.url() + ' ' + t); });
   let loads = 0;
   page.on('load', () => { loads++; if (loads > 1 && !page.__qaReload) reloads.push(page.url()); });
   if (clearStorage) await page.evaluateOnNewDocument(() => { if (!sessionStorage.getItem('qa-keep')) { try { localStorage.clear(); } catch (e) {} sessionStorage.setItem('qa-keep', '1'); } });
@@ -48,6 +51,7 @@ async function open(viewport = DESKTOP, url = URL0, { clearStorage = true } = {}
   }
   page.__qaReload = false;
   await sleep(600);
+  opening = false;
   return { page, errors };
 }
 const st = (page) => page.evaluate(() => window.__hip.state);
@@ -243,7 +247,7 @@ await run(5, async () => {
   }, sign, n, gs, gz, angle);
   await motion(1);
   const a = await page.evaluate(() => ({ has: window.__hip.input.hasTilt, v: +window.__hip.input.tiltValue.toFixed(3) }));
-  rec(5, 'devicemotion detectado', a.has && Math.abs(a.v) > 0.2, { screenAngle: angle, ...a, esperado: +(0.981 * Math.sin(15 * Math.PI / 180)).toFixed(3) });
+  rec(5, 'devicemotion detectado, con la magnitud del original (g lateral × 0,1)', a.has && Math.abs(Math.abs(a.v) - 0.981 * Math.SQRT1_2 * Math.sin(15 * Math.PI / 180)) < 0.005, { screenAngle: angle, ...a, esperado: +(0.981 * Math.SQRT1_2 * Math.sin(15 * Math.PI / 180)).toFixed(3) });
   const out = {};
   for (const sign of [1, -1]) {
     await page.evaluate(() => window.__hip.start('classic', 11)); await invul(page);
@@ -271,6 +275,20 @@ await run(5, async () => {
   // meter del título
   const meter = await page.evaluate(() => getComputedStyle(document.getElementById('tiltMeter')).getPropertyValue('--v'));
   note(5, 'medidor de inclinación (--v)', meter);
+  // con inclinación, tocar la pantalla jugando pausa; el mismo toque no pulsa "Continuar"
+  await page.evaluate(() => { window.__hip.ui.show('hud'); window.__hip.start('classic', 11); });
+  await invul(page); await motion(1);
+  const wp = await waitState(page, 'play', 6000);
+  await page.touchscreen.tap(PHONE.width / 2, PHONE.height / 2);
+  await sleep(60);
+  const p1 = { st: await st(page), scr: await scr(page) };
+  rec(5, 'con inclinación, un toque en la pantalla pausa', wp.ok && p1.st === 'paused' && p1.scr === 'pause', { wp, ...p1 });
+  await page.evaluate(() => document.querySelector('.scr[data-screen="pause"] [data-act="resume"]').click());
+  rec(5, 'el toque que pausa no reanuda al instante', (await st(page)) === 'paused', await st(page));
+  await sleep(500);
+  await clickIn(page, 'pause', '[data-act="resume"]');
+  const w2 = await waitState(page, ['countdown', 'play'], 1500);
+  rec(5, 'Continuar reanuda la partida', w2.ok, w2);
   if (errors.length) rec(5, 'sin errores', false, errors);
   await page.close();
 });
