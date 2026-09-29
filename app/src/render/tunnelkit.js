@@ -44,9 +44,9 @@ vWarn = aWarn; vFacet = fract(sin(dot(position.xz, vec2(12.9898, 78.233))) * 437
       .replace('#include <color_fragment>', crystal ? `#include <color_fragment>
 // cristal del aviso: apagado = pastel, encendido = color vivo
 float on = clamp((vWarn.a - 0.42) / 0.58, 0.0, 1.0);
-diffuseColor.rgb *= mix(mix(vWarn.rgb, vec3(1.0), 0.35), vWarn.rgb, on);` : '#include <color_fragment>')
+diffuseColor.rgb *= mix(mix(vWarn.rgb, vec3(1.0), 0.35), vWarn.rgb * vWarn.rgb * 1.2, on);` : '#include <color_fragment>')
       .replace('#include <emissivemap_fragment>', crystal ? `#include <emissivemap_fragment>
-totalEmissiveRadiance += vWarn.rgb * (0.08 + 0.6 * on) * uGlowK;` : '#include <emissivemap_fragment>');
+totalEmissiveRadiance += vWarn.rgb * (0.1 + 0.85 * on) * uGlowK;` : '#include <emissivemap_fragment>');
     sh.uniforms.uGlowK = mat.userData.uGlowK;
   };
   mat.userData.uGlowK = { value: 1 };
