@@ -7,3 +7,4 @@ tests/base-v031/
 tests/*/
 !tests/*.js
 dist/
+__pycache__/
