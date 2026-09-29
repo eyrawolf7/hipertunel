@@ -17,7 +17,7 @@ import { Decor, aerialU } from './decor.js';
 import { Fx } from './fx.js';
 import { Coins } from './coins.js';
 import { Streaks } from './streaks.js';
-import { TunnelKit } from './tunnelkit.js';
+import { TunnelKit, kitU } from './tunnelkit.js';
 import { TunnelProps } from './tunnelprops.js';
 import { Life } from './life.js';
 import { styleUniforms } from './stylize.js';
@@ -138,6 +138,8 @@ export class Renderer {
     u.uDark.value = (A.dark || 0) + ((B.dark || 0) - (A.dark || 0)) * t;
     styleUniforms.uShadowCol.value.set(A.shadow || 0x6d5fc4).lerp(new THREE.Color(B.shadow || 0x6d5fc4), t);
     styleUniforms.uRimCol.value.set(A.rim || 0xbfe8ff).lerp(new THREE.Color(B.rim || 0xbfe8ff), t);
+    kitU.uInlay.value.set(A.inlay || 0xffc861).lerp(new THREE.Color(B.inlay || 0xffc861), t);
+    kitU.uSeamGlow.value.set(A.seamGlow || 0).lerp(new THREE.Color(B.seamGlow || 0), t);
     // sol con el color de cada mundo (dorado, rosado, frío de noche…)
     const ka = A.sunK || [1.15, 1, 0.8], kb = B.sunK || [1.15, 1, 0.8];
     styleUniforms.uSunCol.value.setRGB(ka[0] + (kb[0] - ka[0]) * t, ka[1] + (kb[1] - ka[1]) * t, ka[2] + (kb[2] - ka[2]) * t);
@@ -303,7 +305,7 @@ export class Renderer {
     this.kit.setVisible(useKit);
     if (useKit) {
       const dk = Math.max(this.tunnel.uniforms.uDark.value, this.cam.invert);
-      this.stoneTint.setRGB(1, 1, 1).lerp(new THREE.Color(0.28, 0.3, 0.45), dk);
+      this.stoneTint.setRGB(1, 1, 1).lerp(new THREE.Color(0.46, 0.48, 0.64), dk);   // mundos oscuros: la piedra no baja de ~25 % de luminancia
       this.kit.update(game, tr, this.colors, this.tunnel.laneGlow, this.stoneTint, dk > 0.5);
     }
     this.props.setVisible(this.quality !== 'baja');
@@ -334,7 +336,7 @@ export class Renderer {
     this.tunnel.uniforms.uRing.value.set(0xfff1c9).lerp(BOOST_BLUE, bk);
     if (this.grade) {
       const g = this.grade.uniforms;
-      g.uBlur.value = (0.01 + sp01 * 0.03 + c.kick * 0.06) * (reduceFx ? 0.3 : 1);
+      g.uBlur.value = (sp01 * 0.016 + c.kick * 0.05) * (reduceFx ? 0.3 : 1);
       g.uCA.value = c.kick * 0.004;
       g.uVigCol.value.copy(this.fogColor);
       if (c.blueVig > 0) { g.uVigCol.value.lerp(BOOST_BLUE, 0.8); g.uVig.value = 0.45; c.blueVig -= dt; }

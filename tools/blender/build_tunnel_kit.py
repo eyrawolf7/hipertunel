@@ -444,6 +444,8 @@ def stone_top_formas(seed=11):
     # bordes nítidos (forma gráfica, no mancha borrosa)
     # solo en la junta (8 cm) y a rodales: nada de manchas sobre la cara por la que se conduce
     moss = sstep(0.55, 0.6, F) * sstep(0.08, 0.05, e)
+    # nada en las esquinas: en los cruces de juntas formaba cruces verdes
+    moss = moss * sstep(0.2, 0.32, np.maximum(ax - np.abs(lx), az - np.abs(lz)))
     H = lerp(H, np.maximum(H, GR + 0.02), moss).astype(np.float32)
 
     # albedo: arenisca clara, cada losa con su tono y un degradado suave; canto más claro

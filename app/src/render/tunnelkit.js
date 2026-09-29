@@ -16,13 +16,16 @@ const MAXI = (ROWS + 4) * (LANES + 2);          // + los dos faldones de la lám
 const SKIRT_H = 1.5;                            // alto del faldón de piedra bajo cada borde
 const HALF_W = 1.035, LEN = 4.0;
 
+// colores del anillo tallado y del brillo de las juntas (los pone el render según el mundo)
+export const kitU = { uInlay: { value: new THREE.Color(0xffc861) }, uSeamGlow: { value: new THREE.Color(0, 0, 0) } };
+
 function patch(mat, crystal) {
   mat.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', `#include <common>
 attribute vec3 aC0; attribute vec3 aC1; attribute vec3 aC2; attribute vec3 aC3;
 attribute vec3 aN0; attribute vec3 aN1; attribute vec4 aWarn;
-varying vec4 vWarn; varying float vFacet; varying float vTile;
+varying vec4 vWarn; varying float vFacet; varying float vTile; varying float vKz;
 vec3 cellPos(vec3 p, out vec3 Tx, out vec3 Ny, out vec3 Tz){
   // X del kit va de C1 a C0 (no al revés): así la base (X, Y hacia dentro, Z adelante) es
   // dextrógira y la losa no sale reflejada (se verían sus caras de abajo)
@@ -39,9 +42,9 @@ vec3 objectNormal = normalize(_tx * normal.x + _ny * normal.y + _tz * normal.z);
 vec3 objectTangent = normalize(_tx * tangent.x + _ny * tangent.y + _tz * tangent.z);
 #endif`)
       .replace('#include <begin_vertex>', `vec3 transformed = cellPos(position, _tx, _ny, _tz);
-vWarn = aWarn; vTile = fract(sin(dot(aC0, vec3(12.9898, 78.233, 37.719))) * 43758.5453); vFacet = fract(sin(dot(position.xz, vec2(12.9898, 78.233))) * 43758.5453);`);
+vWarn = aWarn; vKz = position.z / ${LEN.toFixed(1)}; vTile = fract(sin(dot(aC0, vec3(12.9898, 78.233, 37.719))) * 43758.5453); vFacet = fract(sin(dot(position.xz, vec2(12.9898, 78.233))) * 43758.5453);`);
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec4 vWarn; varying float vFacet; varying float vTile;\nuniform float uGlowK;')
+      .replace('#include <common>', '#include <common>\nvarying vec4 vWarn; varying float vFacet; varying float vTile; varying float vKz;\nuniform float uGlowK; uniform vec3 uInlay; uniform vec3 uSeamGlow;')
       .replace('#include <color_fragment>', crystal ? `#include <color_fragment>
 // cristal del aviso: apagado = pastel, encendido = color vivo. El canto claro de la textura
 // (vRimC) se aprovecha para que brille el borde de cada panel.
@@ -49,12 +52,20 @@ float on = clamp((vWarn.a - 0.42) / 0.58, 0.0, 1.0);
 float vRimC = smoothstep(0.8, 0.95, dot(diffuseColor.rgb, vec3(0.3333)));
 diffuseColor.rgb *= mix(mix(vWarn.rgb, vec3(1.0), 0.35), vWarn.rgb * mix(vec3(1.0), vWarn.rgb, 0.6), on);` : `#include <color_fragment>
 // cada losa con su tono (±6 %) y alguna algo más verdosa, como piedra de verdad
-diffuseColor.rgb *= (0.94 + 0.12 * vTile) * mix(vec3(1.0), vec3(0.93, 1.02, 0.9), step(0.82, fract(vTile * 7.13)));`)
+diffuseColor.rgb *= (0.94 + 0.12 * vTile) * mix(vec3(1.0), vec3(0.93, 1.02, 0.9), step(0.82, fract(vTile * 7.13)));
+// anillo tallado cada 8 filas (vWarn.x = 1 en esas losas): franja más oscura a ras de la losa con
+// una incrustación luminosa en medio. Da el ritmo de C1 sin nada que sobresalga en la calzada.
+float ribBand = vWarn.x * (1.0 - smoothstep(0.075, 0.09, vKz));
+float ribInlay = vWarn.x * smoothstep(0.022, 0.03, vKz) * (1.0 - smoothstep(0.05, 0.058, vKz));
+diffuseColor.rgb *= 1.0 - 0.28 * ribBand;
+// juntas: máscara sacada de la textura (la junta es lo más oscuro de la losa)
+float seamM = (1.0 - smoothstep(0.1, 0.15, dot(texture2D(map, vMapUv).rgb, vec3(0.2126, 0.7152, 0.0722)))) * step(0.13, vMapUv.y);   // solo la cara (las jambas de los arcos usan la franja de arriba del atlas, v < 0,13)`)
       .replace('#include <emissivemap_fragment>', crystal ? `#include <emissivemap_fragment>
 float fresC = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 3.0);
 vec3 glowC = mix(vWarn.rgb, vec3(1.0), 0.35);
-totalEmissiveRadiance += (vWarn.rgb * (0.06 + 0.3 * on) + glowC * vRimC * (0.1 + 0.3 * on) + glowC * fresC * (0.08 + 0.15 * on)) * uGlowK;` : '#include <emissivemap_fragment>');
-    sh.uniforms.uGlowK = mat.userData.uGlowK;
+totalEmissiveRadiance += (vWarn.rgb * (0.06 + 0.3 * on) + glowC * vRimC * (0.1 + 0.3 * on) + glowC * fresC * (0.08 + 0.15 * on)) * uGlowK;` : `#include <emissivemap_fragment>
+totalEmissiveRadiance += uInlay * ribInlay * 1.4 + uSeamGlow * seamM;`);
+    sh.uniforms.uGlowK = mat.userData.uGlowK; sh.uniforms.uInlay = kitU.uInlay; sh.uniforms.uSeamGlow = kitU.uSeamGlow;
   };
   mat.userData.uGlowK = { value: 1 };
   mat.customProgramCacheKey = () => (crystal ? 'kit-crystal' : 'kit-stone');
@@ -149,7 +160,7 @@ export class TunnelKit {
         const nx = -d[c * 2 + 1], ny = d[c * 2];
         n.copy(ra.X).multiplyScalar(nx).addScaledVector(ra.U, ny); g.aN0.setXYZ(i, n.x, n.y, n.z);
         n.copy(rb.X).multiplyScalar(nx).addScaledVector(rb.U, ny); g.aN1.setXYZ(i, n.x, n.y, n.z);
-        g.aWarn.setXYZW(i, wr, wg, wb, wa);
+        if (wa > 0) g.aWarn.setXYZW(i, wr, wg, wb, wa); else g.aWarn.setXYZW(i, (k & 7) === 0 ? 1 : 0, 0, 0, 0);
       }
       // lámina abierta: un faldón de sillería cuelga de cada borde, así la pista tiene grosor de
       // obra (como el anillo del concepto C·3) y no es una cinta de papel. Usa la losa lisa del
