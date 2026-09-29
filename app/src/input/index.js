@@ -12,23 +12,21 @@ export function createInput(target) {
     pad: { x: 0, dl: false, dr: false, a: false, b: false, start: false, up: false, down: false, prev: {} },
     onButton: null,
   };
-  try { st.cal = +(localStorage.getItem('hipertunel-cal') || 0) || 0; } catch (e) {}
+  try { st.cal = +(localStorage.getItem('hipertunel-cal2') || 0) || 0; } catch (e) {}
 
-  const screenAngle = () => {
-    const o = (screen.orientation && typeof screen.orientation.angle === 'number') ? screen.orientation.angle : (window.orientation || 0);
-    return ((o % 360) + 360) % 360;
-  };
+  // Mismo método que la v0.32, que en el móvil de Víctor iba bien: el ángulo de la gravedad en el
+  // plano de la pantalla, medido desde la postura apaisada neutra (múltiplo de π más cercano).
+  // No depende del signo de cada sistema (iOS da la gravedad al revés que Android) ni de hacia qué
+  // lado esté girado el móvil. La magnitud es la del original: 0,981 · seno de la inclinación.
   function onMotion(e) {
     const g = e.accelerationIncludingGravity;
     if (!g || g.x == null || g.y == null) return;
+    if (Math.hypot(g.x, g.y) < 2.5) return;            // móvil casi plano: sin dato fiable
     st.motionN++;
-    let x = g.x, y = g.y;
-    if (isIOS) { x = -x; y = -y; }
-    // gravedad en coordenadas de pantalla: el eje x de la pantalla es el que manda al girar
-    const ang = screenAngle();
-    let sx;
-    if (ang === 90) sx = y; else if (ang === 270) sx = -y; else if (ang === 180) sx = x; else sx = -x;
-    st.raw = sx * 0.1;                    // appSetAccel: aceleración × 0,1
+    const phi = Math.atan2(g.y, g.x);
+    const base = Math.round(phi / Math.PI) * Math.PI;
+    const d = Math.atan2(Math.sin(phi - base), Math.cos(phi - base));
+    st.raw = 0.981 * Math.sin(d);
     st.has = true;
   }
   function listen() {
@@ -89,7 +87,7 @@ export function createInput(target) {
     get state() { return st; },
     set onButton(fn) { st.onButton = fn; },
     configure({ tilt, invert, sens }) { if (tilt !== undefined) st.tiltOn = tilt; if (invert !== undefined) st.invert = invert; if (sens !== undefined) st.sens = sens; },
-    calibrate() { st.cal = st.raw; try { localStorage.setItem('hipertunel-cal', String(st.cal)); } catch (e) {} },
+    calibrate() { st.cal = st.raw; try { localStorage.setItem('hipertunel-cal2', String(st.cal)); } catch (e) {} },
     get tiltValue() { return st.raw - st.cal; },
     get hasTilt() { return st.has; },
     // Llamar una vez por paso de simulación (60 Hz). Devuelve el "a" final.

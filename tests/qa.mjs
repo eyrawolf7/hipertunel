@@ -231,15 +231,17 @@ await run(5, async () => {
   const G = 9.81, deg = 15, gs = G * Math.sin(deg * Math.PI / 180), gz = G * Math.cos(deg * Math.PI / 180);
   const motion = (sign, n = 1) => page.evaluate(async (sign, n, gs, gz, ang) => {
     for (let i = 0; i < n; i++) {
-      // en horizontal (90) el eje que manda es y; en vertical (0) es x
-      const g = ang === 90 || ang === 270 ? { x: 0, y: sign * gs, z: gz } : { x: -sign * gs, y: 0, z: gz };
+      // móvil en horizontal, algo reclinado (45°): la gravedad tira hacia el borde largo de abajo
+      // (eje x del dispositivo) y al girarlo 15° pasa una parte al eje y
+      const r = Math.SQRT1_2, G = 9.81, t = 15 * Math.PI / 180;
+      const g = { x: -G * r * Math.cos(t), y: sign * G * r * Math.sin(t), z: G * r };
       window.dispatchEvent(new DeviceMotionEvent('devicemotion', { accelerationIncludingGravity: g, interval: 16 }));
       if (n > 1) await new Promise((r) => requestAnimationFrame(r));
     }
   }, sign, n, gs, gz, angle);
   await motion(1);
   const a = await page.evaluate(() => ({ has: window.__hip.input.hasTilt, v: +window.__hip.input.tiltValue.toFixed(3) }));
-  rec(5, 'devicemotion detectado', a.has && Math.abs(a.v) > 0.2, { screenAngle: angle, ...a, esperado: +(gs * 0.1).toFixed(3) });
+  rec(5, 'devicemotion detectado', a.has && Math.abs(a.v) > 0.2, { screenAngle: angle, ...a, esperado: +(0.981 * Math.sin(15 * Math.PI / 180)).toFixed(3) });
   const out = {};
   for (const sign of [1, -1]) {
     await page.evaluate(() => window.__hip.start('classic', 11)); await invul(page);
@@ -248,7 +250,7 @@ await run(5, async () => {
   rec(5, 'el giro cambia de signo con la inclinación', Math.sign(out.mas15) === -Math.sign(out.menos15) && Math.abs(out.mas15) > 0.1, out);
   // meter a cero: inclinación 0 no gira (zona muerta)
   await page.evaluate(() => window.__hip.start('classic', 11)); await invul(page);
-  await page.evaluate(() => window.dispatchEvent(new DeviceMotionEvent('devicemotion', { accelerationIncludingGravity: { x: 0, y: 0.1, z: 9.8 } })));
+  await page.evaluate(() => window.dispatchEvent(new DeviceMotionEvent('devicemotion', { accelerationIncludingGravity: { x: -6.93, y: 0.07, z: 6.93 } })));
   await thetaProbe(page); await sleep(400); const d0 = await probeRead(page);
   rec(5, 'plano (0,6°) no gira', Math.abs(d0) < 0.01, d0);
   // calibrar desde Ajustes con el móvil inclinado +15°
@@ -258,7 +260,7 @@ await run(5, async () => {
   await motion(1);
   await clickIn(page, 'title', '[data-act="settings"]');
   await clickIn(page, 'settings', '[data-act="calibrate"]');
-  const c = await page.evaluate(() => ({ v: +window.__hip.input.tiltValue.toFixed(4), cal: +window.__hip.input.state.cal.toFixed(4), ls: localStorage.getItem('hipertunel-cal'), toasts: [...document.querySelectorAll('.toasts > *')].map((t) => t.textContent.trim()) }));
+  const c = await page.evaluate(() => ({ v: +window.__hip.input.tiltValue.toFixed(4), cal: +window.__hip.input.state.cal.toFixed(4), ls: localStorage.getItem('hipertunel-cal2'), toasts: [...document.querySelectorAll('.toasts > *')].map((t) => t.textContent.trim()) }));
   rec(5, 'Calibrar el centro pone la inclinación a 0', Math.abs(c.v) < 1e-3 && c.ls !== null, c);
   rec(5, 'Calibrar muestra un único aviso', c.toasts.filter((t) => /calibrado/i.test(t)).length === 1, c.toasts);
   await motion(-1);
