@@ -64,7 +64,7 @@ export class Life {
     const a = Math.random() * Math.PI * 2;
     // dentro: en un anillo pegado a la pared, alrededor del eje del tubo (unos 3,2 m por encima de
     // la cámara, que va a ras de suelo); fuera: a los lados y por encima de la pista
-    const r = outside ? 4 + Math.random() * 7 : 2.7 + Math.random() * 0.8;
+    const r = outside ? 3.5 + Math.random() * 5 : 2.7 + Math.random() * 0.8;
     let ca = Math.cos(a), sa = Math.sin(a);
     if (outside && sa < -0.2) sa = -sa;                 // por fuera, nada por debajo de la pista
     const d = near ? 4 + Math.random() * 20 : 18 + Math.random() * 8;
@@ -80,7 +80,10 @@ export class Life {
     const { m, q, sc, c } = this;
     const right = this._r.crossVectors(look, up).normalize();
     let n = 0;
-    for (const p of this.p) {
+    for (let i = 0; i < this.p.length; i++) {
+      const p = this.p[i];
+      // por fuera la mitad basta (sin paredes que las oculten, muchas llenarían un lado de la vista)
+      if (outside && (i & 1)) { continue; }
       if (!p.live) this.spawn(p, cam, look, up, outside, true);
       const rel = this._d.copy(p.pos).sub(cam.position);
       const ahead = rel.dot(look);
@@ -94,7 +97,7 @@ export class Life {
       p.pos.addScaledVector(up, (K.glow ? 0.15 * Math.sin(p.flut) : -0.35) * dt).addScaledVector(right, 0.3 * Math.sin(p.flut * 0.7) * dt);
       q.setFromRotationMatrix(m.lookAt(cam.position, p.pos, up));
       q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), p.rot));
-      const s = K.size * (0.7 + 0.6 * ((p.col & 7) / 7)) * (K.glow ? 1 : 0.9 + 0.3 * Math.abs(Math.sin(p.flut)));
+      const s = K.size * (outside ? 0.6 : 1) * (0.7 + 0.6 * ((p.col & 7) / 7)) * (K.glow ? 1 : 0.9 + 0.3 * Math.abs(Math.sin(p.flut)));
       sc.set(s, s * (K.tex === 'leaf' ? 1.4 : 1), s);
       m.compose(p.pos, q, sc);
       this.mesh.setMatrixAt(n, m);

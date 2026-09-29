@@ -45,8 +45,9 @@ void main(){
   vec2 puv = vec2(lon / 6.2831853 + 0.5 + uTime * 0.0015, 0.5 + lat / 3.14159265);
   vec3 pa = texture2D(uPanoA, puv).rgb, pb = texture2D(uPanoB, puv).rgb;
   vec3 pano = mix(pa, pb, uPanoT); float hasP = mix(uHasA, uHasB, uPanoT);
-  // lo de muy abajo del panorama (primer plano de la imagen) sale ampliado y borroso: bruma
-  pano = mix(pano, mix(uMid, vec3(1.0), 0.35), smoothstep(-0.3, -0.75, h) * 0.75);
+  // (los panoramas en capas son limpios: ya no hace falta la bruma que tapaba el primer plano
+  // borroso de los pintados; solo un toque muy abajo, cerca del polo)
+  pano = mix(pano, uMid, smoothstep(-0.6, -0.9, h) * 0.5);
   col = mix(col, pano * 1.05 + uSun * pow(sd, 900.0) * 2.0, hasP);
   vec3 night = mix(vec3(0.02, 0.015, 0.06), vec3(0.09, 0.04, 0.16), smoothstep(-0.3, 0.6, h)) + vec3(st) * 1.2;
   col = mix(col, night, uInvert);

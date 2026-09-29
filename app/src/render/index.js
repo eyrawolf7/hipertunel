@@ -319,7 +319,11 @@ export class Renderer {
     this.pads.update(game, tr, dt);
     this.coins.update(game, tr, dt, cam.position);
     this.fx.update(dt);
-    this.sky.update(cam, this.fr.U, outside ? 1 : 0, dt, this.cam.invert, this.fr.F);
+    // el horizonte del paisaje sigue sobre todo a la cámara (70 %): así queda casi a nivel en la
+    // vista y el paisaje llena la mitad de abajo, aunque vayas por un carril girado; el 30 % de la
+    // pista conserva algo de la sensación de rodar alrededor del tubo
+    this._skyUp = (this._skyUp || new THREE.Vector3()).copy(this.fr.U).lerp(this.upS, 0.7).normalize();
+    this.sky.update(cam, this._skyUp, outside ? 1 : 0, dt, this.cam.invert, this.fr.F);
     this.decor.update(game, tr, cam, true, dt);   // se ve también por los arcos del túnel
     this.life.update(cam, this.look, this.upS, outside, this.themeIdx, dt, this.quality !== 'baja' && !reduceFx, this.cam.invert);
     this.renderer.setClearColor(this.fogColor, 1);
