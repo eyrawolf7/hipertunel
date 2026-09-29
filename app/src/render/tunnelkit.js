@@ -43,13 +43,17 @@ vWarn = aWarn; vTile = fract(sin(dot(aC0, vec3(12.9898, 78.233, 37.719))) * 4375
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying vec4 vWarn; varying float vFacet; varying float vTile;\nuniform float uGlowK;')
       .replace('#include <color_fragment>', crystal ? `#include <color_fragment>
-// cristal del aviso: apagado = pastel, encendido = color vivo
+// cristal del aviso: apagado = pastel, encendido = color vivo. El canto claro de la textura
+// (vRimC) se aprovecha para que brille el borde de cada panel.
 float on = clamp((vWarn.a - 0.42) / 0.58, 0.0, 1.0);
+float vRimC = smoothstep(0.8, 0.95, dot(diffuseColor.rgb, vec3(0.3333)));
 diffuseColor.rgb *= mix(mix(vWarn.rgb, vec3(1.0), 0.35), vWarn.rgb * mix(vec3(1.0), vWarn.rgb, 0.6), on);` : `#include <color_fragment>
 // cada losa con su tono (±6 %) y alguna algo más verdosa, como piedra de verdad
 diffuseColor.rgb *= (0.94 + 0.12 * vTile) * mix(vec3(1.0), vec3(0.93, 1.02, 0.9), step(0.82, fract(vTile * 7.13)));`)
       .replace('#include <emissivemap_fragment>', crystal ? `#include <emissivemap_fragment>
-totalEmissiveRadiance += vWarn.rgb * (0.08 + 0.35 * on) * uGlowK;` : '#include <emissivemap_fragment>');
+float fresC = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 3.0);
+vec3 glowC = mix(vWarn.rgb, vec3(1.0), 0.35);
+totalEmissiveRadiance += (vWarn.rgb * (0.06 + 0.3 * on) + glowC * vRimC * (0.1 + 0.3 * on) + glowC * fresC * (0.08 + 0.15 * on)) * uGlowK;` : '#include <emissivemap_fragment>');
     sh.uniforms.uGlowK = mat.userData.uGlowK;
   };
   mat.userData.uGlowK = { value: 1 };

@@ -79,7 +79,19 @@ export class Boxes {
     if (!kit) return;
     const tex = async (n, srgb) => { const t = await loadTexture('kit/' + n); if (t) { t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.flipY = false; t.needsUpdate = true; } return t; };
     const [alb, nrm, orm, cn] = await Promise.all([tex('stone_albedo.jpg', true), tex('stone_normal.png'), tex('stone_orm.jpg'), tex('crystal_normal.png')]);
-    const stone = stylize(new THREE.MeshStandardMaterial({ map: alb, normalMap: nrm, aoMap: orm, roughnessMap: orm, roughness: 1 }), { rim: 0.55, key: 'box-stone' });
+    const stoneM = new THREE.MeshStandardMaterial({ map: alb, normalMap: nrm, aoMap: orm, roughnessMap: orm, roughness: 1 });
+    // borde luminoso del color de la caja (fresnel) y núcleo algo más oscuro: se lee como un bloque
+    // con luz dentro, no como plástico macizo, y el bloom recoge el contorno
+    stoneM.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <color_fragment>', '#include <color_fragment>\n  diffuseColor.rgb *= 0.8;')
+        .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+  #ifdef USE_INSTANCING_COLOR
+  float boxFres = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 3.0);
+  totalEmissiveRadiance += vColor * boxFres * 0.6;
+  #endif`);
+    };
+    const stone = stylize(stoneM, { rim: 0.35, key: 'box-stone2' });
     const rune = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const crystal = stylize(new THREE.MeshStandardMaterial({ normalMap: cn, roughness: 0.12, envMapIntensity: 1.6, vertexColors: true, emissive: 0x000000 }), { rim: 0.7, key: 'box-crystal' });
     const make = (name) => {
