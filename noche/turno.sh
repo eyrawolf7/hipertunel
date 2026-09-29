@@ -4,7 +4,7 @@
 #
 #   sh noche/turno.sh [hasta HH:MM] [máximo de rondas]      p. ej.  sh noche/turno.sh 07:30 60
 #
-# - Copia de trabajo: ../hipertunel-noche (rama de integración noche/AAAA-MM-DD, creada desde main).
+# - Copia de trabajo: ../hipertunel-noche (rama de integración noche/AAAA-MM-DD/todo, desde main).
 # - Cada tarea va en su propia rama noche/AAAA-MM-DD/<id> (desde main). Si pasa la puerta, se fusiona
 #   también en la de integración, para poder probarlo todo junto. Víctor elige por la mañana.
 # - Estado (tareas, progreso, informe, capturas): ../hipertunel-noche/.noche/ (fuera de git).
@@ -31,7 +31,7 @@ fi
 
 # copia de trabajo y estado
 if [ ! -d "$WT" ]; then
-  git -C "$REPO" worktree add -B "noche/$FECHA" "$WT" main || exit 1
+  git -C "$REPO" worktree add -B "noche/$FECHA/todo" "$WT" main || exit 1
   ln -s "$REPO/node_modules" "$WT/node_modules"
 fi
 mkdir -p "$EST/logs" "$EST/capturas" "$EST/builds"
