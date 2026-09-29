@@ -2,6 +2,7 @@
 // oleadas alcanzadas, densidad, placas, choques, plegados. Uso:
 //   node tests/sim-bot.mjs [modo] [partidas] [skill]
 import { Game } from '../app/src/sim/game.js';
+import { Arcade } from '../app/src/sim/arcade.js';
 import { botSteer } from '../app/src/sim/bot.js';
 
 const mode = process.argv[2] || 'classic';
@@ -11,7 +12,7 @@ const SKILL = +(process.argv[4] || 1);        // 1 = bueno; <1 reacciona más ta
 if (import.meta.url === `file://${process.argv[1]}`) {
   const res = [];
   for (let i = 0; i < N; i++) {
-    const g = new Game({ mode, seed: 1000 + i });
+    const g = mode === 'arcade' ? new Arcade({ seed: 1000 + i }) : new Game({ mode, seed: 1000 + i });
     let boosts = 0, crashes = 0, folds = 0, maxLevel = 0, spawns = 0;
     const maxFrames = 60 * 60 * 8;
     while (g.alive && g.frame < maxFrames) {
