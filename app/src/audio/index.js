@@ -446,7 +446,17 @@ export function createAudio(options = {}) {
       [0, 4, 7, 12].forEach((iv) => note('sine', mtof(r + 12 + iv), t + 0.65, 0.6, 0.03, nodes.sfxDelay, { a: 0.02, sus: 0.7, rel: 0.4 }));
       duck(0.4, 1.4);
     },
-    nearMiss(t) {
+    // Aventura: la losa cruje (o = { k: 0..1 } fuerza del desgaste) y se hunde
+    creak(t, o = {}) {
+      const k = Math.max(0.2, Math.min(1, o.k ?? 0.5));
+      noiseHit(t, 0.12, 0.1 * k, nodes.sfx, 'bandpass', 420 + 300 * k, 260, 3, 0.005);
+      sweep('sawtooth', 150 + 60 * k, 90, t, 0.1, 0.03 * k, nodes.sfx, 0.004);
+    },
+    collapse(t) {
+      noiseHit(t, 0.5, 0.3, nodes.sfx, 'lowpass', 900, 120, 0.8, 0.005);
+      sweep('sine', 180, 45, t, 0.45, 0.12, nodes.sfx, 0.005);
+    },
+        nearMiss(t) {
       const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
       let dest = nodes.sfx;
       if (p) { p.pan.value = Math.random() < 0.5 ? -0.6 : 0.6; p.connect(nodes.sfx); dest = p; }

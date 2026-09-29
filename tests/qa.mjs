@@ -728,7 +728,7 @@ await run(19, async () => {
   await page.evaluate(() => { window.__hip.ui.show('modes'); document.querySelector('.card-adventure').click(); });
   await sleep(500);
   const map = await page.evaluate(() => ({ scr: document.getElementById('ui').dataset.screen, n: document.querySelectorAll('.stage').length, locked: document.querySelectorAll('.stage.locked').length }));
-  rec(19, 'el mapa enseña 10 tramos y solo el primero abierto', map.scr === 'map' && map.n === 10 && map.locked === 9, map);
+  rec(19, 'el mapa enseña 12 tramos y solo el primero abierto', map.scr === 'map' && map.n === 12 && map.locked === 11, map);
   await page.evaluate(() => document.querySelector('[data-stage="0"]').click());
   const w = await waitState(page, 'play', 6000);
   await page.evaluate(() => { const h = window.__hip; h.input.steer = () => h.bot(h.game, 11); });

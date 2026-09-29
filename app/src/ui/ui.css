@@ -830,3 +830,20 @@
 .htui .has-next .btn-next { display: inline-flex; }
 .htui .is-adv .oc-best, .htui .is-adv .oc-tabs .oc-tab[data-tab="top"] { display: none; }
 .htui .card-adventure .card-rec { visibility: hidden; }
+/* Aventura: tarjeta del tramo, estrellas del fin de tramo */
+.htui .adv-intro { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -62%) scale(.9); opacity: 0; pointer-events: none; transition: opacity .25s, transform .35s var(--spring); background: var(--paper); color: var(--ink); border: .16em solid var(--ink); border-radius: 1.3em; box-shadow: 0 .35em 0 var(--ink); padding: .7em 1.3em .8em; text-align: center; min-width: 16em; max-width: 24em; }
+.htui .adv-intro.on { opacity: 1; transform: translate(-50%, -62%) scale(1); }
+.htui .ai-n { font-size: .7em; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #e0600f; }
+.htui .ai-name { font-size: 1.4em; font-weight: 700; margin: .05em 0 .25em; }
+.htui .ai-tip { font-size: .8em; font-weight: 600; background: var(--yel); border-radius: .7em; padding: .3em .7em; margin-bottom: .4em; box-shadow: inset 0 0 0 .1em var(--ink); }
+.htui .ai-goals, .htui .goals { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .2em; text-align: left; }
+.htui .ai-goals li { font-size: .75em; display: flex; gap: .4em; align-items: center; }
+.htui .goals li { display: flex; align-items: center; gap: .45em; font-size: .85em; font-weight: 600; padding: .25em .5em; border-radius: .7em; }
+.htui .goals li.ok { background: var(--yel); box-shadow: inset 0 0 0 .1em var(--ink); }
+.htui .goals li b { margin-left: auto; font-size: .8em; }
+.htui .goals li small { margin-left: auto; font-size: .75em; color: #7a7299; }
+.htui .goals .st { font-size: 1.4em; }
+.htui .btn-cp { display: none; }
+.htui .has-cp .btn-cp { display: inline-flex; }
+.htui .is-adv .oc-tabs { display: none; }
+.htui .map-path { grid-template-columns: repeat(6, minmax(0, 1fr)); }

@@ -248,10 +248,12 @@ function overHTML() {
         <div class="oc-tabs"><button class="oc-tab on" data-tab="miss">Misiones</button><button class="oc-tab" data-tab="top">Tus mejores</button></div>
         <div class="oc-pane" data-pane="miss"><div class="miss-done" data-bind="missDone"></div><ul class="miss" data-bind="missions"></ul><div class="miss-rank" data-bind="rankLine"></div></div>
         <div class="oc-pane" data-pane="top" hidden><ol class="top5" data-bind="top"></ol></div>
+        <div class="oc-pane oc-goals" data-pane="goals" hidden></div>
       </div>
     </div>
     <div class="oc-btns">
       <button class="btn btn-primary" data-nav data-act="restart" data-default><span class="btn-ico">${ICON.retry}</span><span>Otra vez</span></button>
+      <button class="btn btn-sec btn-cp" data-nav data-act="checkpoint"><span class="btn-ico">${ICON.play}</span><span>Desde el control</span></button>
       <button class="btn btn-primary btn-next" data-nav data-act="next"><span class="btn-ico">${ICON.play}</span><span>Siguiente</span></button>
       <button class="btn btn-sec" data-nav data-act="menu"><span class="btn-ico">${ICON.home}</span><span>Menú</span></button>
     </div>
@@ -273,6 +275,7 @@ function hudHTML() {
     <div class="hud-speed"><b data-hud="speed">0</b> km/h</div>
   </div>
   <div class="hud-count" data-hud="count"></div>
+  <div class="adv-intro" data-hud="advIntro"></div>
   <div class="adv-bar" data-hud="advBar"><span data-hud="advN">Tramo 1</span><i><b data-hud="advP"></b></i><em data-hud="advPow"></em></div>
   <div class="pad-hint pad-l" data-hud="padL">${ICON.chevron}<span>placa</span></div>
   <div class="pad-hint pad-r" data-hud="padR"><span>placa</span>${ICON.chevron}</div>
@@ -426,6 +429,7 @@ export function createUI(root, handlers = {}) {
       case 'resume': call('onResume'); break;
       case 'restart': call('onRestart'); break;
       case 'next': call('onNext'); break;
+      case 'checkpoint': call('onCheckpoint'); break;
       case 'menu': call('onMenu'); break;
       case 'calibrate': call('onCalibrate'); toast('Centro calibrado', 'info'); break;
       default: break;
@@ -539,7 +543,7 @@ export function createUI(root, handlers = {}) {
   const hudEl = {
     coins: $('[data-hud="coins"]'), timer: $('[data-hud="timer"]'), timerBox: $('[data-hud="timerBox"]'),
     dist: $('[data-hud="dist"]'), speed: $('[data-hud="speed"]'), chevs: $('[data-hud="chevs"]'),
-    chev: $$('.chev'), distBox: $('.hud-dist'), padL: $('[data-hud="padL"]'), padR: $('[data-hud="padR"]'), advBar: $('[data-hud="advBar"]'), advN: $('[data-hud="advN"]'), advP: $('[data-hud="advP"]'), advPow: $('[data-hud="advPow"]'),
+    chev: $$('.chev'), distBox: $('.hud-dist'), padL: $('[data-hud="padL"]'), padR: $('[data-hud="padR"]'), advBar: $('[data-hud="advBar"]'), advIntro: $('[data-hud="advIntro"]'), advN: $('[data-hud="advN"]'), advP: $('[data-hud="advP"]'), advPow: $('[data-hud="advPow"]'),
   };
   const last = {};
   function hudReset() {
@@ -558,6 +562,9 @@ export function createUI(root, handlers = {}) {
     }
     // flecha hacia la placa más cercana tras perder los impulsos (en el borde, nunca en el centro)
     // Aventura: avance del tramo y poder activo
+    // la tarjeta del tramo solo durante la cuenta atrás
+    const introOn = !!st.adv && st.countdown > 0;
+    if (introOn !== last.introOn) { last.introOn = introOn; hudEl.advIntro.classList.toggle('on', introOn); }
     const av = st.adv;
     hudEl.advBar.classList.toggle('on', !!av);
     if (av) {
@@ -662,13 +669,19 @@ export function createUI(root, handlers = {}) {
     const adv = r.adv;
     scr.classList.toggle('is-adv', !!adv);
     scr.classList.toggle('has-next', !!(adv && adv.hasNext));
+    scr.classList.toggle('has-cp', !!(adv && adv.cp));
     bind('adv').innerHTML = adv ? `<span class="oa-n">Tramo ${adv.n} · ${esc(adv.name)}</span><span class="oa-stars">${[0, 1, 2].map((i) => `<i class="st ${i < adv.stars ? 'on' : ''}" style="--d:${i}">★</i>`).join('')}</span>` : '';
     bind('facts').innerHTML = (r.facts && r.facts.lines ? r.facts.lines : []).map((t) => `<li>${esc(t)}</li>`).join('');
     // misiones cumplidas en esta partida (ya sustituidas en la lista por las nuevas)
     const done = Array.isArray(r.missionsDone) ? r.missionsDone : [];
     bind('missDone').innerHTML = done.map((m) => `<div class="md">✔ ${esc(m.text)}</div>`).join('');
     // con récord se enseña primero la tabla; si no, las misiones
-    setTab(r.isRecord ? 'top' : 'miss');
+    setTab(adv ? 'goals' : r.isRecord ? 'top' : 'miss');
+    if (adv) {
+      const g = (ok, was, txt) => `<li class="${ok ? 'ok' : was ? 'was' : ''}"><i class="st ${ok || was ? 'on' : ''}">★</i><span>${txt}</span>${ok ? '<b>¡Hecho!</b>' : was ? '<small>ya la tenías</small>' : ''}</li>`;
+      const b = adv.bits | 0, m = adv.merged | 0;
+      $('.oc-goals', scr).innerHTML = `<h3 class="oc-toptitle">Estrellas del tramo</h3><ul class="goals">${g(b & 1, m & 1, adv.cleared ? 'Superado' : `Supéralo (llegaste al ${Math.round(adv.prog * 100)} %)`)}${g(b & 2, m & 2, 'Sin chocar ni caer')}${g(b & 4, m & 4, `Monedas: ${adv.coins}/${adv.goal}`)}</ul><div class="miss-rank">Tiempo ${fmtTime(adv.time)}</div>`;
+    }
     show('over');
     // se reinicia la animación de entrada
     restart($('.over-card', scr), 'enter');
@@ -739,6 +752,9 @@ export function createUI(root, handlers = {}) {
   show('none');
 
   return {
+    intro(d) {
+      hudEl.advIntro.innerHTML = `<div class="ai-n">${d.boss && !d.name.startsWith('Jefe') ? 'Jefe · ' : ''}Tramo ${d.n}</div><div class="ai-name">${esc(d.name)}</div>${d.tip ? `<div class="ai-tip">${esc(d.tip)}</div>` : ''}<ul class="ai-goals">${d.goals.map((g) => `<li><i class="st on">★</i>${esc(g)}</li>`).join('')}</ul>`;
+    },
     show, hud, toast, over, settings, tiltMeter, records: setRecords, missions, shop: paintShop, map: paintMap,
     // modos bloqueados: { voyage: true } → tarjeta en gris con su descripción de desbloqueo
     locks(l = {}) { for (const k of MODE_KEYS) { const c = $(`.card-${k}`); if (!c) continue; c.classList.toggle('locked', !!l[k]); const d = $('.card-desc', c); if (d) d.textContent = l[k] && MODES[k].lockedDesc ? MODES[k].lockedDesc : MODES[k].desc; } },

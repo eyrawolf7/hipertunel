@@ -16,26 +16,32 @@ import { makeRng } from './rng.js';
 const TAU = Math.PI * 2;
 const mod = (a, n) => ((a % n) + n) % n;
 
-// wave: oleada del guion clásico con la que empieza (la dificultad sube de tramo en tramo)
+// wave: oleada del guion clásico con la que empieza. Oleada y semilla salen de una búsqueda con
+// bots de tres niveles (novato, medio, bueno) para que la curva suba suave y los jefes sean un pico
+// (ver tests/aventura.mjs)
 // rows: largo del tramo en filas (4 m cada una); breaks / crumble: cuántos de cada
 export const STAGES = [
-  { name: 'La primera grieta', seed: 1101, wave: 0, rows: 420, breaks: 2, crumble: 0, powers: 1, world: 0 },
-  { name: 'Suelo que cruje', seed: 1102, wave: 1, rows: 480, breaks: 1, crumble: 1, powers: 1, world: 0 },
-  { name: 'Saltos en la selva', seed: 1103, wave: 7, rows: 520, breaks: 3, crumble: 1, powers: 2, world: 1 },
-  { name: 'Cascada rota', seed: 1104, wave: 11, rows: 560, breaks: 2, crumble: 2, powers: 2, world: 1 },
-  { name: 'Jefe: el Guardián', seed: 1105, wave: 8, rows: 700, breaks: 3, crumble: 2, powers: 2, world: 1, boss: true },
-  { name: 'Noche sin suelo', seed: 1106, wave: 15, rows: 560, breaks: 3, crumble: 2, powers: 2, world: 2 },
-  { name: 'Luciérnagas', seed: 1107, wave: 17, rows: 600, breaks: 3, crumble: 2, powers: 2, world: 2 },
-  { name: 'Escalinata', seed: 1108, wave: 20, rows: 620, breaks: 3, crumble: 3, powers: 2, world: 3 },
-  { name: 'Templo en ruinas', seed: 1109, wave: 16, rows: 660, breaks: 4, crumble: 3, powers: 3, world: 3 },
-  { name: 'Jefe: el Volcán', seed: 1110, wave: 22, rows: 800, breaks: 4, crumble: 3, powers: 3, world: 4, boss: true },
+  { name: 'La primera grieta', seed: 1101, wave: 0, rows: 420, breaks: 2, crumble: 0, powers: 1, world: 0, tip: 'El tubo se rompe: ponte en un carril entero antes del salto' },
+  { name: 'Suelo que cruje', seed: 1102, wave: 0, rows: 460, breaks: 1, crumble: 1, zone: 50, powers: 1, world: 0, tip: 'Donde el suelo cruje, no te quedes quieto en un carril' },
+  { name: 'Luces del camino', seed: 1103, wave: 1, rows: 480, breaks: 2, crumble: 1, powers: 2, world: 1 },
+  { name: 'Saltos en la selva', seed: 1304, wave: 7, rows: 520, breaks: 3, crumble: 1, powers: 2, world: 1, tip: 'Las cajas rodantes cambian de carril: mira hacia dónde giran' },
+  { name: 'Jefe: el Guardián', seed: 1405, wave: 8, rows: 680, breaks: 3, crumble: 2, powers: 2, world: 1, boss: true },
+  { name: 'Cascada rota', seed: 1306, wave: 10, rows: 540, breaks: 2, crumble: 2, powers: 2, world: 2 },
+  { name: 'Noche sin suelo', seed: 1407, wave: 9, rows: 560, breaks: 3, crumble: 2, powers: 2, world: 2 },
+  { name: 'Luciérnagas', seed: 1308, wave: 13, rows: 580, breaks: 3, crumble: 2, powers: 2, world: 2 },
+  { name: 'Escalinata', seed: 1309, wave: 18, rows: 600, breaks: 3, crumble: 3, powers: 2, world: 3 },
+  { name: 'Templo en ruinas', seed: 1310, wave: 14, rows: 620, breaks: 4, crumble: 3, powers: 3, world: 3 },
+  { name: 'Puente de lava', seed: 1211, wave: 17, rows: 640, breaks: 4, crumble: 3, powers: 3, world: 4 },
+  { name: 'Jefe: el Volcán', seed: 1112, wave: 21, rows: 780, breaks: 4, crumble: 3, powers: 3, world: 4, boss: true },
 ];
 
-export const COIN_STAR = 0.5;   // parte de las monedas del tramo para la 3.ª estrella
+export const COIN_STAR = 0.35;  // parte de las monedas del tramo para la estrella de monedas
 const BREAK_ROWS = 6;          // filas sin carretera
 const LAND_ROWS = 3;           // filas de aterrizaje con huecos
-const CRUMBLE_ROWS = 90;       // largo de una zona que se desmorona
-const WEAR_S = 0.8;            // segundos en un carril antes de que se hunda
+const CRUMBLE_ROWS = 70;       // largo de una zona que se desmorona (por defecto)
+// filas seguidas en un carril antes de que se hunda: en filas y no en segundos, para que ir lento
+// tras un choque no lo vuelva más difícil
+const WEAR_ROWS = 12;
 const POWER_S = { magnet: 8, x2: 10 };
 export const POWERS = ['magnet', 'x2', 'shield'];
 
@@ -72,10 +78,10 @@ export class Adventure extends Game {
         if (slots.every((s) => a + len + 25 < s.a || a > s.b + 25)) { slots.push({ kind, a, b: a + len }); return; }
       }
     };
-    for (let i = 0; i < st.crumble; i++) put('crumble', CRUMBLE_ROWS);
+    for (let i = 0; i < st.crumble; i++) put('crumble', st.zone || CRUMBLE_ROWS);
     for (let i = 0; i < st.breaks; i++) put('break', BREAK_ROWS + LAND_ROWS);
     for (const s of slots) {
-      if (s.kind === 'crumble') this.zones.push({ from: s.a, to: s.b, wear: new Array(LANES).fill(0), gone: new Set() });
+      if (s.kind === 'crumble') this.zones.push({ from: s.a, to: s.b, wear: new Array(LANES).fill(0), gone: new Set(), warned: false, creak: new Array(LANES).fill(0) });
       else {
         const from = s.a, to = s.a + BREAK_ROWS - 1;
         this.gaps.push({ from, to, adv: true });
@@ -97,7 +103,11 @@ export class Adventure extends Game {
       }
     }
     this.gaps.sort((a, b) => a.from - b.from);
-    for (const z of this.zones) for (let k = z.from - 4; k <= z.to; k++) if (!this.safe.has(k)) this.safe.set(k, 'z');
+    // sin cajas dentro de las zonas que crujen: ahí la única amenaza es el suelo
+    for (const z of this.zones) for (let k = z.from - 6; k <= z.to; k++) this.safe.set(k, true);
+    // jefes: punto de control a mitad del tramo
+    this.checkpointRow = st.boss ? Math.floor(L / 2) : -1;
+    this.pastCheckpoint = false;
     // poderes, en filas libres
     for (let i = 0; i < st.powers; i++) {
       let k = 0; for (let t = 0; t < 30; t++) { k = Math.floor(80 + r.float(0, 1) * (L - 120)); if (!this.safe.get(k)) break; }
@@ -117,7 +127,7 @@ export class Adventure extends Game {
 
   isHole(k, lane) { const h = this.holes.get(k); return !!(h && h.has(lane)); }
   // desgaste 0..1 de un carril en la fila k (para las grietas del dibujo)
-  wearAt(k, lane) { for (const z of this.zones) if (k >= z.from && k <= z.to) return z.gone.has(lane) ? 1 : Math.min(1, z.wear[lane] / WEAR_S); return 0; }
+  wearAt(k, lane) { for (const z of this.zones) if (k >= z.from && k <= z.to) return z.gone.has(lane) ? 1 : Math.min(1, z.wear[lane] / WEAR_ROWS); return 0; }
   get progress() { return Math.min(1, this.s / this.stage.rows); }
 
   // sin cajas en las roturas ni en los aterrizajes (no se puede esquivar lo que no se ve al saltar)
@@ -149,20 +159,29 @@ export class Adventure extends Game {
     const dt = 1 / 60, cur = Math.floor(this.s), lane = this.laneOf();
     // ---- final del tramo
     if (this.s >= this.stage.rows) { this.cleared = true; this.alive = false; this.event('clear', {}); return this.events; }
+    // ---- punto de control (jefes)
+    if (!this.pastCheckpoint && this.checkpointRow > 0 && cur >= this.checkpointRow) { this.pastCheckpoint = true; this.event('checkpoint', { frame: this.frame }); }
     // ---- huecos: si pisas uno (y no vas por el aire)
     if (this.invul <= 0 && this.jumpAt(this.s) < 0.25 && this.isHole(cur, lane)) this.fall();
     // ---- zonas que se desmoronan
+    const dRows = this.v / 13.176;             // filas avanzadas en este paso
     for (const z of this.zones) {
+      if (!z.warned && cur >= z.from - 18 && cur < z.from) { z.warned = true; this.event('zoneIn', {}); }
       if (cur < z.from || cur > z.to) continue;
-      for (let l = 0; l < LANES; l++) if (l !== lane && !z.gone.has(l)) z.wear[l] = Math.max(0, z.wear[l] - dt * 0.35);
+      for (let l = 0; l < LANES; l++) if (l !== lane && !z.gone.has(l)) z.wear[l] = Math.max(0, z.wear[l] - dRows * 0.5);
       if (z.gone.has(lane)) continue;
-      z.wear[lane] += dt;
-      if (z.wear[lane] >= WEAR_S) {
+      z.wear[lane] += dRows;
+      const f = z.wear[lane] / WEAR_ROWS;
+      if (f > 0.35 && z.creak[lane] < 1) { z.creak[lane] = 1; this.event('creak', { k: 0.4, lane }); }
+      if (f > 0.7 && z.creak[lane] < 2) { z.creak[lane] = 2; this.event('creak', { k: 0.9, lane }); }
+      if (z.wear[lane] >= WEAR_ROWS) {
+        z.creak[lane] = 0;
         // el carril se hunde desde un poco por delante hasta el final de la zona
         z.gone.add(lane);
         const ahead = Math.max(3, Math.ceil(0.45 * 60 * this.v / 13.176));
         for (let k = cur + ahead; k <= z.to; k++) { if (!this.holes.has(k)) this.holes.set(k, new Set()); this.holes.get(k).add(lane); }
         this.event('crumble', { lane, k: cur + ahead });
+        z.wear[lane] = WEAR_ROWS;
       }
     }
     // ---- poderes
@@ -205,14 +224,16 @@ export class Adventure extends Game {
     for (const k of this.holes.keys()) if (k < k0) this.holes.delete(k);
   }
 
-  // estrellas: 1 = superado, 2 = sin chocar ni caer, 3 = además la mitad de las monedas
-  get stars() {
+  // cada estrella es independiente (bits): 1 = superado, 2 = sin chocar ni caer, 4 = monedas
+  get starBits() {
     if (!this.cleared) return 0;
-    let s = 1;
-    if (this.crashes === 0 && this.falls === 0) s++;
-    if (this.coinsGot >= Math.ceil(this.coinsSpawned * COIN_STAR)) s++;
-    return s;
+    let b = 1;
+    if (this.crashes === 0 && this.falls === 0 && !this.fromCheckpoint) b |= 2;
+    if (this.coinsGot >= this.coinGoal) b |= 4;
+    return b;
   }
+  get coinGoal() { return Math.ceil(this.coinsSpawned * COIN_STAR); }
+  get stars() { const b = this.starBits; return (b & 1) + ((b >> 1) & 1) + ((b >> 2) & 1); }
 }
 
 // fantasma: los giros de cada fotograma, cuantizados a un byte y en base64 (unos 3-6 KB por tramo)

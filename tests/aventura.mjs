@@ -5,26 +5,32 @@ import { botSteer } from '../app/src/sim/bot.js';
 const N = +(process.argv[2] || 6);
 let fails = 0;
 const ok = (c, m) => { console.log((c ? '  ✓ ' : '  ✗ ') + m); if (!c) fails++; };
-function play(stage, look, noise, rec) {
+// jugadores de tres niveles: reaccionan con retraso (ven la partida de hace unos fotogramas)
+function play(stage, look, noise, rec, delay = 0) {
   const g = new Adventure({ stage });
   const steers = [];
-  let t = 0;
+  const hist = [];
   while (g.alive && g.frame < 60 * 60 * 5) {
     let a = botSteer(g, look) + (Math.sin(g.frame * 0.05 + noise) * 0.08);
+    hist.push(a); if (delay) a = hist.length > delay ? hist[hist.length - 1 - delay] : 0;
     a = quantSteer(a); steers.push(a);
     g.step({ steer: a });
   }
   return { g, steers };
 }
-console.log('Tramos');
+const LEVELS = [['novato', 7, 14], ['medio', 9, 7], ['bueno', 12, 2]];
+console.log('Tramos (superado: novato / medio / bueno · estrellas del medio)');
+const curve = [];
 for (let i = 0; i < STAGES.length; i++) {
-  let clr = 0, falls = 0, crashes = 0, stars = 0, crumb = 0, secs = 0;
-  for (let n = 0; n < N; n++) {
-    const { g } = play(i, 8 + (n % 3) * 3, n);
-    if (g.cleared) clr++; falls += g.falls; crashes += g.crashes; stars += g.stars; secs += g.time;
-    crumb += g.zones.reduce((s, z) => s + z.gone.size, 0);
+  const row = [];
+  let stars = 0, secs = 0;
+  for (const [, look, delay] of LEVELS) {
+    let clr = 0;
+    for (let n = 0; n < N; n++) { const { g } = play(i, look, n * 1.7, false, delay); if (g.cleared) clr++; if (delay === 7) { stars += g.stars; secs += g.time; } }
+    row.push(Math.round(100 * clr / N));
   }
-  console.log(`  ${String(i + 1).padStart(2)} ${STAGES[i].name.padEnd(20)} superado ${clr}/${N} · caídas ${(falls / N).toFixed(1)} · choques ${(crashes / N).toFixed(1)} · carriles hundidos ${(crumb / N).toFixed(1)} · estrellas ${(stars / N).toFixed(1)} · ${(secs / N).toFixed(0)} s`);
+  curve.push(row[1]);
+  console.log(`  ${String(i + 1).padStart(2)} ${STAGES[i].name.padEnd(20)} ${row.map((x) => String(x).padStart(3) + ' %').join(' / ')} · ★ ${(stars / N).toFixed(1)} · ${(secs / N).toFixed(0)} s`);
 }
 console.log('Fantasma');
 {
