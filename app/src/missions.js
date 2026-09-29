@@ -92,7 +92,9 @@ export function createMissions() {
       if (!run) return { completed: [], rankUp: false };
       run.runs = 1;
       const fresh = check();
-      for (const m of data.active) { const t = tpl(m); if (!m.done && t.kind === 'total') m.got += run[t.stat] || 0; }
+      for (const m of data.active) { const t = tpl(m); if (!m.done && t.kind === 'total') m.got += run[t.stat] || 0;
+        // las de una partida guardan tu mejor intento (si no, al acabar volvían a 0)
+        if (!m.done && t.kind === 'run') m.got = Math.max(m.got, run[t.stat] || 0); }
       const completed = data.active.filter((m) => m.done).map((m) => ({ text: tpl(m).text(m.n) }));
       const before = data.rank;
       data.rank = Math.floor(data.done / 3);
