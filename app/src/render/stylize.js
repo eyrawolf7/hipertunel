@@ -27,7 +27,7 @@ export function stylize(mat, { rim = 0.35, key = 'st' } = {}) {
   float ndl = dot(Nv, normalize(uSunDirV));
   // en un túnel el techo recibe mucha luz rebotada: la sombra no llega nunca al tono puro
   // la sombra conserva al menos ~75 % del valor de la cara al sol (ilustración clara, no sucia)
-  float sh = smoothstep(0.35, -0.35, ndl) * 0.7;
+  float sh = smoothstep(0.35, -0.35, ndl) * 0.6;
   vec3 base = diffuseColor.rgb;
   // cara al sol: cálida y algo más brillante cuanto más de frente (da volumen a biseles y losas)
   // sombra con color propio (no solo más oscura): el tono frío del mundo tiñe también la luz

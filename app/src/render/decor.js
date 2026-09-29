@@ -24,8 +24,8 @@ function aerial(mat) {
 // que el decorado 3D sea de la misma familia que las siluetas del fondo (no una pegatina)
 float airL = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
 outgoingLight = mix(outgoingLight, vec3(airL), 0.35);
-outgoingLight *= mix(vec3(1.0), uAirCol * 1.15, 0.3);
-outgoingLight = mix(outgoingLight, uAirCol, mix(0.3, 0.65, smoothstep(150.0, 600.0, airD)) * smoothstep(40.0, 150.0, airD));
+outgoingLight *= mix(vec3(1.0), uAirCol * 1.15, 0.2);
+outgoingLight = mix(outgoingLight, uAirCol, mix(0.15, 0.6, smoothstep(180.0, 600.0, airD)) * smoothstep(60.0, 180.0, airD));
 #include <opaque_fragment>`);
   };
   mat.customProgramCacheKey = () => 'decor-air';

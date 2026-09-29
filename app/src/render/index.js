@@ -146,7 +146,8 @@ export class Renderer {
     u.uInvBase.value.set(A.inv || 0x13112a).lerp(new THREE.Color(B.inv || 0x13112a), t);
     this.sky.setTheme(A, B, t);
     this.decor.setTheme(t < 0.5 ? A : B);
-    aerialU.uAirCol.value.set(A.fog).lerp(new THREE.Color(B.fog), t);
+    // color del horizonte de cada panorama (el decorado 3D se funde con él)
+    aerialU.uAirCol.value.set(A.air || A.fog).lerp(new THREE.Color(B.air || B.fog), t);
     this.themeFog = u.uFog.value.clone();
     this.themeGlow = u.uGlow.value.clone();
     this.fogColor = u.uFog.value;
@@ -325,6 +326,7 @@ export class Renderer {
     // vista y el paisaje llena la mitad de abajo, aunque vayas por un carril girado; el 30 % de la
     // pista conserva algo de la sensación de rodar alrededor del tubo
     this._skyUp = (this._skyUp || new THREE.Vector3()).copy(this.fr.U).lerp(this.upS, 0.7).normalize();
+    this.sky.inside = gapNear ? 0 : Math.max(0, Math.min(1, (game.fold - 20) / 10));
     this.sky.update(cam, this._skyUp, outside ? 1 : 0, dt, this.cam.invert, this.fr.F);
     this.decor.update(game, tr, cam, true, dt);   // se ve también por los arcos del túnel
     this.life.update(cam, this.look, this.upS, outside, this.themeIdx, dt, this.quality !== 'baja' && !reduceFx, this.cam.invert);

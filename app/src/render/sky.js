@@ -51,7 +51,15 @@ void main(){
   col = mix(col, pano * 1.05 + uSun * pow(sd, 900.0) * 2.0, hasP);
   // dentro del túnel, lo que se ve por los arcos tira hacia el tono del horizonte del mundo (el
   // cielo pálido parecía un agujero en la pared)
-  col = mix(col, mix(uMid, uTop, 0.55) * 0.85, uIn * 0.5);
+  // (desaturado y claro: por los arcos bajos se ve a ras de pista, y un azul o magenta vivo ahí se
+  // confundía con una placa de impulso o con un aviso de carril, reglas 3 y 4)
+  vec3 thru = mix(uMid, uTop, 0.4);
+  thru = mix(vec3(dot(thru, vec3(0.2126, 0.7152, 0.0722))), thru, 0.45) * 1.1;
+  col = mix(col, thru, uIn * 0.45);
+  float colL = dot(col, vec3(0.2126, 0.7152, 0.0722));
+  // por debajo del horizonte (lo que se ve por los arcos del suelo) casi gris y más claro
+  float low = uIn * smoothstep(0.05, -0.25, h);
+  col = mix(col, vec3(colL * 0.8 + 0.12) * mix(vec3(1.0), uMid, 0.25), low * 0.85);
   vec3 night = mix(vec3(0.02, 0.015, 0.06), vec3(0.09, 0.04, 0.16), smoothstep(-0.3, 0.6, h)) + vec3(st) * 1.2;
   col = mix(col, night, uInvert);
   gl_FragColor = vec4(col, 1.0);
@@ -123,7 +131,8 @@ export class Sky {
     this.u.uUp.value.lerp(up, Math.min(1, dt * 1.5)).normalize();
     this.u.uTime.value += dt;
     this.u.uInvert.value = invert;
-    this.u.uIn.value += ((outside ? 0 : 1) - this.u.uIn.value) * Math.min(1, dt * 2);
+    // cuánto estás dentro del tubo: sale del plegado (lo da el render), no del tiempo
+    this.u.uIn.value = this.inside !== undefined ? this.inside : (outside ? 0 : 1);
     // el túnel de piedra tiene arcos abiertos: el cielo se ve siempre
     this.vis = 1;
     this.mesh.visible = true;
