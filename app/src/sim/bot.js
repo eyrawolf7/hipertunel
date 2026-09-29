@@ -14,6 +14,11 @@ export function botSteer(g, look = 14) {
     if (b.opp >= 0) lanes.push(b.opp);
     for (const l of lanes) { danger[l] += 10 * w; danger[(l + 1) % LANES] += 0.8 * w; danger[(l + LANES - 1) % LANES] += 0.8 * w; }
   }
+  // Aventura: huecos y carriles que se están agrietando también son peligro
+  if (g.isHole) {
+    for (let d = 0; d <= look; d++) for (let l = 0; l < LANES; l++) if (g.isHole(cur + d, l)) danger[l] += 12 / (1 + d);
+    for (let l = 0; l < LANES; l++) { const w = g.wearAt(cur + 1, l); if (w > 0.4) danger[l] += 6 * w; }
+  }
   const bonus = new Array(LANES).fill(0);
   for (const p of g.pads) { const d = p.k - cur; if (!p.taken && d >= 0 && d < look) bonus[p.lane] += 3 / (1 + d); }
   const th = g.theta;
