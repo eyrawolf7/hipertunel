@@ -35,6 +35,7 @@ export class Hero {
   useModel(m) {
     this.group.remove(this.model);
     this.model = m; this.group.add(m);
+    this.onModel?.(m);
     m.scale.setScalar(1.25);           // mide 1,2 m: un poco más grande para que se lea detrás de las cajas (2 m)
     m.traverse((o) => { if (o.isMesh && o.material) { o.material = o.material.clone(); stylize(o.material, { rim: 0.5, key: 'hero-glb' }); o.frustumCulled = false; } });
     const clips = m.userData.animations || m.animations || [];

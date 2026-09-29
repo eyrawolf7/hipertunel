@@ -17,6 +17,11 @@ const TEMPLATES = [
   { id: 'world', kind: 'run', stat: 'world', v: [2, 3, 4, 5, 6], text: (n) => `Llega al mundo ${n}` },
   { id: 'folds', kind: 'run', stat: 'folds', v: [1, 2, 4, 6], text: (n) => n === 1 ? 'Sal por fuera del túnel' : `Sal por fuera del túnel ${n} veces en una partida` },
   { id: 'saves', kind: 'run', stat: 'saves', v: [1, 2, 3, 5], text: (n) => n === 1 ? 'Choca con impulso y sigue vivo' : `Sobrevive a ${n} choques en una partida` },
+  // Arcade: muro de cartón y piruetas del salto entre mundos
+  { id: 'smash', kind: 'run', stat: 'smashes', v: [1, 2, 3, 5], text: (n) => n === 1 ? 'Rompe un bloque de cartón' : `Rompe ${n} bloques de cartón en una partida` },
+  { id: 'tricks', kind: 'total', stat: 'tricks', v: [3, 8, 15, 25], text: (n) => `Haz ${n} piruetas en total` },
+  { id: 'perfect', kind: 'run', stat: 'perfect', v: [1, 2, 3], text: (n) => n === 1 ? 'Haz una pirueta perfecta' : `Haz ${n} piruetas perfectas en una partida` },
+  { id: 'combo', kind: 'run', stat: 'combo', v: [2, 3], text: (n) => `Encadena ${n} piruetas en un mismo salto` },
   { id: 'runs', kind: 'total', stat: 'runs', v: [3, 5, 8], text: (n) => `Juega ${n} partidas` },
 ];
 
@@ -68,7 +73,7 @@ export function createMissions() {
 
   return {
     // al empezar una partida
-    start() { run = { dist: 0, clean: 0, cleanBest: 0, coins: 0, near: 0, pads: 0, maxSpeed: 0, world: 1, folds: 0, saves: 0, runs: 0 }; },
+    start() { run = { dist: 0, clean: 0, cleanBest: 0, coins: 0, near: 0, pads: 0, maxSpeed: 0, world: 1, folds: 0, saves: 0, runs: 0, smashes: 0, tricks: 0, perfect: 0, combo: 0 }; },
     // sucesos de la simulación y de main.js; devuelve las misiones recién cumplidas
     event(e, game) {
       if (!run) return [];
@@ -78,6 +83,8 @@ export function createMissions() {
       else if (e.type === 'foldEnd' && game && game.fold < 0) run.folds++;
       else if (e.type === 'world' && e.visWorld) run.world = Math.max(run.world, e.visWorld);
       else if (e.type === 'near') run.near++;
+      else if (e.type === 'smash') run.smashes++;
+      else if (e.type === 'trickDone') { run.tricks++; if (e.perfect) run.perfect++; run.combo = Math.max(run.combo, e.n || 1); }
       return check();
     },
     // cada paso (para las de distancia)
