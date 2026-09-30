@@ -323,7 +323,7 @@ await run('j', async () => {
     await page.evaluate((s) => { window.__hip.ui.show(s); }, screen); await sleep(300);
     const total = await page.evaluate((s) => [...document.querySelectorAll(`.scr[data-screen="${s}"] [data-nav]`)].filter((e) => e.offsetParent !== null && !e.disabled).length, screen);
     const seen = new Set(); let seed = 12345;   // paseo aleatorio con semilla (las flechas de un deslizador lo ajustan en vez de moverse)
-    for (let i = 0; i < 90 && seen.size < total; i++) {
+    for (let i = 0; i < 240 && seen.size < total; i++) {
       seen.add(await page.evaluate(() => { const f = document.querySelector('.is-focus'); return f ? [...f.parentElement.children].indexOf(f) + ':' + (f.dataset.act || f.dataset.mode || f.dataset.set || f.dataset.stage || f.className) : ''; }));
       seed = (seed * 1103515245 + 12345) & 0x7fffffff;
       await page.keyboard.press(keys[(seed >> 8) % keys.length]); await sleep(25);

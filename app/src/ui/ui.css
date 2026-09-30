@@ -2149,3 +2149,26 @@
 .roce-chispa.izq { left: 0; transform-origin: 0 50%; background-image: radial-gradient(ellipse 26% 12% at 0 50%, #fff, rgba(255, 246, 176, 0) 100%), linear-gradient(90deg, #fff, #fff6b0 30%, rgba(255, 170, 20, .9) 60%, rgba(255, 170, 20, 0)), radial-gradient(ellipse 100% 55% at 0 50%, rgba(255, 150, 20, .7), rgba(255, 150, 20, 0) 70%), radial-gradient(circle 1.6vh at 45% 20%, #fff6b0 85%, transparent), radial-gradient(circle 1.2vh at 66% 36%, #fff 85%, transparent), radial-gradient(circle 2vh at 34% 64%, #ffd54a 85%, transparent), radial-gradient(circle 1.3vh at 72% 74%, #fff6b0 85%, transparent), radial-gradient(circle 1.4vh at 20% 36%, #fff 85%, transparent), radial-gradient(circle 1.1vh at 55% 88%, #ffd54a 85%, transparent); }
 .roce-chispa.der { right: 0; transform-origin: 100% 50%; background-image: radial-gradient(ellipse 26% 12% at 100% 50%, #fff, rgba(255, 246, 176, 0) 100%), linear-gradient(270deg, #fff, #fff6b0 30%, rgba(255, 170, 20, .9) 60%, rgba(255, 170, 20, 0)), radial-gradient(ellipse 100% 55% at 100% 50%, rgba(255, 150, 20, .7), rgba(255, 150, 20, 0) 70%), radial-gradient(circle 1.6vh at 55% 20%, #fff6b0 85%, transparent), radial-gradient(circle 1.2vh at 34% 36%, #fff 85%, transparent), radial-gradient(circle 2vh at 66% 64%, #ffd54a 85%, transparent), radial-gradient(circle 1.3vh at 28% 74%, #fff6b0 85%, transparent), radial-gradient(circle 1.4vh at 80% 36%, #fff 85%, transparent), radial-gradient(circle 1.1vh at 45% 88%, #ffd54a 85%, transparent); }
 @keyframes roce-chispa { 0% { opacity: 0; transform: scaleX(.3); } 15% { opacity: 1; transform: scaleX(1); } 35% { opacity: 1; transform: scaleX(1.05); } 100% { opacity: 0; transform: scaleX(1.15); } }
+/* ---------- Fases: mapa de dos (o más) fases, botones del fin de fase y tarjeta del modo ---------- */
+.htui .scr-phases .map-path { grid-template-columns: repeat(auto-fit, minmax(0, 15em)); justify-content: center; max-width: 56em; }
+.htui .scr-phases .stage { min-height: 8.5em; }
+.htui .card-phase { --c: #8bd43a; --cd: #4f9d12; --detail: #4f9d12; }
+.htui .scr-over[data-mode="phase"] .oc-mode { --mc: #4f9d12; }
+.htui .btn-fresh { display: none; }
+.htui .has-fresh .btn-fresh { display: inline-flex; }
+.htui .scr-over.has-fresh .oc-btns { gap: .5em; padding-left: .7em; padding-right: .7em; }
+.htui .scr-over.has-fresh .oc-btns .btn { font-size: .98em; min-width: 0; padding-left: .95em; padding-right: .95em; }
+.htui.has-estrella .card-phase .card-ico { width: 1.25em; height: 1.25em; margin-top: 0; background: var(--img-estrella) center / contain no-repeat; filter: drop-shadow(0 .04em .05em rgba(30, 14, 4, .35)); }
+.htui.has-estrella .card-phase .card-ico > svg { visibility: hidden; }
+.htui .ht-fases { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -48%); }
+.htui .scr-phases .map-path { grid-auto-rows: 14em; align-content: center; gap: 1.6em 1.6em; }
+.htui .scr-phases .stage { min-height: 0; }
+.htui .scr-phases .stage .sg-name { font-size: 1em; }
+.htui .scr-phases .stage .st { font-size: 1.6em; }
+.htui .head-title.ht-fases { font-size: 3.1em; }
+/* Fases: la tarjeta de la fase va arriba a la izquierda (no tapa el centro), barra de avance más gruesa y sin la línea «toca para reintentar» */
+.htui .adv-intro.ph { left: .8em; top: 3.4em; transform: scale(.95); transform-origin: top left; min-width: 0; max-width: 17em; }
+.htui .adv-intro.ph.on { transform: scale(1); }
+.htui .adv-bar { font-size: .92em; }
+.htui .adv-bar i { width: 13em; height: .8em; box-shadow: inset 0 0 0 .12em rgba(30, 14, 4, .7); }
+.htui .scr-over[data-mode="phase"] .oc-hint { display: none; }

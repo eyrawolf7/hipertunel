@@ -101,7 +101,7 @@ export class AdvView {
     for (let i = n; i < this.pool.length; i++) this.pool[i].visible = false;
     // fantasma: a ras del carril por el que iba en su mejor intento, si está a la vista
     this.ghost.visible = false; this.ghostInfo = null;
-    if (adv && ghost && ghost.alive !== undefined && ghost.s > game.s + 0.6 && ghost.s < game.kLast - 1) {
+    if ((adv || game.isPhase) && ghost && ghost.alive !== undefined && ghost.s > game.s + 0.6 && ghost.s < game.kLast - 1) {
       const lane = ghost.theta / (Math.PI / 6);
       if (this.place(track, game, ghost.s, lane, this.ghost.position, 0.5)) {
         this.ghost.visible = true;

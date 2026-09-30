@@ -14,6 +14,7 @@ import { Adventure, STAGES, packGhost, unpackGhost, quantSteer } from './sim/adv
 import { Arcade } from './sim/arcade.js';
 import { Zorro } from './sim/zorro.js';
 import { GHOST_KEY, GhostRecorder, quantGhost, unpackRun, newGhostGame, stepGhost, ghostMatches } from './ghost.js';
+import { Fase, FASES, FASE_COIN_STAR, Recording, replay, packRec, unpackRec } from './sim/fases.js';
 
 const VERSION = '0.61';
 const STEP = 1 / 60;
@@ -75,16 +76,37 @@ const saveAdv = (d) => { try { localStorage.setItem('hipertunel-aventura', JSON.
 const bitsOf = (e) => (e ? (e.bits ?? (e.stars >= 3 ? 7 : e.stars === 2 ? 3 : e.stars ? 1 : 0)) : 0);
 const nBits = (b) => (b & 1) + ((b >> 1) & 1) + ((b >> 2) & 1);
 const advInfo = () => { const d = loadAdv(); return STAGES.map((st, i) => ({ name: st.name, boss: !!st.boss, stars: nBits(bitsOf(d[i])), best: d[i]?.best || 0, locked: i > 0 && !(bitsOf(d[i - 1]) & 1) })); };                   // modo Viaje: mundo visual con el que se empieza
+// Fases: fase elegida, progreso guardado (estrellas, avance y fantasma) y grabación de la partida
+// (entradas de cada fotograma: con ellas se vuelve al punto de control y se pinta el fantasma)
+let phaseIdx = 0, rec = new Recording(), cpRec = null, cpCoins = 0, paid = 0, giftNext = false, ghostRec = null;
+// tolera lo guardado roto: solo se aceptan entradas que sean objetos
+const loadPh = () => { try { const d = JSON.parse(localStorage.getItem('hipertunel-fases') || '{}'), o = {}; if (d && typeof d === 'object') for (const k in d) if (d[k] && typeof d[k] === 'object') o[k] = d[k]; return o; } catch (e) { return {}; } };
+const safeGhost = (g) => { try { return g ? unpackRec(g) : null; } catch (e) { return null; } };
+const savePh = (d) => { try { localStorage.setItem('hipertunel-fases', JSON.stringify(d)); } catch (e) {} };
+const phaseLocked = (d, i) => i > 0 && !((d[i - 1]?.bits | 0) & 1);
+const phaseInfo = () => { const d = loadPh(); return FASES.map((f, i) => ({ name: f.name, boss: false, stars: nBits(d[i]?.bits | 0), best: d[i]?.best || 0, locked: phaseLocked(d, i) })); };
+// la siguiente fase por superar (la primera sin superar); -1 si están todas
+const nextPhase = () => { const d = loadPh(); for (let i = 0; i < FASES.length; i++) if (!phaseLocked(d, i) && !((d[i]?.bits | 0) & 1)) return i; return -1; };
 let lostAt = -1, killBox = null, recAnnounced = false, visWorld = 1;   // visWorld: mundo que se ve (1, 2…)   // para el resumen del fin de partida
 const bestAtStart = {};
 
 const ui = createUI($('ui'), {
-  onPlay: (m, stage) => { audio.unlock(); input.requestTilt(); goLandscape(); if (m === 'adventure') advStage = stage | 0; startGame(m); },
+  onPlay: (m, stage) => {
+    audio.unlock(); input.requestTilt(); goLandscape();
+    if (m === 'adventure') advStage = stage | 0;
+    // «Jugar» va directo a la siguiente fase; con todas superadas, a Sin fin
+    if (m === 'phase') { const n = stage !== undefined ? stage | 0 : nextPhase(); if (n < 0) m = 'arcade'; else phaseIdx = n; }
+    startGame(m);
+  },
   onMap: () => ui.map?.(advInfo()),
+  onPhases: () => ui.phases?.(phaseInfo()),
   onCheckpoint: () => { audio.unlock(); startGame('adventure', true, true); },
-  onNext: () => { audio.unlock(); advStage = Math.min(STAGES.length - 1, advStage + 1); startGame('adventure'); },
+  // tras la última fase, «Siguiente» lleva a Sin fin
+  onNext: () => { audio.unlock(); if (mode === 'phase') { if (phaseIdx + 1 >= FASES.length) startGame('arcade'); else { phaseIdx++; startGame('phase'); } } else { advStage = Math.min(STAGES.length - 1, advStage + 1); startGame('adventure'); } },
   onResume: () => resume(),
-  onRestart: () => { audio.unlock(); startGame(mode, true); },
+  // «Otra vez» al morir en una fase vuelve al último punto de control (con su impulso de regalo); desde la pausa, reinicia
+  onRestart: () => { audio.unlock(); startGame(mode, true, mode === 'phase' && state === 'over' && !!cpRec); },
+  onFresh: () => { audio.unlock(); startGame(mode, true); },
   onMenu: () => toMenu(),
   onSetting: (k, v) => {
     settings[k] = v; saveSettings();
@@ -107,7 +129,8 @@ const ui = createUI($('ui'), {
   keyboard: false,
 });
 const pushMissions = () => ui.missions?.(missions.list(), missions.rank());
-const pushRecords = () => { ui.records?.({ zorro: bestScore('zorro'), arcade: bestScore('arcade'), classic: bestOf('classic'), survival: bestOf('survival'), timetrial: bestOf('timetrial'), daily: bestOf('daily'), voyage: bestOf('voyage') }); ui.locks?.({ voyage: maxWorld() < 1 }); };
+const phaseStars = () => Object.values(loadPh()).reduce((a, e) => a + nBits(e.bits | 0), 0);
+const pushRecords = () => { ui.records?.({ phase: phaseStars(), zorro: bestScore('zorro'), arcade: bestScore('arcade'), classic: bestOf('classic'), survival: bestOf('survival'), timetrial: bestOf('timetrial'), daily: bestOf('daily'), voyage: bestOf('voyage') }); ui.locks?.({ voyage: maxWorld() < 1 }); };
 pushRecords();
 pushMissions();
 applyCosmetics();
@@ -166,6 +189,18 @@ function newGame(m, seed, fromCp = false) {
       for (let i = 0; i < cpPrefix.length && game.alive; i++) { game.step({ steer: cpPrefix[i] }); if (ghostGame && ghostGame.alive) ghostGame.step({ steer: ghostSteers[ghostGame.frame] ?? 0 }); }
       advRec = Array.from(cpPrefix); game.fromCheckpoint = true; game.events = [];
     } else { cpFrame = -1; cpPrefix = null; }
+  } else if (m === 'phase') {
+    game = new Fase({ fase: phaseIdx });
+    const saved = loadPh()[phaseIdx];
+    ghostRec = saved ? safeGhost(saved.ghost) : null;
+    ghostGame = ghostRec ? new Fase({ fase: phaseIdx }) : null;
+    rec = new Recording(); giftNext = false;
+    // desde el punto de control: se repiten las entradas guardadas hasta ahí (la simulación es
+    // determinista, así que llegas exactamente al mismo sitio) y la primera acción lleva el regalo
+    if (fromCp && cpRec && cpRec.length) {
+      replay(game, cpRec); if (ghostGame) replay(ghostGame, ghostRec, cpRec.length);
+      rec = cpRec.slice(cpRec.length); giftNext = true;
+    } else { cpRec = null; cpCoins = 0; paid = 0; }
   } else if (m === 'zorro') { game = new Zorro({ seed: seed ?? ((Math.random() * 1e9) | 0) }); ghostGame = null; ghostSteers = null; }
   else if (m === 'arcade') {
     const sd = seed ?? ((Math.random() * 1e9) | 0), easy = Math.max(0, 3 - wallHints);
@@ -177,7 +212,7 @@ function newGame(m, seed, fromCp = false) {
   renderer.ghostGame = ghostGame;
   renderer.third = m === 'zorro';
   input.heroMode = m === 'zorro';
-  worldBase = m === 'voyage' ? maxWorld() : m === 'adventure' ? STAGES[advStage].world : 0;
+  worldBase = m === 'voyage' ? maxWorld() : m === 'adventure' ? STAGES[advStage].world : m === 'phase' ? FASES[phaseIdx].theme : 0;
   renderer.themeBase = worldBase;
   renderer.reset();
   prev = { s: game.s, theta: game.theta };
@@ -204,9 +239,14 @@ function startGame(m, quick = false, fromCp = false) {
   mode = m;
   newGame(m, undefined, fromCp);
   if (m === 'adventure') { renderer.track.sync(game); prev = { s: game.s, theta: game.theta }; const st = STAGES[advStage]; ui.intro?.({ n: advStage + 1, name: st.name, boss: !!st.boss, tip: fromCp ? 'Sigues desde el punto de control' : st.tip || (st.boss ? 'Jefe: a mitad del tramo hay un punto de control' : ''), goals: ['Supéralo', 'Sin chocar ni caer', 'Coge monedas: ' + Math.round(0.35 * 100) + ' % del tramo'] }); }
+  if (m === 'phase') {
+    const f = FASES[phaseIdx];
+    renderer.track.sync(game); prev = { s: game.s, theta: game.theta };
+    ui.intro?.({ label: 'Fase ' + (phaseIdx + 1), n: phaseIdx + 1, name: f.name, boss: false, tip: fromCp ? 'Sigues desde el punto de control, con un impulso de regalo' : f.tip || '', goals: ['Llega al portal', 'Sin chocar', 'Monedas: ' + Math.round(FASE_COIN_STAR * 100) + ' % del camino, sin puntos de control'] });
+  }
   coins = 0;
   bestAtStart[m] = bestOf(m);
-  missions.start(m); pushMissions(); missDist = 0; mult = 1; multDist = 0; points = 0; maxMult = 1; bestScoreAtStart = bestScore(m); lostAt = -1; killBox = null; recAnnounced = false; visWorld = 1;
+  missions.start(m === 'phase' ? 'arcade' : m); pushMissions(); missDist = m === 'phase' ? game.distanceM : 0; mult = 1; multDist = 0; points = 0; maxMult = 1; bestScoreAtStart = bestScore(m); lostAt = -1; killBox = null; recAnnounced = false; visWorld = m === 'phase' ? FASES[phaseIdx].theme + 1 : 1;
   renderer.setRecordRow?.(bestAtStart[m] > 0 ? Math.round(bestAtStart[m] / 4) : -1);
   // reintento rápido: sin 3-2-1, solo un instante antes del ¡YA!
   state = 'countdown'; countdown = quick ? 0.6 : 3; pendingChime = false; nearT = 0; toastQ.length = 0; input.syncJump();
@@ -235,6 +275,7 @@ function toMenu() { audio.pause(false); vibStop(); attract(); }
 function finish() {
   state = 'over'; overT = 0;
   if (game.mode === 'adventure') return finishAdventure();
+  if (game.isPhase) return finishPhase();
   const distM = game.distanceM;
   coins = game.coinsGot;
   const score = game.variant === 'arcade' ? Math.round(points + coins * 10) : Math.round(distM + coins * 10);
@@ -315,6 +356,7 @@ function engineRumble(dt) {
   if (!rumbleDue) rumbleT = 0.34 - 0.14 * sp;
 }
 function bumpMult(why) {
+  if (game.isPhase) { audio.play('coin', { combo: 4 }); buzz([8, 20, 8]); ui.toast(why, 'mission'); return; }   // en las fases no hay racha: solo el aviso
   if (mult >= 5) return;
   mult++; maxMult = Math.max(maxMult, mult); audio.play('coin', { combo: mult * 2 }); buzz([8, 20, 8]);
   ui.toast(`×${mult} · ${why}`, 'mission');
@@ -372,6 +414,36 @@ function finishAdventure() {
     if (game.falls > 0) lines.push('Mira dónde aterrizas: solo los carriles enteros aguantan');
   }
   ui.over({ mode: 'adventure', distM: game.distanceM, coins: game.coinsGot, score: Math.round(game.distanceM + game.coinsGot * 10), best: 0, isRecord: false, time: game.time, top: [], missionsDone: mr.completed, facts: { lines: lines.slice(0, 2) }, headline: game.cleared ? (stars === 3 ? '¡Perfecto!' : '¡Tramo superado!') : '¡Casi lo tienes!', adv: { name: st.name, n: advStage + 1, stars, bits, merged, cleared: game.cleared, hasNext: game.cleared && advStage + 1 < STAGES.length, prog, time: game.time, coins: game.coinsGot, goal: game.coinGoal, cp: !game.cleared && cpPrefix && game.frame > cpFrame } });
+  ui.show('over');
+  if (mr.rankUp) setTimeout(() => { if (state !== 'over') return; audio.play('record'); ui.toast(`¡Rango ${missions.rank().level}: ${missions.rank().name}!`, 'mission', { force: true }); }, 700);
+}
+
+// fin de una salida de una fase: estrellas (se suman entre intentos), avance, fantasma y desbloqueo de la siguiente
+function finishPhase() {
+  const d = loadPh(); const cur = { ...(d[phaseIdx] || {}) }; cur.best = +cur.best || 0; cur.time = +cur.time || undefined;
+  const bits = game.starBits, prog = game.progress, oldBits = cur.bits | 0, cleared = game.cleared;
+  const stars = nBits(bits), merged = oldBits | bits;
+  // el fantasma es la mejor salida: la más rápida al superarla; mientras no, la que más lejos llegó
+  const better = cleared ? !(oldBits & 1) || game.time < (cur.time || 1e9) : !(oldBits & 1) && prog > (cur.best || 0) + 0.001;
+  d[phaseIdx] = { bits: merged, best: Math.max(prog, cur.best || 0), time: cleared ? Math.min(game.time, cur.time || 1e9) : cur.time, ghost: better && rec.length ? packRec(rec) : cur.ghost };
+  savePh(d);
+  // las monedas que ya se cobraron antes del control no se cobran otra vez
+  coins = game.coinsGot; shop.add(Math.max(0, game.coinsGot - paid)); paid = Math.max(paid, game.coinsGot);
+  const mr = missions.finish(); pushMissions();
+  const f = FASES[phaseIdx];
+  const lines = [];
+  if (ghostGame) { const dg = Math.round((ghostGame.s - game.s) * 4); lines.push(dg > 4 ? `Tu fantasma iba ${dg} m por delante` : dg < -4 ? `Le sacaste ${-dg} m a tu fantasma` : 'Ibas a la par que tu fantasma'); }
+  if (cleared) {
+    if (stars) setTimeout(() => buzz([...Array(stars)].flatMap(() => [40, 120]).slice(0, -1)), 300);
+    if (merged === 7) lines.push('¡Fase perfecta!');
+    else if (game.gifts) lines.push('Con puntos de control no vale la estrella de monedas');
+    try { const w = f.theme + 1; if (w > maxWorld()) localStorage.setItem('hipertunel-mundo-max', String(Math.min(w, 4))); } catch (e) {}
+    cpRec = null;
+  } else {
+    lines.push(`Llegaste al ${Math.round(prog * 100)} % de la fase` + (cur.best ? ` (tu mejor: ${Math.round(Math.max(cur.best, prog) * 100)} %)` : ''));
+    if (cpRec) lines.push('«Otra vez» te devuelve al último punto de control, con un impulso de regalo');
+  }
+  ui.over({ mode: 'phase', distM: game.distanceM, coins: game.coinsGot, score: Math.round(game.distanceM + game.coinsGot * 10), best: 0, isRecord: false, time: game.time, top: [], missionsDone: mr.completed, facts: { lines: lines.slice(0, 2) }, headline: cleared ? (stars === 3 ? '¡Perfecto!' : '¡Fase superada!') : '¡Casi lo tienes!', adv: { label: 'Fase ' + (phaseIdx + 1), name: f.name, n: phaseIdx + 1, stars, bits, merged, cleared, hasNext: cleared, nextLabel: phaseIdx + 1 < FASES.length ? 'Siguiente fase' : 'Sin fin', fresh: !cleared && !!cpRec, prog, time: game.time, coins: game.picked, goal: game.coinGoal, cpUsed: game.gifts > 0 } });
   ui.show('over');
   if (mr.rankUp) setTimeout(() => { if (state !== 'over') return; audio.play('record'); ui.toast(`¡Rango ${missions.rank().level}: ${missions.rank().name}!`, 'mission', { force: true }); }, 700);
 }
@@ -452,11 +524,11 @@ function stepSim() {
   }
   else input.steer(STEP, game.theta, false);
   const arc = state === 'play' && game.variant === 'arcade';
-  // Arcade: el giro se juega en milésimas, tal cual se graba, y el fantasma repite los mismos pasos
-  const rec = arc && arcRec && game.alive;
-  if (rec) steer = quantGhost(steer);
   const trick = arc ? input.consumeTrick() : false;
-  if (rec) {
+  // Arcade: el giro se juega en milésimas, tal cual se graba, y el fantasma repite los mismos pasos
+  const recG = arc && arcRec && game.alive;
+  if (recG) {
+    steer = quantGhost(steer);
     arcRec.push(steer, trick);
     if (ghostGame && ghostGame.alive) {
       stepGhost(ghostGame, arcGhost);
@@ -464,7 +536,15 @@ function stepSim() {
       if ((!ghostGame.alive && !ghostMatches(ghostGame, arcGhost)) || (ghostGame.alive && ghostGame.frame >= arcGhost.n)) { ghostGame = null; renderer.ghostGame = null; }
     }
   }
-  const ev = game.step({ steer, jump: state === 'play' && game.hero ? input.consumeJump() : false, trick });
+  // fases: se graba lo que se juega (giro cuantizado, pirueta, regalo) para volver al control y para el fantasma
+  let gift = false;
+  if (game.isPhase && state === 'play') {
+    steer = quantSteer(steer); gift = giftNext; giftNext = false; rec.push(steer, trick, gift);
+    if (ghostGame && ghostGame.alive) ghostGame.step(ghostRec.input(ghostGame.frame));
+  }
+  const ev = game.step({ steer, jump: state === 'play' && game.hero ? input.consumeJump() : false, trick, gift });
+  // el impulso de regalo del control: la simulación vacía sus sucesos, así que suena y se ve aquí
+  if (gift && game.boostOn) { audio.play('boost', { level: game.level }); renderer.onEvents([{ type: 'boost', level: game.level }], game); }
   // pirueta: mientras vuelas (y 0,5 s después de caer) tocar la pantalla no pausa
   if (arc) {
     const fl = !!game.flight();
@@ -490,7 +570,11 @@ function stepSim() {
     else if (e.type === 'crumble') { audio.play('collapse'); buzz(25); }
     else if (e.type === 'creak') { audio.play('creak', { k: e.k }); buzz(e.k > 0.6 ? 12 : 6); }
     else if (e.type === 'zoneIn') { ui.toast('¡El suelo cruje! No te quedes quieto', 'mission'); audio.play('creak', { k: 0.5 }); }
-    else if (e.type === 'checkpoint') { cpFrame = advRec.length; cpPrefix = Float64Array.from(advRec); ui.toast('¡Punto de control!', 'mission', DEFER); audio.play('world'); }
+    else if (e.type === 'checkpoint') {
+      if (game.isPhase) { cpRec = rec.slice(rec.length); cpCoins = game.coinsGot; }
+      else { cpFrame = advRec.length; cpPrefix = Float64Array.from(advRec); }
+      ui.toast('¡Punto de control!', 'mission', DEFER); audio.play('world'); buzz([20, 30, 20]);
+    }
     else if (e.type === 'power') { const n = { magnet: 'Imán', x2: 'Monedas ×2', shield: 'Escudo' }[e.kind]; ui.toast(`¡${n}!`, 'mission', DEFER); audio.play('world'); buzz([10, 20, 10]); }
     else if (e.type === 'shield') { ui.toast('El escudo te ha salvado', 'mission'); audio.play('crash'); renderer.flash(0xb58cff, 0.35); }
     else if (e.type === 'clear') { audio.play('record'); buzz([30, 40, 30, 40, 60], 1, true); }
@@ -535,7 +619,7 @@ function stepSim() {
   // Arcade: puntos = distancia × racha; cada 500 m sin chocar la racha sube
   if (game.variant === 'arcade' && (state === 'play' || state === 'dying')) {
     const d = game.distanceM - (game._pd || 0); game._pd = game.distanceM;
-    if (game.alive) { points += d * mult; multDist += d; if (multDist >= 500 && mult < 5) { multDist = 0; bumpMult('500 m sin chocar'); } }
+    if (game.alive) { points += d * mult; multDist += d; if (multDist >= 500 && mult < 5 && !game.isPhase) { multDist = 0; bumpMult('500 m sin chocar'); } }
   }
   // misiones: escuchan los sucesos de la partida (no cambian nada de ella)
   if (state === 'play' || state === 'dying') {
@@ -621,7 +705,7 @@ function frame(now) {
   audio.setSurface?.(state === 'play' && game.alive && game.variant === 'arcade', game.surfNow || 0, Math.min(1, game.speedMS / 100), Math.min(1, Math.abs(game.omega) / 0.1));
   audio.setHover?.(!!game.hero && (state === 'play' || state === 'countdown') && game.alive, Math.min(1, game.speedMS / 100));
   if (state === 'play' || state === 'countdown' || state === 'dying') {
-    ui.hud({ ghost: state === 'play' && ghostGame && arcGhost && ghostGame.alive ? Math.round((ghostGame.s - game.s) * 4) : null, jumps: game.hero ? { n: game.charges, part: game.charges < 2 ? game.coinAcc / 10 : 0, free: game.boostOn } : null, mult: game.variant === 'arcade' ? mult : 0, points: game.variant === 'arcade' ? Math.round(points + game.coinsGot * 10) : 0, adv: game.mode === 'adventure' ? { p: game.progress, power: game.power, powerT: game.powerT, shield: game.shield, n: advStage + 1 } : null, padDir: state === 'play' ? padDirection() : 0, distM: game.distanceM, speedMS: state === 'countdown' && game.frame === 0 ? 0 : game.speedMS, level: game.level, coins: game.coinsGot, timeLeft: mode === 'timetrial' ? game.timeLeft : null, mode, invul: game.invul > 0, best: bestAtStart[mode] || 0, countdown: state === 'countdown' ? Math.ceil(countdown) : 0 });
+    ui.hud({ ghost: state === 'play' && ghostGame && arcGhost && ghostGame.alive ? Math.round((ghostGame.s - game.s) * 4) : null, jumps: game.hero ? { n: game.charges, part: game.charges < 2 ? game.coinAcc / 10 : 0, free: game.boostOn } : null, mult: game.variant === 'arcade' && !game.isPhase ? mult : 0, points: game.variant === 'arcade' ? Math.round(points + game.coinsGot * 10) : 0, adv: game.mode === 'adventure' ? { p: game.progress, power: game.power, powerT: game.powerT, shield: game.shield, n: advStage + 1 } : game.isPhase ? { p: game.progress, power: null, powerT: 0, shield: false, n: phaseIdx + 1, label: 'Fase ' + (phaseIdx + 1) } : null, padDir: state === 'play' ? padDirection() : 0, distM: game.distanceM, speedMS: state === 'countdown' && game.frame === 0 ? 0 : game.speedMS, level: game.level, coins: game.coinsGot, timeLeft: mode === 'timetrial' ? game.timeLeft : null, mode, invul: game.invul > 0, best: bestAtStart[mode] || 0, countdown: state === 'countdown' ? Math.ceil(countdown) : 0 });
   }
   // en la web desde Android se ofrece la app; dentro de la app (Capacitor) no
   const apk = $('apk'); if (apk) apk.hidden = !(IS_ANDROID_WEB && state === 'attract');
@@ -637,6 +721,11 @@ window.__hip = {
   VERSION,
   get game() { return game; }, get state() { return state; }, renderer, ui, audio, input, missions, shop,
   startMenu: (m = 'arcade') => startGame(m),
+  // n pasos de la simulación tal cual los da el bucle (con entradas, grabación y sucesos), para pruebas con __freeze
+  tick(n = 1) { for (let i = 0; i < n && state === 'play'; i++) { stepSim(); if (!game.alive) { state = 'dying'; overT = 0; } } },
+  // fases: elegir la fase de la próxima partida y ver la grabación / el último control
+  setPhase: (i) => { phaseIdx = i | 0; },
+  get phaseIdx() { return phaseIdx; }, get rec() { return rec; }, get cpRec() { return cpRec; }, get giftNext() { return giftNext; },
   start: (m = 'classic', seed) => { startGame(m); if (seed !== undefined) newGame(m, seed); state = 'play'; },
   skipTo(rows) { while (game.s < rows && game.alive) { game.step({ steer: botSteer(game) }); renderer.track.sync(game); } prev = { s: game.s, theta: game.theta }; },
   step(n = 1, steer = null) { for (let i = 0; i < n; i++) { prev.s = game.s; prev.theta = game.theta; const ev = game.step({ steer: steer ?? botSteer(game) }); renderer.onEvents(ev, game); renderer.track.sync(game); } },

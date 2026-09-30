@@ -93,6 +93,8 @@ export function createBot(levelName, seed = 1) {
       for (const cb of cartons) if (cb.lane !== l && L.carton > 0) cost += 25 * L.carton;
       // placas de impulso: prefiero pasar por ellas
       for (const p of g.pads) if (!p.taken && p.k >= cur && p.k <= cur + L.look && p.lane === l) cost -= 3 / (1 + (p.k - cur) / 6);
+      // monedas (solo si el nivel las persigue: L.coins > 0)
+      if (L.coins) for (const c of g.coins) if (!c.got && c.lane === l && c.k >= cur && c.k <= cur + L.look) cost -= L.coins / (1 + (c.k - cur) / 8);
       if (campNear && l === myLane) cost += 12;
       // ir lejos cuesta un poco; mantener el destino anterior da estabilidad
       cost += Math.abs(diff) * 1.5;
