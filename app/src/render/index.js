@@ -98,6 +98,7 @@ export class Renderer {
     this.applyTheme(0, 0, 1);
     this.time = 0;
     this.lean = 0;
+    this.weight = { dip: 0, v: 0, ph: 0, gaze: 0, air: false };
     this.warmup();
     this.deathFocus = null;
   }
@@ -130,7 +131,7 @@ export class Renderer {
     this.camera.updateProjectionMatrix();
   }
 
-  reset() { this.boxes?.carton?.reset(); this.deadS = null; this.introT = -1; this.deadT = 0; this.heroMood = null; this.track.reset(); this.fx.reset(); this.cam.shake = 0; this.cam.kick = 0; this.cam.roll = 0; this.cam.rollAmp = 0; this.deathFocus = null; this.themeIdx = this.themeBase || 0; this.pendingTheme = 0; this.applyTheme(this.themeIdx, this.themeIdx, 1); this.look.set(0, 0, -1); this.upS.set(0, 1, 0); this.firstFrame = true; }
+  reset() { this.boxes?.carton?.reset(); this.deadS = null; this.introT = -1; this.deadT = 0; this.heroMood = null; this.track.reset(); this.fx.reset(); this.cam.shake = 0; this.cam.kick = 0; this.cam.roll = 0; this.cam.rollAmp = 0; Object.assign(this.weight, { dip: 0, v: 0, gaze: 0, air: false }); this.deathFocus = null; this.themeIdx = this.themeBase || 0; this.pendingTheme = 0; this.applyTheme(this.themeIdx, this.themeIdx, 1); this.look.set(0, 0, -1); this.upS.set(0, 1, 0); this.firstFrame = true; }
 
   applyTheme(from, to, t) {
     const A = THEMES[from % THEMES.length], B = THEMES[to % THEMES.length];
@@ -182,7 +183,7 @@ export class Renderer {
         this.hero.once('smash');
       }
       if (e.type === 'foldStart') { this.cam.shake = Math.max(this.cam.shake, 0.12); this.cam.shakeDecay = 0.15; }
-      if (e.type === 'foldEnd') { this.flash(0xffffff, 0.3); }
+      if (e.type === 'foldEnd') { this.flash(0xffffff, 0.3); if (game.alive && !this.third) this.weight.v += 0.29; }
       if (e.type === 'foldStart') this.cam.foldFov = 1.2;
       if (e.type === 'world') {
         // el mundo nuevo se enciende al aterrizar del salto, si lo hay
@@ -371,6 +372,23 @@ export class Renderer {
     cam.lookAt(target);
     // sacudida de giro del choque (0,08 rad, 0,25 s)
     if (c.rollShake > 0) { cam.rotateZ((Math.random() * 2 - 1) * 0.08 * (c.rollShake / 0.25) * (reduceFx ? 0.3 : 1)); c.rollShake -= dt; }
+    // peso de la cámara (solo primera persona; magnitudes en fracción del alto de pantalla, el centro
+    // no se mueve más de ~1 %): bajón elástico al aterrizar, respiración y mirada que se adelanta al giro
+    const wt = this.weight, wOn = game.alive && !this.third ? 1 - (V ? V.e : 0) : 0, air = game.jumpAt(camS) > 0.2;
+    const spd = Math.min(1, Math.max(0, (game.speedMS - 36) / 64));
+    if (wt.air && !air && wOn) wt.v += 0.31;
+    wt.air = air;
+    const wdt = Math.min(dt, 1 / 30);
+    wt.v += (-180 * wt.dip - 16 * wt.v) * wdt; wt.dip = Math.max(-0.002, Math.min(0.0098, wt.dip + wt.v * wdt));
+    wt.ph += wdt * 6.283 * (1.1 + 0.5 * spd);
+    wt.gaze += (Math.max(-1, Math.min(1, this.lean / 0.07)) - wt.gaze) * Math.min(1, dt * 6);
+    if (wOn) {
+      const fovR = cam.fov * DEG, fx = reduceFx ? 0.3 : 1;
+      const pitch = (wt.dip * fx + (reduceFx ? 0 : Math.sin(wt.ph) * 0.0022 * (0.5 + 0.5 * spd))) * wOn * fovR;
+      cam.position.addScaledVector(this.upS, -wt.dip * fx * wOn * 8);
+      cam.rotateX(-pitch);
+      cam.rotateY(wt.gaze * 0.006 * fx * wOn * fovR);
+    }
     // campo de visión: base del original, con un empujón al impulsar
     const sp01 = Math.min(1, Math.max(0, (game.speedMS - 36) / 64));
     const fov = this.baseFov + (this.third ? 6 : 0) + iq * 18 + sp01 * 14 + easeKick(c.kick) * (reduceFx ? 4 : 12) * (c.kickAmp || 1) + (c.foldFov > 0 ? Math.sin(Math.min(1, (1.2 - c.foldFov) / 1.2) * Math.PI) * 8 : 0);
