@@ -98,7 +98,7 @@ export class Renderer {
     this.applyTheme(0, 0, 1);
     this.time = 0;
     this.lean = 0;
-    this.weight = { dip: 0, v: 0, ph: 0, gaze: 0, air: false };
+    this.weight = { dip: 0, v: 0, ph: 0, gaze: 0, air: false, on: 0 };
     this.warmup();
     this.deathFocus = null;
   }
@@ -374,12 +374,16 @@ export class Renderer {
     if (c.rollShake > 0) { cam.rotateZ((Math.random() * 2 - 1) * 0.08 * (c.rollShake / 0.25) * (reduceFx ? 0.3 : 1)); c.rollShake -= dt; }
     // peso de la cámara (solo primera persona; magnitudes en fracción del alto de pantalla, el centro
     // no se mueve más de ~1 %): bajón elástico al aterrizar, respiración y mirada que se adelanta al giro
-    const wt = this.weight, wOn = game.alive && !this.third ? 1 - (V ? V.e : 0) : 0, air = game.jumpAt(camS) > 0.2;
+    const wt = this.weight, wGoal = game.alive && !this.third ? 1 - (V ? V.e : 0) : 0, air = game.jumpAt(camS) > 0.2;
+    // el peso entra y sale suave: al morir o cambiar de vista no se endereza de golpe
+    wt.on += (wGoal - wt.on) * Math.min(1, dt * 10); const wOn = wt.on > 0.01 ? wt.on : 0;
     const spd = Math.min(1, Math.max(0, (game.speedMS - 36) / 64));
-    if (wt.air && !air && wOn) wt.v += 0.31;
+    if (wt.air && !air && wOn && this.time - (wt.landAt ?? -9) > 0.3) { wt.v += 0.31; wt.landAt = this.time; }
     wt.air = air;
     const wdt = Math.min(dt, 1 / 30);
+    wt.v = Math.min(wt.v, 0.36);
     wt.v += (-180 * wt.dip - 16 * wt.v) * wdt; wt.dip = Math.max(-0.002, Math.min(0.0098, wt.dip + wt.v * wdt));
+    if (wt.dip >= 0.0098 && wt.v > 0) wt.v = 0;
     wt.ph += wdt * 6.283 * (1.1 + 0.5 * spd);
     wt.gaze += (Math.max(-1, Math.min(1, this.lean / 0.07)) - wt.gaze) * Math.min(1, dt * 6);
     if (wOn) {
