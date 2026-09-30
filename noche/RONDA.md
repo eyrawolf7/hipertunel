@@ -1,3 +1,5 @@
+**RITMO (Víctor, lo más importante):** cada ronda dura como mucho 30 minutos y tiene que dejar algo que se NOTE jugando. Haz primero la versión más simple que se vea, verifícala y commitea; el pulido va después, si sobra tiempo. Revisión de críticos: UNA vuelta (si piden cambios, aplica los que sean rápidos y anota el resto para otra tarea), no tres. Nada de pruebas o herramientas nuevas salvo la mínima que demuestre que funciona.
+
 Eres el turno de noche de Hipertúnel. Trabajas SOLO, sin nadie a quien preguntar, en una copia aparte del repositorio (la carpeta actual). Víctor (el dueño) duerme y revisará por la mañana. Esta ronda haces UNA tarea, la dejas verificada y anotada, y terminas. Otra ronda, con el contexto limpio, hará la siguiente.
 
 Antes de nada lee `CLAUDE.md` (reglas de diseño que no se rompen), `docs/CONTRATO.md` y, en la carpeta de estado `.noche/`: `progreso.md` (qué han hecho las rondas anteriores y qué han aprendido) y `tareas.json`.
@@ -20,7 +22,7 @@ Antes de nada lee `CLAUDE.md` (reglas de diseño que no se rompen), `docs/CONTRA
    - lo visual o de interfaz: `director-arte` (≥ 8/10 y ninguna pantalla peor); si afecta a cómo se juega o se entiende: también `critico-jugador`;
    - si tocas `app/src/sim/` o una mecánica: también `auditor-fidelidad`;
    - si tocas sonido: `sonido`.
-   Aplica lo que pidan y vuelve a pasárselo (hasta 3 vueltas). Si discrepan entre ellos, decide con las cifras y anota el porqué. La tarea solo se cierra cuando todos aprueban; si tras 3 vueltas no, cuenta como intento fallido. Guarda un resumen de cada veredicto en `.noche/capturas/<id>/criticos.md`.
+   Aplica lo que pidan que sea rápido y, como mucho, una segunda vuelta. Si discrepan entre ellos, decide con las cifras y anota el porqué. La tarea solo se cierra cuando todos aprueban; si tras 2 vueltas no, commitea igualmente como propuesta con las objeciones anotadas para que decida Víctor (no la bloquees). Guarda un resumen de cada veredicto en `.noche/capturas/<id>/criticos.md`.
 6. **Puerta**: `sh noche/puerta.sh` (la completa, con qa.mjs) tiene que salir en verde. Si falla, arréglalo; si no puedes en esta ronda, `git restore`/`git reset` a lo último bueno, suma 1 a `intentos` y, con 3 intentos, marca la tarea `"bloqueada"` explicando por qué.
 7. **Commit** en la rama de la tarea, con mensaje en español como los del repo y al final la línea `Co-Authored-By: Claude <noreply@anthropic.com>`.
 8. **Integración**: si la tarea es `"tipo": "segura"`, `git switch noche/<fecha>/todo` (la de integración), `git merge --no-ff noche/<fecha>/<id>`, `sh noche/puerta.sh rapida`; si choca o falla, `git merge --abort` o `git reset --hard HEAD~1` y anótalo (la rama suelta queda para Víctor). Las de `"tipo": "propuesta"` (mecánicas y funciones nuevas) NO se fusionan: se quedan en su rama para que Víctor las pruebe por separado.
