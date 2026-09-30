@@ -19,10 +19,11 @@ export function createVibe(vibrate, rnd = Math.random) {
   let lastStart = -Infinity, next = 0, surface = -1, changePending = false;
   const log = [];
   // `vibrate` puede devolver false si no deja salir el pulso (tope de pulsos por segundo): entonces no cuenta
-  const fire = (now, ms, kind = 'suelo') => {
+  // `name` (piedra, lava, cambio...) solo la usa la app de Android para elegir el golpe de Haptics
+  const fire = (now, ms, kind = 'suelo', name) => {
     if (now - lastStart < MIN_GAP) return false;
     let ok;
-    try { ok = vibrate(ms, kind); } catch (e) { /* sin API de vibración */ }
+    try { ok = vibrate(ms, kind, name); } catch (e) { /* sin API de vibración */ }
     if (ok === false) return false;
     lastStart = now;
     log.push({ t: now, ms, kind });
@@ -37,11 +38,11 @@ export function createVibe(vibrate, rnd = Math.random) {
       if (surface < 0) { surface = s; next = now + p.min; return; }          // sin pulso al empezar
       if (s !== surface) { surface = s; changePending = true; }
       if (changePending) {                                                   // pulso de cambio (espera si acaba de sonar otro)
-        if (fire(now, CHANGE_MS)) { changePending = false; next = now + p.min; }
+        if (fire(now, CHANGE_MS, 'suelo', 'cambio')) { changePending = false; next = now + p.min; }
         return;
       }
       // el siguiente se ancla al calendario (no al fotograma en que salió) para que la media sea la pedida
-      if (now >= next && fire(now, p.ms)) next = Math.max(now, next + p.min + rnd() * (p.max - p.min));
+      if (now >= next && fire(now, p.ms, 'suelo', p.name)) next = Math.max(now, next + p.min + rnd() * (p.max - p.min));
     },
     // el motor pide un pulso suelto; false si no cabe
     tryPulse(now, ms) { return fire(now, ms, 'motor'); },

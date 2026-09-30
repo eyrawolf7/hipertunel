@@ -882,6 +882,12 @@ if (!ONLY && !opt.built) {
   const ffl = ff.stdout.split('\n').filter((l) => /^(PASA|FALLA)/.test(l));
   rec(26, 'Fases en el navegador (qa-fases.mjs)', ff.status === 0 && ffl.length >= 22, { pasa: ffl.filter((l) => l.startsWith('PASA')).length, fallos: ffl.filter((l) => l.startsWith('FALLA')).map((l) => l.slice(0, 200)).slice(0, 3) });
 }
+// Vibración con intensidad en la app de Android (Haptics simulado; la web sigue con navigator.vibrate): tests/haptics.mjs
+if (!ONLY && !opt.built) {
+  const hp = spawnSync(process.execPath, [new URL('./haptics.mjs', import.meta.url).pathname, `--url=${URL0}`], { encoding: 'utf8', timeout: 400000 });
+  const hl = hp.stdout.split('\n').filter((l) => /^(PASA|FALLA)/.test(l));
+  rec(27, 'Vibración con intensidad en Android (haptics.mjs)', hp.status === 0 && hl.length >= 40, { pasa: hl.filter((l) => l.startsWith('PASA')).length, fallos: hl.filter((l) => l.startsWith('FALLA')).map((l) => l.slice(0, 200)).slice(0, 3) });
+}
 writeFileSync(SHOTS + 'qa-report.json', JSON.stringify(results, null, 1));
 const fails = results.filter((r) => r.pass === false);
 console.log(`\n${results.filter((r) => r.pass === true).length} PASS · ${fails.length} FAIL`);
