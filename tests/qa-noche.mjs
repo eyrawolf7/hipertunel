@@ -13,6 +13,7 @@ let fails = 0;
 const rec = (id, name, pass, info) => { if (pass === false) fails++; console.log(`${pass === null ? 'INFO' : pass ? 'PASS' : 'FAIL'}  [${id}] ${name}  — ${JSON.stringify(info)}`); };
 async function open(vp = PHONE) {
   const page = await browser.newPage(); await page.setViewport(vp);
+  let n = 0; page.on('load', () => { if (++n > 1 && !page.__qaReload) console.log('RELOAD ' + page.url()); });
   const errors = []; page.on('pageerror', (e) => errors.push(String(e))); page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   await page.evaluateOnNewDocument(() => { try { localStorage.clear(); } catch (e) {} });
   await page.goto(URL0, { waitUntil: 'networkidle0' }); await page.waitForFunction(() => window.__hip && window.__hip.game, { timeout: 15000 }); await sleep(800);
@@ -109,7 +110,10 @@ await run('e', async () => {
   const { page, errors } = await open();
   const out = [];
   for (const s of ['title', 'modes', 'shop', 'settings', 'map', 'pause', 'over', 'hud']) {
-    const r = await page.evaluate((s) => { const ui = window.__hip.ui; try { ui.show(s); } catch (e) { return { s, err: String(e) }; } const el = document.querySelector(`[data-screen="${s}"]`) || document.getElementById('ui'); const W = innerWidth, H = innerHeight; const off = []; el.querySelectorAll('button, h1, h2, img, .card, [class*=btn]').forEach((b) => { const r = b.getBoundingClientRect(); if (r.width && getComputedStyle(b).visibility !== 'hidden' && (r.left < -1 || r.top < -1 || r.right > W + 1 || r.bottom > H + 1)) off.push(`${b.tagName}.${b.className}`.slice(0, 40) + ` ${r.left | 0},${r.top | 0},${r.right | 0},${r.bottom | 0}`); }); return { s, off: off.slice(0, 4), n: off.length }; }, s);
+    const r = await page.evaluate(async (s) => { const ui = window.__hip.ui; try { ui.show(s); } catch (e) { return { s, err: String(e) }; } await new Promise((r) => setTimeout(r, 400)); const el = document.querySelector(`.scr[data-screen="${s}"]`) || document.getElementById('ui'); const W = innerWidth, H = innerHeight;
+      // la placa pintada del título asoma por arriba a propósito (≤ 20 px) y las tarjetas de un carrusel con scroll se deslizan
+      const scrolls = (b) => { for (let p = b.parentElement; p && p !== document.body; p = p.parentElement) if (p.scrollWidth > p.clientWidth + 2 && /auto|scroll/.test(getComputedStyle(p).overflowX)) return true; return false; };
+      const off = []; el.querySelectorAll('button, h1, h2, img, .card, [class*=btn]').forEach((b) => { const r = b.getBoundingClientRect(); if (b.classList.contains('head-title') && r.top >= -20 && r.left >= -1 && r.right <= W + 1 && r.bottom <= H + 1) return; if (scrolls(b) && r.top >= -1 && r.bottom <= H + 1) return; if (r.width && getComputedStyle(b).visibility !== 'hidden' && (r.left < -1 || r.top < -1 || r.right > W + 1 || r.bottom > H + 1)) off.push(`${b.tagName}.${b.className}`.slice(0, 40) + ` ${r.left | 0},${r.top | 0},${r.right | 0},${r.bottom | 0}`); }); return { s, off: off.slice(0, 4), n: off.length }; }, s);
     await sleep(350); await page.screenshot({ path: OUT + `e-${s}.png` });
     out.push(r);
   }
@@ -129,17 +133,220 @@ await run('f', async () => {
   const st = await page.evaluate(() => ({ st: window.__hip.state, screen: document.getElementById('ui').dataset.screen, mode: window.__hip.game.variant || window.__hip.game.mode }));
   rec('f', 'A en el título empieza a jugar', st.st === 'play' || st.st === 'countdown', { s0, ...st });
   const th0 = await page.evaluate(() => window.__hip.game.theta);
-  await page.evaluate(() => { window.__pad.axes[0] = 1; window.__pad.timestamp++; }); await sleep(300); await page.evaluate(() => { window.__pad.axes[0] = 0; });
+  await page.evaluate(() => { window.__pad.axes[0] = 1; window.__pad.timestamp++; }); await page.waitForFunction((t0) => Math.abs(window.__hip.game.theta - t0) > 0.3 || !window.__hip.game.alive, { timeout: 2000 }, th0).catch(() => {}); await page.evaluate(() => { window.__pad.axes[0] = 0; });
   const th1 = await page.evaluate(() => window.__hip.game.theta);
   rec('f', 'stick a la derecha gira', Math.abs(th1 - th0) > 0.3, { d: +(th1 - th0).toFixed(2) });
   await press(9); const p = await page.evaluate(() => window.__hip.state);
   rec('f', 'Start pausa', p === 'paused', p);
   await press(9); await sleep(300); const r0 = await page.evaluate(() => window.__hip.state);
   rec('f', 'Start otra vez reanuda', r0 === 'countdown' || r0 === 'play', r0);
-  await press(0); await sleep(300); const r = await page.evaluate(() => ({ st: window.__hip.state, foc: document.querySelector('.is-focus')?.textContent?.trim().slice(0, 20) }));
-  rec('f', 'un solo A reanuda desde la pausa', r.st === 'countdown' || r.st === 'play', r);
-  if (r.st === 'paused') { await press(0); await sleep(300); rec('f', 'segundo A', null, await page.evaluate(() => window.__hip.state)); }
+  // la cuenta atrás ya terminó: se pausa de nuevo y un solo A sobre «Continuar» tiene que reanudar
+  await page.evaluate(() => { window.__hip.game.invul = 1e9; });
+  await page.waitForFunction(() => window.__hip.state === 'play', { timeout: 6000 });
+  await press(9); const p2 = await page.evaluate(() => ({ st: window.__hip.state, foc: document.querySelector('.is-focus')?.dataset.act }));
+  await press(0); await sleep(300); const r = await page.evaluate(() => ({ st: window.__hip.state }));
+  rec('f', 'un solo A sobre Continuar reanuda desde la pausa', p2.st === 'paused' && p2.foc === 'resume' && (r.st === 'countdown' || r.st === 'play'), { p2, r });
   rec('f', 'sin errores', errors.length === 0, errors.slice(0, 3));
+  await page.close();
+});
+
+// g. piruetas (simulación congelada, entradas directas a game.step): dentro del salto cuentan, fuera no, el tropiezo resta
+await run('g', async () => {
+  const { page, errors } = await open();
+  await page.evaluate(() => { window.__hip.start('arcade', 7); window.__freeze = true; });
+  const r = await page.evaluate(() => {
+    const h = window.__hip, g = h.game, out = {};
+    const evs = []; const inv = g.invul;
+    const step = (trick) => { const before = g.s; const ev = g.step({ steer: h.bot(g), trick }); for (const e of ev) evs.push(e.type + (e.lost !== undefined ? ':' + e.lost : '')); h.renderer.onEvents(ev, g); h.renderer.track.sync(g); };
+    g.crash = (b) => { b.hit = true; };
+    // fuera del salto: pedir pirueta no hace nada
+    for (let i = 0; i < 30; i++) step(true);
+    out.trickFuera = g.trickT; out.totalFuera = g.tricksTotal;
+    // hasta el salto
+    for (let i = 0; i < 60 * 240 && g.alive && !g.flight(); i++) step(false);
+    out.enVuelo = !!g.flight(); out.landIn0 = +g.landIn.toFixed(2);
+    // pirueta en el aire: se completa y suma monedas
+    const c0 = g.coinsGot; step(true); out.trickT = g.trickT;
+    for (let i = 0; i < 60 && g.trickT >= 0; i++) step(false);
+    out.total1 = g.tricksTotal; out.coins1 = g.coinsGot - c0; out.done = evs.includes('trickDone');
+    // segunda pirueta demasiado tarde: aterriza a medias → tropiezo, pierde las monedas de la racha
+    while (g.flight() && g.landIn > 0.2) step(false);
+    const c1 = g.coinsGot; step(true);
+    for (let i = 0; i < 60 && g.trickT >= 0; i++) step(false);
+    out.fail = evs.find((e) => e.startsWith('trickFail')); out.coinsTrasFallo = g.coinsGot - c0; out.c1 = c1 - c0; out.trickTFin = g.trickT;
+    return out;
+  });
+  rec('g', 'pedir pirueta fuera del salto no hace nada', r.trickFuera === -1 && r.totalFuera === 0, { t: r.trickFuera, total: r.totalFuera });
+  rec('g', 'en el salto la pirueta arranca, se completa (trickDone) y da monedas', r.enVuelo && r.trickT >= 0 && r.total1 === 1 && r.done && r.coins1 >= 5, r);
+  rec('g', 'aterrizar a mitad de otra pirueta = tropiezo y pierde las monedas de la racha', !!r.fail && r.fail !== 'trickFail:0' && r.coinsTrasFallo === 0 && r.trickTFin === -1, { fail: r.fail, c1: r.c1, tras: r.coinsTrasFallo });
+  await page.close();
+  // tocar la pantalla en el salto hace la pirueta y no pausa (toque real, con la partida en marcha)
+  const b = await open();
+  await b.page.evaluate(() => { window.__hip.start('arcade', 7); window.__freeze = true; const h = window.__hip, g = h.game; g.crash = (x) => { x.hit = true; }; for (let i = 0; i < 60 * 240 && g.alive && !(g.flight() && g.landIn > 0.7); i++) h.step(1); window.__seen = 0; (function f() { if (g.trickT >= 0) window.__seen++; requestAnimationFrame(f); })(); window.__freeze = false; });
+  await b.page.touchscreen.tap(PHONE.width / 2, PHONE.height / 2);
+  await sleep(300);
+  const t = await b.page.evaluate(() => ({ st: window.__hip.state, seen: window.__seen, alive: window.__hip.game.alive }));
+  rec('g', 'tocar en el salto no pausa y arranca la pirueta', t.st === 'play' && t.seen > 0, t);
+  await b.page.close();
+  // Espacio y X del mando (botón 2) en el aire: la pirueta llega a trickDone por la ruta real de entrada
+  for (const via of ['Espacio', 'X del mando']) {
+    const c = await open();
+    await c.page.evaluate(() => { const pad = { id: 'QA pad', index: 0, connected: true, mapping: 'standard', timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) }; window.__pad = pad; navigator.getGamepads = () => [pad, null, null, null]; window.dispatchEvent(Object.assign(new Event('gamepadconnected'), { gamepad: pad })); });
+    await c.page.evaluate(() => { window.__hip.start('arcade', 7); window.__freeze = true; const h = window.__hip, g = h.game; g.crash = (x) => { x.hit = true; }; g.coinsGot = 0; for (let i = 0; i < 60 * 240 && g.alive && !g.flight(); i++) h.step(1); window.__ev = 0; const r = h.renderer, o = r.onEvents.bind(r); r.onEvents = (ev, gg) => { for (const e of ev) if (e.type === 'trickDone') window.__ev++; return o(ev, gg); }; window.__freeze = false; });
+    if (via === 'Espacio') { await c.page.keyboard.down('Space'); await sleep(60); await c.page.keyboard.up('Space'); }
+    else { await c.page.evaluate(() => { window.__pad.buttons[2] = { pressed: true, value: 1 }; window.__pad.timestamp++; }); await sleep(60); await c.page.evaluate(() => { window.__pad.buttons[2] = { pressed: false, value: 0 }; window.__pad.timestamp++; }); }
+    await sleep(900);
+    const d = await c.page.evaluate(() => ({ st: window.__hip.state, trickDone: window.__ev, total: window.__hip.game.tricksTotal, monedas: window.__hip.game.coinsGot }));
+    rec('g', `${via} en el salto da trickDone y +5 monedas`, d.st === 'play' && d.trickDone >= 1 && d.total >= 1, d);
+    errors.push(...c.errors); await c.page.close();
+  }
+  rec('g', 'sin errores', errors.length === 0 && b.errors.length === 0, [...errors, ...b.errors].slice(0, 3));
+});
+
+// h. muro: aviso antes del muro, carril del cartón apagado, la piedra sin impulso mata, cartón entero tras reiniciar
+await run('h', async () => {
+  const { page, errors } = await open();
+  await page.evaluate(() => { window.__hip.start('arcade', 11); window.__freeze = true; });
+  const r = await page.evaluate(() => {
+    const h = window.__hip, g = h.game, out = { seq: [] };
+    g.invul = 1e9;
+    let wall = null;
+    for (let i = 0; i < 60 * 300 && g.alive && !wall; i++) { h.step(1); for (const e of g.events) if (e.type === 'wallSoon' || e.type === 'wall') { out.seq.push(e.type); if (e.type === 'wall') wall = e; } }
+    if (!wall) return out;
+    out.hole = wall.lane;
+    // que el muro esté cerca (últimas filas) y mirar los carriles encendidos
+    for (let i = 0; i < 60 * 20 && g.boxes.some((b) => b.wall && b.k - g.s > 6); i++) h.step(1);
+    g.theta = ((wall.lane + 6) % 12) * Math.PI / 6;   // el jugador en un carril de piedra (el del cartón no depende de dónde estés)
+    const lit = g.litStrips();
+    out.litHole = lit.has(wall.lane); out.litStone = [...Array(12).keys()].filter((l) => l !== wall.lane && lit.has(l)).length;
+    // piedra sin impulso: al carril opuesto al cartón, sin invulnerabilidad
+    g.boxes = g.boxes.filter((b) => b.wall);   // que solo el muro pueda matar
+    g.invul = 0; g.disableBoost(); g.vTarget = g.v = Math.min(g.v, 2.5); let killer = null;
+    const c = g.crash.bind(g); g.crash = (b) => { if (g.alive) killer = { wall: !!b.wall, carton: !!b.carton, lane: b.lane, k: +b.k.toFixed(1), s: +g.s.toFixed(1), hole: wall.lane }; return c(b); };
+    const lane = (wall.lane + 6) % 12;
+    for (let i = 0; i < 60 * 8 && g.alive; i++) { let d = lane * Math.PI / 6 - g.theta; d = Math.atan2(Math.sin(d), Math.cos(d)); h.step(1, Math.max(-1, Math.min(1, d * 3))); g.boxes = g.boxes.filter((b) => b.wall); }
+    out.alive = g.alive; out.killer = killer;
+    return out;
+  });
+  rec('h', 'wallSoon llega antes que wall', r.seq[0] === 'wallSoon' && r.seq[1] === 'wall', r.seq);
+  rec('h', 'el carril del cartón se queda apagado y los de piedra se encienden', r.litHole === false && r.litStone >= 6, { litHole: r.litHole, litStone: r.litStone });
+  rec('h', 'la piedra sin impulso mata', r.alive === false && r.killer && r.killer.wall && !r.killer.carton, { alive: r.alive, killer: r.killer });
+  // reiniciar: otra partida empieza con el contador de muros a cero
+  await page.evaluate(() => { window.__hip.start('arcade', 12); window.__freeze = true; });
+  const s = await page.evaluate(() => { const g = window.__hip.game; return { walls: g.walls, smashes: g.smashes, wallsOnTrack: g.boxes.filter((b) => b.wall).length, hits: g.boxes.filter((b) => b.wall && b.hit).length }; });
+  rec('h', 'tras reiniciar no queda ningún muro ni cartón roto', s.walls === 0 && s.smashes === 0 && s.wallsOnTrack === 0, s);
+  const r2 = await page.evaluate(() => { const h = window.__hip, g = h.game; g.invul = 1e9; for (let i = 0; i < 60 * 300 && g.alive && !g.boxes.some((b) => b.wall); i++) h.step(1); const c = g.boxes.filter((b) => b.wall && b.carton); return { n: c.length, hit: c.filter((b) => b.hit).length, alive: g.alive }; });
+  rec('h', 'el cartón del muro nuevo está entero', r2.n === 1 && r2.hit === 0, r2);
+  // romperlo (el trozo de cartón queda en el render) y reiniciar: el render se limpia
+  const sm = await page.evaluate(() => { const h = window.__hip, g = h.game, R = h.renderer; g.boxes = g.boxes.filter((b) => b.wall); const hole = g.boxes.find((b) => b.carton); for (let i = 0; i < 60 * 6 && g.alive && !g.smashes; i++) { let d = hole.lane * Math.PI / 6 - g.theta; d = Math.atan2(Math.sin(d), Math.cos(d)); h.step(1, Math.max(-1, Math.min(1, d * 3))); R.update(g, g.s, g.theta, 1 / 60); g.boxes = g.boxes.filter((b) => b.wall); } return { smashes: g.smashes, partes: R.boxes.carton.live.length }; });
+  await page.evaluate(() => { window.__hip.start('arcade', 13); window.__freeze = true; window.__hip.renderer.update(window.__hip.game, 0, 0, 1 / 60); });
+  const sm2 = await page.evaluate(() => ({ smashes: window.__hip.game.smashes, partes: window.__hip.renderer.boxes.carton.live.length }));
+  rec('h', 'romper el cartón deja trozos y reiniciar los limpia del render', sm.smashes >= 1 && sm.partes > 0 && sm2.smashes === 0 && sm2.partes === 0, { sm, sm2 });
+  rec('h', 'sin errores', errors.length === 0, errors.slice(0, 3));
+  await page.close();
+});
+
+// i. cámaras: la intro se salta con A/Enter o con un toque; al morir el zorro sale en pantalla, junto a la caja, sin NaN
+await run('i', async () => {
+  const { page, errors } = await open();
+  const intro = () => page.evaluate(() => ({ st: window.__hip.state, on: window.__hip.renderer.introOn }));
+  await page.evaluate(() => window.__hip.startMenu('arcade')); await sleep(400);
+  const i0 = await intro();
+  await page.keyboard.press('Enter'); await sleep(200);
+  const i1 = await intro();
+  rec('i', 'la intro arranca y Enter la salta', i0.st === 'countdown' && i0.on === true && i1.on === false, { i0, i1 });
+  await page.evaluate(() => window.__hip.startMenu('arcade')); await sleep(400);
+  const j0 = await intro();
+  await page.touchscreen.tap(PHONE.width / 2, PHONE.height / 2); await sleep(200);
+  const j1 = await intro();
+  rec('i', 'un toque salta la intro', j0.on === true && j1.on === false, { j0, j1 });
+  await page.evaluate(() => { const pad = { id: 'QA pad', index: 0, connected: true, mapping: 'standard', timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) }; window.__pad = pad; navigator.getGamepads = () => [pad, null, null, null]; window.dispatchEvent(Object.assign(new Event('gamepadconnected'), { gamepad: pad })); window.__hip.startMenu('arcade'); });
+  await sleep(400);
+  const k0 = await intro();
+  await page.evaluate(() => { window.__pad.buttons[0] = { pressed: true, value: 1 }; window.__pad.timestamp++; }); await sleep(120);
+  await page.evaluate(() => { window.__pad.buttons[0] = { pressed: false, value: 0 }; window.__pad.timestamp++; }); await sleep(150);
+  const k1 = await intro();
+  rec('i', 'A del mando salta la intro', k0.on === true && k1.on === false, { k0, k1 });
+  // muerte: se juega en tiempo real, el zorro tiene que verse entero en los fotogramas siguientes
+  await page.evaluate(() => { window.__hip.start('arcade', 5); window.__freeze = true; const h = window.__hip; for (let k = 0; k < 60 * 60 && h.game.alive; k++) { h.step(1, 0); h.renderer.update(h.game, h.game.s, h.game.theta, 1 / 60); } window.__freeze = false; });
+  const samples = await page.evaluate(() => new Promise((res) => {
+    const h = window.__hip, R = h.renderer, out = []; const t0 = performance.now();
+    (function f() {
+      const t = (performance.now() - t0) / 1000;
+      const p = R.hero.group.position.clone(), cp = R.camera.position;
+      const ndc = p.clone().project(R.camera);
+      const foc = R.deathFocus;
+      out.push({ t: +t.toFixed(2), vis: R.hero.group.visible, finite: [p.x, p.y, p.z, cp.x, cp.y, cp.z].every(Number.isFinite), ndc: [+ndc.x.toFixed(2), +ndc.y.toFixed(2)], d: foc ? +p.distanceTo(foc).toFixed(1) : null, st: h.state });
+      if (t < 2.6) requestAnimationFrame(f); else res(out);
+    })();
+  }));
+  const late = samples.filter((s) => s.t > 0.4);
+  const fin = samples[samples.length - 1];
+  await page.screenshot({ path: OUT + 'i-muerte.png' });
+  rec('i', 'ni la cámara ni el zorro tienen NaN', samples.every((s) => s.finite), samples.filter((s) => !s.finite).slice(0, 2));
+  rec('i', 'el zorro se ve y está en pantalla tras el choque', late.length > 10 && late.every((s) => s.vis && Math.abs(s.ndc[0]) < 1 && Math.abs(s.ndc[1]) < 1), { fin, malas: late.filter((s) => !s.vis || Math.abs(s.ndc[0]) >= 1 || Math.abs(s.ndc[1]) >= 1).slice(0, 3) });
+  rec('i', 'el zorro cae cerca del sitio del choque (< 8 u)', late.every((s) => s.d !== null && s.d < 8), { max: Math.max(...late.map((s) => s.d ?? -1)), sinFoco: late.filter((s) => s.d === null).length });
+  rec('i', 'sin errores', errors.length === 0, errors.slice(0, 3));
+  await page.close();
+});
+
+// j. menús pintados: todas las piezas cargan, foco por defecto en cada pantalla, navegación entera con teclado y mando
+await run('j', async () => {
+  const { page, errors } = await open();
+  const dir = new URL('../app/src/assets/ui/', import.meta.url).pathname;
+  const { readdirSync } = await import('node:fs');
+  const files = [...new Set(readdirSync(dir).filter((f) => /\.(png|webp)$/.test(f)).map((f) => f.replace(/\.(png|webp)$/, '')))];
+  const imgs = await page.evaluate(async (files) => {
+    const root = document.getElementById('ui'), bad = [];
+    for (const n of files) {
+      const v = root.style.getPropertyValue('--img-' + n); const m = v.match(/url\("?(.*?)"?\)/);
+      if (!m || !root.classList.contains('has-' + n)) { bad.push(n + ': sin variable'); continue; }
+      const ok = await new Promise((res) => { const i = new Image(); i.onload = () => res(i.naturalWidth > 0); i.onerror = () => res(false); i.src = m[1]; });
+      if (!ok) bad.push(n + ': no carga');
+    }
+    return bad;
+  }, files);
+  rec('j', `las ${files.length} piezas pintadas cargan y están publicadas`, files.length >= 30 && imgs.length === 0, imgs.slice(0, 5));
+  const focus = await page.evaluate(async () => {
+    const out = [];
+    for (const s of ['title', 'modes', 'shop', 'settings', 'map', 'pause', 'over']) {
+      window.__hip.ui.show(s); await new Promise((r) => setTimeout(r, 200));
+      const f = document.querySelector(`.scr[data-screen="${s}"] .is-focus`), def = document.querySelector(`.scr[data-screen="${s}"] [data-default]`);
+      const r = f && f.getBoundingClientRect();
+      out.push({ s, ok: !!f && (def ? def === f : ['shop', 'map'].includes(s)) && r.width > 0 && r.right > 0 && r.left < innerWidth && r.bottom > 0 && r.top < innerHeight, foco: f ? (f.dataset.act || f.dataset.mode || f.dataset.set || f.dataset.stage || f.className).toString().slice(0, 24) : null });
+    }
+    return out;
+  });
+  rec('j', 'cada pantalla tiene un foco por defecto visible', focus.every((x) => x.ok), focus.filter((x) => !x.ok));
+  // navegación con teclado: recorrer con flechas y ver que se llega a todo lo enfocable
+  const reach = async (screen, keys) => {
+    await page.evaluate((s) => { window.__hip.ui.show(s); }, screen); await sleep(300);
+    const total = await page.evaluate((s) => [...document.querySelectorAll(`.scr[data-screen="${s}"] [data-nav]`)].filter((e) => e.offsetParent !== null && !e.disabled).length, screen);
+    const seen = new Set(); let seed = 12345;   // paseo aleatorio con semilla (las flechas de un deslizador lo ajustan en vez de moverse)
+    for (let i = 0; i < 90 && seen.size < total; i++) {
+      seen.add(await page.evaluate(() => { const f = document.querySelector('.is-focus'); return f ? [...f.parentElement.children].indexOf(f) + ':' + (f.dataset.act || f.dataset.mode || f.dataset.set || f.dataset.stage || f.className) : ''; }));
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      await page.keyboard.press(keys[(seed >> 8) % keys.length]); await sleep(25);
+    }
+    return { screen, total, vistos: seen.size };
+  };
+  const nav = [];
+  const ARROWS = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'];
+  for (const s of ['title', 'modes', 'settings', 'pause', 'over']) nav.push(await reach(s, ARROWS));
+  rec('j', 'con flechas se llega a todos los botones de cada pantalla', nav.every((n) => n.total >= 2 && n.vistos >= n.total), nav);
+  // mando: cruceta (12-15) mueve el foco y A (0) pulsa
+  await page.evaluate(() => { const pad = { id: 'QA pad', index: 0, connected: true, mapping: 'standard', timestamp: 0, axes: [0, 0, 0, 0], buttons: Array.from({ length: 17 }, () => ({ pressed: false, value: 0 })) }; window.__pad = pad; navigator.getGamepads = () => [pad, null, null, null]; window.dispatchEvent(Object.assign(new Event('gamepadconnected'), { gamepad: pad })); window.__hip.ui.show('title'); });
+  await sleep(300);
+  const press = async (i) => { await page.evaluate((i) => { window.__pad.buttons[i] = { pressed: true, value: 1 }; window.__pad.timestamp++; }, i); await sleep(90); await page.evaluate((i) => { window.__pad.buttons[i] = { pressed: false, value: 0 }; window.__pad.timestamp++; }, i); await sleep(150); };
+  const foc = () => page.evaluate(() => { const f = document.querySelector('.is-focus'); return f ? (f.dataset.act || f.dataset.mode || f.className) : null; });
+  const f0 = await foc(); let moved = false, f1 = f0;
+  for (const b of [13, 15, 12, 14]) { await press(b); f1 = await foc(); if (f1 !== f0) { moved = true; break; } }
+  rec('j', 'la cruceta del mando mueve el foco en el título', moved, { f0, f1 });
+  await press(1); await sleep(200);
+  await page.evaluate(() => window.__hip.ui.show('modes')); await sleep(300);
+  await press(1); await sleep(300);
+  rec('j', 'B en Elige modo vuelve al título', await page.evaluate(() => document.getElementById('ui').dataset.screen) === 'title', null);
+  rec('j', 'sin errores', errors.length === 0, errors.slice(0, 3));
   await page.close();
 });
 

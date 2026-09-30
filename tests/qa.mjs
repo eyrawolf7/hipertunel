@@ -82,7 +82,13 @@ const invul = (page) => page.evaluate(() => { window.__hip.game.invul = 1e9; });
 
 async function run(id, fn) {
   if (ONLY && !ONLY.has(id)) return;
-  try { await fn(); } catch (e) { rec(id, 'excepción en la prueba', false, String(e && e.stack || e).split('\n').slice(0, 3).join(' | ')); }
+  for (let attempt = 0; ; attempt++) {
+    const r0 = reloads.length, n0 = results.length;
+    try { await fn(); } catch (e) { rec(id, 'excepción en la prueba', false, String(e && e.stack || e).split('\n').slice(0, 3).join(' | ')); }
+    // si Vite recargó la página (HMR) a mitad de la sección y algo falló, se repite entera una vez
+    if (attempt === 0 && reloads.length > r0 && results.slice(n0).some((x) => x.pass === false)) { const malas = results.slice(n0).filter((x) => x.pass === false).map((x) => x.name); results.length = n0; note(id, 'sección repetida por recarga de Vite; fallos del primer intento', malas); console.log(`      (recarga de Vite durante la sección ${id}: se repite)`); continue; }
+    break;
+  }
 }
 
 // ------------------------------------------------------------------ 1. carga sin errores
@@ -815,6 +821,15 @@ if (!ONLY && !opt.built) {
   const m = spawnSync(process.execPath, [new URL('./qa-mando.mjs', import.meta.url).pathname, `--url=${URL0}`], { encoding: 'utf8' });
   const bad = m.stdout.split('\n').filter((l) => l.startsWith('FALLA'));
   rec(18, 'mando simulado (qa-mando.mjs)', m.status === 0 && bad.length === 0, { pasa: (m.stdout.match(/^PASA/gm) || []).length, fallos: bad.slice(0, 3) });
+}
+// Barrido de la 0.60 (pausa en salto, piruetas, muro, cámaras, menús pintados, mando): tests/qa-noche.mjs, aparte (solo contra el servidor de desarrollo, no con --built)
+if (!ONLY && !opt.built) {
+  const noche = () => spawnSync(process.execPath, [new URL('./qa-noche.mjs', import.meta.url).pathname, `--url=${URL0}`], { encoding: 'utf8', timeout: 480000 });
+  let n = noche(), lines = n.stdout.split('\n').filter((l) => /^(PASS|FAIL)/.test(l));
+  if (n.status !== 0 && /^RELOAD /m.test(n.stdout)) { note(19, 'qa-noche falló con recarga de Vite y se repitió una vez; fallos del primer intento', lines.filter((l) => l.startsWith('FAIL')).map((l) => l.slice(0, 120)).slice(0, 5)); n = noche(); lines = n.stdout.split('\n').filter((l) => /^(PASS|FAIL)/.test(l)); }
+  for (const l of lines) { const m = l.match(/^(PASS|FAIL)\s+\[(\w)\]\s+(.*?)(?:\s+—\s+(.*))?$/); if (m) rec(`19${m[2]}`, m[3], m[1] === 'PASS', m[4]); }
+  if (n.status !== 0 && !lines.some((l) => l.startsWith('FAIL'))) rec(19, 'qa-noche.mjs terminó mal', false, (n.stderr || n.stdout).split('\n').slice(-3).join(' | '));
+  if (lines.length < 40) rec(19, 'qa-noche.mjs ejecutó todas las secciones (≥ 40 comprobaciones)', false, lines.length);
 }
 writeFileSync(SHOTS + 'qa-report.json', JSON.stringify(results, null, 1));
 const fails = results.filter((r) => r.pass === false);
