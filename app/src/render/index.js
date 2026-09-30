@@ -19,7 +19,7 @@ import { Coins } from './coins.js';
 import { Streaks } from './streaks.js';
 import { TunnelKit, kitU } from './tunnelkit.js';
 import { TunnelProps } from './tunnelprops.js';
-import { Life } from './life.js';
+import { Life, Wildlife } from './life.js';
 import { AdvView } from './advview.js';
 import { Hero } from './hero.js';
 import { styleUniforms } from './stylize.js';
@@ -77,7 +77,7 @@ export class Renderer {
     this.tunnel = new Tunnel(this.scene);
     this.kit = new TunnelKit(this.scene);
     this.kit.onReady = () => this.warmup();
-    this.props = new TunnelProps(this.scene); this.life = new Life(this.scene); this.adv = new AdvView(this.scene); this.hero = new Hero(this.scene); this.third = false; this._hp = new THREE.Vector3(); this._hu = new THREE.Vector3(); this._hf = new THREE.Vector3(); this.introT = -1; this.deadT = 0; this.heroPos = new THREE.Vector3(); this.ghostGame = null;
+    this.props = new TunnelProps(this.scene); this.life = new Life(this.scene); this.wild = new Wildlife(this.scene); this.adv = new AdvView(this.scene); this.hero = new Hero(this.scene); this.third = false; this._hp = new THREE.Vector3(); this._hu = new THREE.Vector3(); this._hf = new THREE.Vector3(); this.introT = -1; this.deadT = 0; this.heroPos = new THREE.Vector3(); this.ghostGame = null;
     this.scene.fog = new THREE.Fog(0xffffff, 40, 120);
     this.stoneTint = new THREE.Color(1, 1, 1);
     this.boxes = new Boxes(this.scene);
@@ -484,6 +484,7 @@ export class Renderer {
     this.decor.update(game, tr, cam, true, dt);   // se ve también por los arcos del túnel
     this.adv.update(game, tr, dt, this.ghostGame);
     this.life.update(cam, this.look, this.upS, outside, this.themeIdx, dt, this.quality !== 'baja' && !reduceFx, this.cam.invert);
+    this.wild.update(game, tr, cam, this.look, this.upS, outside, this.themeIdx, dt, this.quality !== 'baja' && !reduceFx && this.cam.invert < 0.5);
     this.renderer.setClearColor(this.fogColor, 1);
 
     // impulso: 0,4 s de azul eléctrico en juntas y anillos (nunca en los carriles)
