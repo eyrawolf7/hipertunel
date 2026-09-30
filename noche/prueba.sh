@@ -5,7 +5,7 @@
 set -eu
 id=$1
 REPO=$(cd "$(dirname "$0")/.." && pwd)
-rama=$(git -C "$REPO" branch --list "noche/*/$id" | tr -d ' *' | tail -1)
+rama=$(git -C "$REPO" branch --list "noche/*/$id" | tr -d ' *+' | tail -1)
 [ -n "$rama" ] || { echo "no hay rama para $id"; exit 1; }
 TMP=$(mktemp -d /tmp/prueba-XXXX)
 git -C "$REPO" worktree add -q --detach "$TMP" "$rama"
