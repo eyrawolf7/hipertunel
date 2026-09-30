@@ -15,8 +15,9 @@ import { ICON, DECO } from './icons.js';
 import { applySkin } from './skin.js';
 
 const MODES = {
+  phase: { name: 'Fases', desc: 'Un mundo por fase: puntos de control, portal al final y hasta 3 estrellas.', tag: 'Recomendado', unit: '★' },
   zorro: { name: 'Zorro', desc: 'Nuevo: el Arcade en tercera persona, con el zorro en su tabla de hoja.', tag: 'Prototipo', unit: 'pts' },
-  arcade: { name: 'Arcade', desc: 'Boost a tope: más cajas, mundos antes y racha ×5 si arriesgas.', tag: 'Recomendado', unit: 'pts' },
+  arcade: { name: 'Sin fin', desc: 'Boost a tope sin final: más cajas, mundos antes y racha ×5 si arriesgas.', tag: 'Infinito', unit: 'pts' },
   adventure: { name: 'Aventura', desc: '10 tramos: el tubo se rompe, el suelo se hunde, poderes y jefes.', tag: 'Nuevo' },
   classic: { name: 'Clásico', desc: 'Boost 2 tal cual: sin límite, llega lo más lejos que puedas.', tag: 'El original' },
   survival: { name: 'Supervivencia', desc: 'Sin impulsos y la velocidad no para de subir.', tag: 'Desafío' },
@@ -25,7 +26,7 @@ const MODES = {
   voyage: { name: 'Viaje', desc: 'Empieza en el último mundo al que llegaste.', tag: 'Exploración', lockedDesc: 'Llega al mundo 2 para desbloquearlo.' },
 };
 const MODE_KEYS = Object.keys(MODES);
-const MENU_SCREENS = new Set(['title', 'modes', 'settings', 'pause', 'over', 'shop', 'map']);
+const MENU_SCREENS = new Set(['title', 'modes', 'settings', 'pause', 'over', 'shop', 'map', 'phases']);
 const LOGO = 'Hipertúnel';
 const LOGO_TINTS = ['r', 'y', 'b', 'm'];
 
@@ -153,13 +154,13 @@ function modesHTML() {
 </section>`;
 }
 
-function mapHTML() {
+function mapHTML(name = 'map', title = 'Aventura', key = 'aventura') {
   return `
-<section class="scr scr-menu scr-map" data-screen="map">
+<section class="scr scr-menu scr-map scr-${name}" data-screen="${name}">
   <div class="vig vig-menu"></div>
-  ${headerHTML('Aventura', 'aventura')}
-  <div class="map-total stone-chip">${stoneLeaves}<span class="mt-star">★</span><span data-bind="mapTotal"></span></div>
-  <div class="map-path" data-bind="map"></div>
+  ${headerHTML(title, key)}
+  <div class="map-total stone-chip">${stoneLeaves}<span class="mt-star">★</span><span data-bind="${name}Total"></span></div>
+  <div class="map-path" data-bind="${name}"></div>
 </section>`;
 }
 
@@ -294,9 +295,10 @@ function overHTML() {
     <div class="oc-btns">
       <span class="ob-lf ob-lf-l" aria-hidden="true">${DECO.leaves}</span><span class="ob-lf ob-lf-r" aria-hidden="true">${DECO.leaves}</span>
       <span class="ob-cr ob-cr-l" aria-hidden="true">${DECO.crystals}</span><span class="ob-cr ob-cr-r" aria-hidden="true">${DECO.crystals}</span>
-      <button class="btn btn-primary" data-nav data-act="restart" data-default><span class="btn-ico">${ICON.retry}</span><span>Otra vez</span></button>
+      <button class="btn btn-primary" data-nav data-act="restart" data-default><span class="btn-ico">${ICON.retry}</span><span data-bind="restartTxt">Otra vez</span></button>
       <button class="btn btn-sec btn-cp" data-nav data-act="checkpoint"><span class="btn-ico">${ICON.play}</span><span>Desde el control</span></button>
-      <button class="btn btn-primary btn-next" data-nav data-act="next"><span class="btn-ico">${ICON.play}</span><span>Siguiente</span></button>
+      <button class="btn btn-sec btn-fresh" data-nav data-act="fresh"><span class="btn-ico">${ICON.retry}</span><span>Desde el principio</span></button>
+      <button class="btn btn-primary btn-next" data-nav data-act="next"><span class="btn-ico">${ICON.play}</span><span data-bind="nextTxt">Siguiente</span></button>
       <button class="btn btn-sec btn-cream" data-nav data-act="menu"><span class="btn-ico">${ICON.home}</span><span>Menú</span></button>
     </div>
     <div class="oc-hint">Toca en cualquier sitio para reintentar</div>
@@ -344,7 +346,7 @@ export function createUI(root, handlers = {}) {
     cssLink.addEventListener('load', () => root.classList.remove('htui-loading'), { once: true });
     cssLink.addEventListener('error', () => root.classList.remove('htui-loading'), { once: true });
   }
-  root.innerHTML = titleHTML() + modesHTML() + settingsHTML() + shopHTML() + mapHTML() + pauseHTML() + overHTML() + hudHTML()
+  root.innerHTML = titleHTML() + modesHTML() + settingsHTML() + shopHTML() + mapHTML() + mapHTML('phases', 'Fases', 'fases') + pauseHTML() + overHTML() + hudHTML()
     + '<div class="toasts" aria-live="polite"></div>';
 
   const $ = (sel, el = root) => el.querySelector(sel);
@@ -355,7 +357,7 @@ export function createUI(root, handlers = {}) {
 
   let current = 'none';
   let settingsFrom = 'title';
-  let lastMode = 'arcade';
+  let lastMode = 'phase';
   let overShownAt = 0;
   let focused = null;
   const records = { classic: 0, survival: 0, timetrial: 0 };
@@ -436,7 +438,7 @@ export function createUI(root, handlers = {}) {
     switch (current) {
       case 'modes': snd('menuBack'); show('title'); break;
       case 'shop': snd('menuBack'); show('title'); break;
-      case 'map': snd('menuBack'); show('modes'); break;
+      case 'map': case 'phases': snd('menuBack'); show('modes'); break;
       case 'settings': snd('menuBack'); show(settingsFrom === 'pause' ? 'pause' : 'title'); break;
       case 'pause': snd('menuBack'); call('onResume'); break;
       case 'over': if (performance.now() - overShownAt < 600) break; snd('menuBack'); call('onMenu'); break;
@@ -456,10 +458,15 @@ export function createUI(root, handlers = {}) {
       if (el.classList.contains('locked')) { snd('menuBack'); toast('Supera el tramo anterior para abrirlo', 'info'); return; }
       lastMode = 'adventure'; snd('menuOk'); call('onPlay', 'adventure', +el.dataset.stage); return;
     }
+    if (el.dataset.phase !== undefined) {
+      if (el.classList.contains('locked')) { snd('menuBack'); toast('Supera la fase anterior para abrirla', 'info'); return; }
+      lastMode = 'phase'; snd('menuOk'); call('onPlay', 'phase', +el.dataset.phase); return;
+    }
     if (el.dataset.buy) { const [cat, id] = el.dataset.buy.split(':'); call('onShop', cat, id); return; }
     if (el.dataset.mode) {
       if (el.classList.contains('locked')) { snd('menuBack'); toast(MODES[el.dataset.mode].lockedDesc || 'Bloqueado', 'info'); return; }
       if (el.dataset.mode === 'adventure') { snd('menuOk'); call('onMap'); show('map'); return; }
+      if (el.dataset.mode === 'phase') { snd('menuOk'); call('onPhases'); show('phases'); return; }
       lastMode = el.dataset.mode; snd('menuOk'); call('onPlay', lastMode); return;
     }
     const act = el.dataset.act;
@@ -470,7 +477,7 @@ export function createUI(root, handlers = {}) {
     if (current === 'over' && performance.now() - overShownAt < 600) return;
     snd('menuOk');
     switch (act) {
-      case 'play': call('onPlay', lastMode); break;
+      case 'play': call('onPlay', 'phase'); break;   // «Jugar» va a la siguiente fase
       case 'modes': show('modes'); break;
       case 'shop': call('onShopOpen'); show('shop'); break;
       case 'settings': show('settings'); break;
@@ -478,6 +485,7 @@ export function createUI(root, handlers = {}) {
       case 'restart': call('onRestart'); break;
       case 'next': call('onNext'); break;
       case 'checkpoint': call('onCheckpoint'); break;
+      case 'fresh': call('onFresh'); break;
       case 'menu': call('onMenu'); break;
       case 'calibrate': call('onCalibrate'); toast('Centro calibrado', 'info'); break;
       default: break;
@@ -489,8 +497,8 @@ export function createUI(root, handlers = {}) {
     const segBtn = e.target.closest('.seg button');
     if (segBtn) { setVal('quality', segBtn.dataset.q); snd('menuOk'); setFocus(segBtn.parentElement, false); return; }
     if (el && root.contains(el) && !el.closest('.slider')) { press(el); return; }
-    if (!el && current === 'title' && e.target.closest('.scr-title')) { snd('menuOk'); call('onPlay', lastMode); return; }
-    if (!el && current === 'over' && performance.now() - overShownAt > 600) { snd('menuOk'); call('onRestart'); }
+    if (!el && current === 'title' && e.target.closest('.scr-title')) { snd('menuOk'); call('onPlay', 'phase'); return; }
+    if (!el && current === 'over' && performance.now() - overShownAt > 600 && !(screens.over.dataset.mode === 'phase' && screens.over.classList.contains('has-next'))) { snd('menuOk'); call('onRestart'); }
   });
   root.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse' || e.button === 0) root.classList.remove('nav-kbd'); });
   root.addEventListener('pointerover', (e) => {
@@ -577,10 +585,10 @@ export function createUI(root, handlers = {}) {
   function paintRecords() {
     for (const k of MODE_KEYS) {
       const el = $(`[data-rec="${k}"]`);
-      el.textContent = records[k] > 0 ? `${fmtInt(records[k])} ${MODES[k].unit || 'm'}` : 'Sin récord';
+      el.textContent = records[k] > 0 ? `${fmtInt(records[k])} ${MODES[k].unit || 'm'}` : k === 'phase' ? 'Sin estrellas' : 'Sin récord';
       el.parentElement.classList.toggle('none', !(records[k] > 0));
     }
-    const lm = MODES[lastMode] ? lastMode : 'arcade', b = records[lm] || 0;
+    const lm = MODES[lastMode] ? lastMode : 'phase', b = records[lm] || 0;
     $('[data-bind="best"]').textContent = b > 0 ? `${fmtInt(b)} ${MODES[lm].unit || 'm'}` : '—';
   }
   function setRecords(r = {}) {
@@ -638,7 +646,8 @@ export function createUI(root, handlers = {}) {
     if (av) {
       const p = Math.round(av.p * 1000);
       if (p !== last.advP) { last.advP = p; hudEl.advP.style.width = (p / 10) + '%'; }
-      if (av.n !== last.advN) { last.advN = av.n; hudEl.advN.textContent = 'Tramo ' + av.n; }
+      const lbl = av.label || 'Tramo ' + av.n;
+      if (lbl !== last.advN) { last.advN = lbl; hudEl.advN.textContent = lbl; }
       const pw = av.power ? `${{ magnet: 'Imán', x2: '×2' }[av.power]} ${Math.ceil(av.powerT)}` : av.shield ? 'Escudo' : '';
       if (pw !== last.advPow) { last.advPow = pw; hudEl.advPow.textContent = pw; hudEl.advPow.classList.toggle('on', !!pw); }
     }
@@ -747,7 +756,10 @@ export function createUI(root, handlers = {}) {
     scr.classList.toggle('is-adv', !!adv);
     scr.classList.toggle('has-next', !!(adv && adv.hasNext));
     scr.classList.toggle('has-cp', !!(adv && adv.cp));
-    bind('adv').innerHTML = adv ? `<span class="oa-n">Tramo ${adv.n} · ${esc(adv.name)}</span><span class="oa-stars">${[0, 1, 2].map((i) => `<i class="st ${i < adv.stars ? 'on' : ''}" style="--d:${i}">★</i>`).join('')}</span>` : '';
+    scr.classList.toggle('has-fresh', !!(adv && adv.fresh));
+    bind('restartTxt').textContent = adv && adv.fresh ? 'Desde el control' : 'Otra vez';
+    bind('nextTxt').textContent = adv && adv.nextLabel ? adv.nextLabel : 'Siguiente';
+    bind('adv').innerHTML = adv ? `<span class="oa-n">${esc(adv.label || 'Tramo ' + adv.n)} · ${esc(adv.name)}</span><span class="oa-stars">${[0, 1, 2].map((i) => `<i class="st ${i < adv.stars ? 'on' : ''}" style="--d:${i}">★</i>`).join('')}</span>` : '';
     bind('facts').innerHTML = (r.facts && r.facts.lines ? r.facts.lines : []).map((t) => `<li>${esc(t)}</li>`).join('');
     // misiones cumplidas en esta partida (ya sustituidas en la lista por las nuevas)
     const done = Array.isArray(r.missionsDone) ? r.missionsDone : [];
@@ -757,8 +769,13 @@ export function createUI(root, handlers = {}) {
     if (adv) {
       const g = (ok, was, txt) => `<li class="${ok ? 'ok' : was ? 'was' : ''}"><i class="st ${ok || was ? 'on' : ''}">★</i><span>${txt}</span>${ok ? '<b>¡Hecho!</b>' : was ? '<small>ya la tenías</small>' : ''}</li>`;
       const b = adv.bits | 0, m = adv.merged | 0;
-      $('.oc-goals', scr).innerHTML = `<h3 class="oc-toptitle">Estrellas del tramo</h3><ul class="goals">${g(b & 1, m & 1, adv.cleared ? 'Superado' : `Supéralo (llegaste al ${Math.round(adv.prog * 100)} %)`)}${g(b & 2, m & 2, 'Sin chocar ni caer')}${g(b & 4, m & 4, `Monedas: ${adv.coins}/${adv.goal}`)}</ul><div class="miss-rank">Tiempo ${fmtTime(adv.time)}</div>`;
+      const ph = !!adv.label;   // fases: portal, sin chocar, monedas sin puntos de control
+      $('.oc-goals', scr).innerHTML = `<h3 class="oc-toptitle">Estrellas ${ph ? 'de la fase' : 'del tramo'}</h3><ul class="goals">${g(b & 1, m & 1, adv.cleared ? (ph ? 'Portal alcanzado' : 'Superado') : (ph ? 'Llega al portal' : `Supéralo (llegaste al ${Math.round(adv.prog * 100)} %)`))}${g(b & 2, m & 2, ph ? 'Sin chocar' : 'Sin chocar ni caer')}${g(b & 4, m & 4, (ph && !adv.cleared ? `Monedas: ${adv.coins} · meta: el 35 % del camino, sin controles` : `Monedas: ${adv.coins}/${adv.goal}${ph ? ' · sin controles' : ''}`))}</ul>${ph ? '' : `<div class="miss-rank">Tiempo ${fmtTime(adv.time)}</div>`}`;
     }
+    // superada la fase, el botón grande y el foco por defecto son «Siguiente»; «Otra vez» pasa a secundario
+    const nx = !!(adv && adv.label && adv.hasNext), rb = $('[data-act="restart"]', scr), nb = $('.btn-next', scr);
+    rb.classList.toggle('btn-primary', !nx); rb.classList.toggle('btn-sec', nx); rb.classList.toggle('btn-cream', nx);
+    rb.toggleAttribute('data-default', !nx); nb.toggleAttribute('data-default', nx);
     show('over');
     // se reinicia la animación de entrada
     restart($('.over-card', scr), 'enter');
@@ -766,19 +783,21 @@ export function createUI(root, handlers = {}) {
 
   // ----- mapa de la Aventura -----
   const starsHTML = (n) => [0, 1, 2].map((i) => `<i class="st ${i < n ? 'on' : ''}">★</i>`).join('');
-  function paintMap(list = []) {
+  // kind: 'map' (Aventura, data-stage) o 'phases' (Fases, data-phase)
+  function paintMap(list = [], kind = 'map') {
     const tot = list.reduce((a, s) => a + s.stars, 0);
-    $('[data-bind="mapTotal"]').innerHTML = `<b>${tot}</b>/${list.length * 3}`;
+    const attr = kind === 'phases' ? 'data-phase' : 'data-stage';
+    $(`[data-bind="${kind}Total"]`).innerHTML = `<b>${tot}</b>/${list.length * 3}`;
     const firstOpen = list.findIndex((s) => !s.locked && s.stars === 0);
-    $('[data-bind="map"]').innerHTML = list.map((s, i) => `
-      <button class="stage ${s.locked ? 'locked' : ''} ${s.boss ? 'boss' : ''} ${s.stars ? 'done' : ''}" data-nav data-stage="${i}" style="--i:${i}" ${i === (firstOpen < 0 ? 0 : firstOpen) ? 'data-default' : ''}>
+    $(`[data-bind="${kind}"]`).innerHTML = list.map((s, i) => `
+      <button class="stage ${s.locked ? 'locked' : ''} ${s.boss ? 'boss' : ''} ${s.stars ? 'done' : ''}" data-nav ${attr}="${i}" style="--i:${i}" ${i === (firstOpen < 0 ? 0 : firstOpen) ? 'data-default' : ''}>
         <span class="sg-gem" aria-hidden="true">${DECO.gem}</span>
         <span class="sg-n">${s.locked ? ICON.lock : `<i class="oc-spark l" aria-hidden="true">${DECO.spark}</i>${i + 1}<i class="oc-spark r" aria-hidden="true">${DECO.spark}</i>`}</span>
         <span class="sg-name">${esc(s.name)}</span>
         <span class="sg-stars">${starsHTML(s.stars)}</span>
         ${!s.stars && s.best > 0 ? `<span class="sg-best">${Math.round(s.best * 100)} %</span>` : ''}
       </button>`).join('');
-    if (current === 'map') { const d = $('[data-default]', screens.map); if (d) { focused = null; setFocus(d, false); } }
+    if (current === kind) { const d = $('[data-default]', screens[kind]); if (d) { focused = null; setFocus(d, false); } }
   }
 
   // ----- tienda -----
@@ -832,9 +851,10 @@ export function createUI(root, handlers = {}) {
 
   return {
     intro(d) {
-      hudEl.advIntro.innerHTML = `<div class="ai-n">${d.boss && !d.name.startsWith('Jefe') ? 'Jefe · ' : ''}Tramo ${d.n}</div><div class="ai-name">${esc(d.name)}</div>${d.tip ? `<div class="ai-tip">${esc(d.tip)}</div>` : ''}<ul class="ai-goals">${d.goals.map((g) => `<li><i class="st on">★</i>${esc(g)}</li>`).join('')}</ul>`;
+      hudEl.advIntro.classList.toggle('ph', !!d.label);
+      hudEl.advIntro.innerHTML = `<div class="ai-n">${d.boss && !d.name.startsWith('Jefe') ? 'Jefe · ' : ''}${esc(d.label || 'Tramo ' + d.n)}</div><div class="ai-name">${esc(d.name)}</div>${d.tip ? `<div class="ai-tip">${esc(d.tip)}</div>` : ''}<ul class="ai-goals">${d.goals.map((g) => `<li><i class="st on">★</i>${esc(g)}</li>`).join('')}</ul>`;
     },
-    show, hud, toast, over, settings, tiltMeter, records: setRecords, missions, shop: paintShop, map: paintMap,
+    show, hud, toast, over, settings, tiltMeter, records: setRecords, missions, shop: paintShop, map: paintMap, phases: (l) => paintMap(l, 'phases'),
     // modos bloqueados: { voyage: true } → tarjeta en gris con su descripción de desbloqueo
     locks(l = {}) { for (const k of MODE_KEYS) { const c = $(`.card-${k}`); if (!c) continue; c.classList.toggle('locked', !!l[k]); const d = $('.card-desc', c); if (d) d.textContent = l[k] && MODES[k].lockedDesc ? MODES[k].lockedDesc : MODES[k].desc; } },
     navigate, confirm, back,

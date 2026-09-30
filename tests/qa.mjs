@@ -857,6 +857,15 @@ if (!ONLY && !opt.built) {
   const vl = vb.stdout.split('\n').filter((l) => /^  [✓✗] /.test(l));
   rec(23, 'Vibración de la superficie (vibe.mjs)', vb.status === 0 && vl.length >= 30, { comprobaciones: vl.length, fallos: vl.filter((l) => l.includes('✗')).map((l) => l.slice(0, 200)).slice(0, 3) });
 }
+// Fases: bots (intentos, duración, control con regalo, fantasma determinista) y el flujo en el navegador (Jugar, mapa, control, portal)
+if (!ONLY && !opt.built) {
+  const fs_ = spawnSync(process.execPath, [new URL('./fases.mjs', import.meta.url).pathname, '20', '--rapido'], { encoding: 'utf8', timeout: 480000 });
+  const fl_ = fs_.stdout.split('\n').filter((l) => /^  [✓✗] /.test(l));
+  rec(25, 'Fases: intentos, duración, control y fantasma (fases.mjs)', fs_.status === 0 && fl_.length >= 25, { comprobaciones: fl_.length, fallos: fl_.filter((l) => l.includes('✗')).map((l) => l.slice(0, 200)).slice(0, 3) });
+  const ff = spawnSync(process.execPath, [new URL('./qa-fases.mjs', import.meta.url).pathname, `--url=${URL0}`], { encoding: 'utf8', timeout: 480000 });
+  const ffl = ff.stdout.split('\n').filter((l) => /^(PASA|FALLA)/.test(l));
+  rec(26, 'Fases en el navegador (qa-fases.mjs)', ff.status === 0 && ffl.length >= 22, { pasa: ffl.filter((l) => l.startsWith('PASA')).length, fallos: ffl.filter((l) => l.startsWith('FALLA')).map((l) => l.slice(0, 200)).slice(0, 3) });
+}
 writeFileSync(SHOTS + 'qa-report.json', JSON.stringify(results, null, 1));
 const fails = results.filter((r) => r.pass === false);
 console.log(`\n${results.filter((r) => r.pass === true).length} PASS · ${fails.length} FAIL`);
