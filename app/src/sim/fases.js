@@ -31,7 +31,7 @@ export class Fase extends Arcade {
     // las oleadas del Arcade van comprimidas (mundos en ~1 min): en una fase se alargan para que dure 60-90 s
     if (f.stretch) for (const w of this.waves) if (w.n > 0 && w.n < 1000) w.n = Math.max(6, Math.round(w.n * f.stretch));
     // ease: densidad de cajas de la fase respecto al Arcade (la primera es más suave)
-    if (f.ease) for (const w of this.waves) { w.a *= f.ease; w.a0 *= f.ease; }
+    if (f.ease) for (const w of this.waves) { w.a *= f.ease; w.a0 *= f.ease; w.a1 *= f.ease; }
     this.waveLeft = this.wave.n;
     if (f.wave > 0) { this.waveIdx = f.wave; this.wave = this.waves[f.wave]; this.waveLeft = this.wave.n; this.gap = 20; this.curves = this.wave.curves; }
     this.world = f.world; this.seenWorld = f.world; this.themeN = f.theme;

@@ -6,7 +6,7 @@ Juego de runner en túnel, en primera persona, con **la jugabilidad exacta de Bo
 te pasará capturas y opiniones. Si queda muy pulido, quiere sacarlo para **Android** y como
 homebrew para su **Switch**: la arquitectura tiene que seguir siendo portable.
 
-Estado actual: versión 0.60 (modos Arcade —el de «Jugar», con piruetas en el salto entre mundos y muro de cartón—, Clásico = Boost 2 exacto, Aventura, Reto diario, Viaje, Supervivencia y Contrarreloj; misiones, tienda; el zorro solo fuera de la primera persona: arranque, muerte, título; menús con piezas pintadas de ChatGPT en `app/src/assets/ui/`, recortadas con `tools/ui/recortar.mjs`; maquetas en `referencias/estilo-visual/maquetas-ui/`). La v0.32 está en `legacy/`.
+Estado actual: versión 0.70 (inmersión: sonido lateral, acústica del tubo, música que reacciona, cámara con peso, luz de ojo, superficies con agarre, mundo vivo, vibración por suceso; fases 1-2, fantasma, roce, reto para expertos, arranque amable; ajuste «Efectos de ambiente»; carriles de trabajo en paralelo con noche/turno.sh y noche/sprints.sh; modos Arcade —el de «Jugar», con piruetas en el salto entre mundos y muro de cartón—, Clásico = Boost 2 exacto, Aventura, Reto diario, Viaje, Supervivencia y Contrarreloj; misiones, tienda; el zorro solo fuera de la primera persona: arranque, muerte, título; menús con piezas pintadas de ChatGPT en `app/src/assets/ui/`, recortadas con `tools/ui/recortar.mjs`; maquetas en `referencias/estilo-visual/maquetas-ui/`). La v0.32 está en `legacy/`.
 
 Publicado en https://eyrawolf7.github.io/hipertunel/ (repo `eyrawolf7/hipertunel`, cuenta
 personal de Víctor, **no** la del trabajo). GitHub Pages sirve el `index.html` de la raíz, que es
