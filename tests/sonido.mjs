@@ -11,6 +11,51 @@ const b = await puppeteer.launch({ headless: 'new' });
 const p = await b.newPage();
 await p.goto((process.env.HIP_URL || 'http://localhost:5173/') + 'src/audio/demo.html', { waitUntil: 'networkidle0' });
 if (process.env.SIN_MUSICA) await p.evaluate(() => { window.__noMusic = true; });
+if (process.argv.includes('--capas')) {
+  // tras el salto entre mundos: compás en silencio y la música crece por escalones (un compás por capa)
+  const r = await p.evaluate(async () => {
+    const { createAudio } = await import('/src/audio/index.js');
+    const sr = 44100, bpmWorld = 2, nBars = 8;
+    const out = {};
+    for (const [name, entry] of [['entrada', true], ['sin salto', false], ['reinicio desde tránsito', null]]) {
+      const ctx = new OfflineAudioContext(1, sr * 40, sr);
+      const a = createAudio({ context: ctx });
+      a.unlock(); a.setMusic(true); a.setWorld(entry === false ? bpmWorld : bpmWorld - 1); a.setSpeed(0, 3);
+      if (entry) a.setWorld(bpmWorld);
+      if (entry === null) a.setWorld(bpmWorld, { restart: true }); // reintento en el mundo 2 desde el tránsito: no es un salto, suena entero
+      const bar = a._barDur;
+      a._scheduleUntil(bar * (nBars + 1));
+      const ch = (await ctx.startRendering()).getChannelData(0);
+      const rms = [], agudos = [];
+      for (let b = 0; b < nBars; b++) {
+        let q = 0, d = 0; const i0 = Math.max(1, Math.floor(b * bar * sr)), i1 = Math.floor((b + 1) * bar * sr);
+        for (let i = i0; i < i1; i++) { q += ch[i] * ch[i]; const x = ch[i] - ch[i - 1]; d += x * x; }
+        rms.push(Math.sqrt(q / (i1 - i0))); agudos.push(Math.sqrt(d / (i1 - i0)));
+      }
+      out[name] = { bar, rms, agudos };
+    }
+    return out;
+  });
+  await b.close();
+  const e = r.entrada.rms, s = r['sin salto'].rms;
+  console.log('compás', r.entrada.bar.toFixed(2), 's · RMS por compás (entrada):', e.map((v) => v.toFixed(4)).join(' '));
+  console.log('RMS por compás (sin salto):', s.map((v) => v.toFixed(4)).join(' '));
+  const fails = [];
+  // el compás 0 lleva solo el resto del barrido de la transición (sin música)
+  if (e[0] > 0.3 * e[4]) fails.push('el primer compás no es casi silencio');
+  const g = r.entrada.agudos;
+  console.log('agudos por compás (entrada):', g.map((v) => v.toFixed(4)).join(' '));
+  // el compresor de master aplana el RMS total: bajo (1) y bombo (2) se ven en el RMS, caja/hats/arpegio (3) y melodía (4) en los agudos
+  for (let i = 1; i <= 2; i++) if (!(e[i] > e[i - 1] * 1.1)) fails.push(`el compás ${i} no crece sobre el anterior`);
+  for (let i = 3; i <= 4; i++) if (!(g[i] > g[i - 1] * 1.1)) fails.push(`los agudos del compás ${i} no crecen sobre el anterior`);
+  if (!(e[4] > e[3] * 0.9)) fails.push('la melodía no mantiene la energía');
+  if (!(s[0] > e[0] * 3)) fails.push('sin salto el primer compás debería sonar');
+  if (!(r['reinicio desde tránsito'].rms[0] > e[0] * 3)) fails.push('reiniciar desde el tránsito deja el primer compás en silencio');
+  const tail =Math.abs(e[7] - s[7]) / s[7];
+  if (tail > 0.25) fails.push(`pasados 5 compases la energía difiere ${(tail * 100).toFixed(0)} % del arranque normal`);
+  console.log(fails.length ? 'FALLA: ' + fails.join('; ') : 'OK: entrada por capas');
+  process.exit(fails.length ? 1 : 0);
+}
 const zorro = !!process.env.ZORRO;
 if (zorro) await p.evaluate(() => { window.__zorro = true; });
 if (process.argv.includes('--espacio')) {

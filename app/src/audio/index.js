@@ -59,6 +59,9 @@ const WORLDS = [
 const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
 const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 
+// entrada de un mundo nuevo: 5 compases (16 pasos) → 0 silencio, 1 bajo+acordes, 2 bombo, 3 caja+hats+arpegio, 4 melodía
+const ENTRY_STEPS = 80;
+
 function degToSemi(scale, d) {
   const o = Math.floor(d / 7);
   return scale[((d % 7) + 7) % 7] + 12 * o;
@@ -83,7 +86,7 @@ export function createAudio(options = {}) {
     muted: false, music: true, world: 0, paused: false,
     ms: 0, level: 0, lastSpeedT: -1, outside: false,
     hover: false, hoverSpeed: 0, lastHoverT: -1,
-    step: 0, nextTime: 0, transitionT: -10,
+    step: 0, nextTime: 0, transitionT: -10, entrySteps: ENTRY_STEPS,
   };
   let ctx = null, nodes = null, timer = null;
   const offline = !!options.context;
@@ -310,9 +313,11 @@ export function createAudio(options = {}) {
     const phrase = w.order[chordSlot];
     const cdeg = CHORD_DEG[phrase];
     const bright = [0.5, 0.65, 0.82, 1][lvl] || 0.5;
+    const es = state.entrySteps, ent = Math.floor(es / 16); // capas ya entradas (5 = todas)
+    if (ent < 1) return; // primer compás: solo la turbina
 
     // batería
-    if (trans) {
+    if (ent < 2) { /* aún sin batería */ } else if (trans) {
       // redoble que acelera durante la transición
       const el = ctx.currentTime - state.transitionT;
       if (inBar % 4 === 0) kick(t, 0.8);
@@ -320,9 +325,9 @@ export function createAudio(options = {}) {
       if (s % every === 0) snare(t, 0.35 + Math.min(0.5, el * 0.2));
     } else {
       if (w.kick.includes(inBar)) kick(t);
-      if (inBar === 4 || inBar === 12) snare(t);
-      if (bar % 8 === 7 && lvl >= 1 && (inBar === 13 || inBar === 14 || inBar === 15)) snare(t, 0.6);
-      if (lvl >= 1) {
+      if ((inBar === 4 || inBar === 12) && ent >= 3) snare(t);
+      if (bar % 8 === 7 && lvl >= 1 && ent >= 3 && (inBar === 13 || inBar === 14 || inBar === 15)) snare(t, 0.6);
+      if (lvl >= 1 && ent >= 3) {
         if (inBar % 4 === 2) hat(t, lvl >= 3, 1);
         else if (lvl >= 2 && inBar % 2 === 1) hat(t, false, 0.55);
         else if (lvl >= 2 && inBar % 4 === 0) hat(t, false, 0.4);
@@ -339,17 +344,17 @@ export function createAudio(options = {}) {
     }
 
     // colchón de acordes: cada 2 compases, dos voces desafinadas
-    if (s % 32 === 0) {
+    if (s % 32 === 0 || es === 16) {
       for (const k of [0, 2, 4]) {
         const m = w.root - 12 + degToSemi(sc, cdeg + k);
-        const len = sd * 31;
+        const len = sd * (31 - s % 32);
         note('sawtooth', mtof(m), t, len, 0.028, nodes.music, { a: 0.25, sus: 0.8, rel: 0.4, cutoff: 700 + 1200 * bright, detune: -7 });
         note('triangle', mtof(m), t, len, 0.04, nodes.music, { a: 0.25, sus: 0.8, rel: 0.4, detune: 7 });
       }
     }
 
     // arpegio (nivel 1+)
-    if (lvl >= 1 && !trans) {
+    if (lvl >= 1 && !trans && ent >= 3) {
       const seq = [0, 2, 4, 7, 4, 2, 4, 7];
       const d = cdeg + seq[s % 8] + (Math.floor(s / 8) % 2 ? 7 : 0);
       const m = w.root + degToSemi(sc, d);
@@ -360,7 +365,7 @@ export function createAudio(options = {}) {
 
     // melodía (nivel 2+)
     const ev = PHRASE_MAP[phrase][s % 32];
-    if (ev && lvl >= 2 && !trans) {
+    if (ev && lvl >= 2 && !trans && ent >= 4) {
       const [d, l] = ev;
       const m = w.root + degToSemi(sc, d);
       const len = l * sd * 0.92;
@@ -385,6 +390,7 @@ export function createAudio(options = {}) {
     if (!ctx || !nodes) return;
     while (state.nextTime < until) {
       scheduleStep(state.step, state.nextTime);
+      if (state.entrySteps < ENTRY_STEPS) state.entrySteps++;
       state.step = (state.step + 1) % 128;
       state.nextTime += stepDur();
     }
@@ -634,17 +640,21 @@ export function createAudio(options = {}) {
       nodes.musicGain.gain.setTargetAtTime(state.music ? MUSIC_VOLUME : 0, ctx.currentTime, 0.1);
       if (state.music && !was) state.nextTime = ctx.currentTime + 0.05;
     }),
-    setWorld: safe(function (i) {
+    setWorld: safe(function (i, opts) {
       i = clamp(Math.round(+i || 0), 0, 6);
+      if (opts && opts.restart) state.entrySteps = ENTRY_STEPS; // partida nueva: la música suena entera
       if (i === state.world) return;
-      const prevBpm = W().bpm;
+      const prevBpm = W().bpm, prevWorld = state.world;
       state.world = i;
+      state.entrySteps = ENTRY_STEPS;
       if (i % 2 === 1 && ctx) state.transitionT = ctx.currentTime;
       if (!ctx) return;
       if (W().bpm !== prevBpm) applyWorldTiming();
       setMusicFilterForWorld();
       // entrando en un mundo nuevo: la canción arranca desde el gancho, en el siguiente tiempo
       if (i % 2 === 0) state.step = 0;
+      // tras el salto entre mundos la melodía entra por capas (un compás en silencio, luego una por compás)
+      if (i === prevWorld + 1 && prevWorld % 2 === 1 && !(opts && opts.restart)) state.entrySteps = 0;
     }),
     setSpeed: safe(function (ms, level) {
       state.ms = +ms || 0;
@@ -703,6 +713,7 @@ export function createAudio(options = {}) {
     // solo para pruebas: programar la música hasta t (OfflineAudioContext)
     _scheduleUntil: safe(function (t) { if (init()) scheduleUntil(t); }),
     get _ctx() { return ctx; },
+    get _barDur() { return stepDur() * 16; },
   };
   return api;
 }

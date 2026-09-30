@@ -200,7 +200,7 @@ function startGame(m, quick = false, fromCp = false) {
   // desde el menú (no en el reintento rápido): se ve al zorro y la cámara entra en su cabeza
   if (!quick && m !== 'zorro' && !settings.reduceFx) renderer.startIntro();
   ui.show('hud');
-  audio.setWorld(worldBase * 2);
+  audio.setWorld(worldBase * 2, { restart: true });
   audio.play('countdown');
   let seen = 0; try { seen = +(localStorage.getItem('hipertunel-partidas') || 0); localStorage.setItem('hipertunel-partidas', String(seen + 1)); } catch (e) {}
   if (m === 'zorro') setTimeout(() => ui.toast(input.hasTilt ? 'Toca la pantalla para saltar por encima de las cajas' : COARSE ? 'Desliza hacia arriba para saltar' : 'Salta con Espacio o ↑', 'mission'), 300);
