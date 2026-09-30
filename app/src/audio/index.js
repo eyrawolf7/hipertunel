@@ -6,6 +6,7 @@
 //   delay (eco de lead/arpegio) ───────────────────────────────────────┤
 //   turbina ─► engineGain ─────────────────────────────────────────────┼─► master ─► compresor ─► limitador suave ─► salida
 //   efectos ─► sfxGain ────────────────────────────────────────────────┘
+//   música y efectos ─► bancos de peines dentro/fuera (setSpace) y viento ─► master
 
 export const MASTER_VOLUME = 0.8;
 const MUSIC_VOLUME = 0.5;
@@ -68,7 +69,7 @@ function createNoop() {
   const st = { muted: false };
   return {
     unlock() {}, setMuted(b) { st.muted = !!b; }, get muted() { return st.muted; },
-    setMusic() {}, setWorld() {}, setSpeed() {}, setHover() {}, play() {}, pause() {},
+    setMusic() {}, setWorld() {}, setSpeed() {}, setHover() {}, setSpace() {}, play() {}, pause() {},
     get available() { return false; },
   };
 }
@@ -80,7 +81,7 @@ export function createAudio(options = {}) {
 
   const state = {
     muted: false, music: true, world: 0, paused: false,
-    ms: 0, level: 0, lastSpeedT: -1,
+    ms: 0, level: 0, lastSpeedT: -1, outside: false,
     hover: false, hoverSpeed: 0, lastHoverT: -1,
     step: 0, nextTime: 0, transitionT: -10,
   };
@@ -131,6 +132,41 @@ export function createAudio(options = {}) {
     const d = n.noise.getChannelData(0);
     let seed = 12345;
     for (let i = 0; i < len; i++) { seed = (seed * 1103515245 + 12345) & 0x7fffffff; d[i] = (seed / 0x3fffffff) - 1; }
+
+    // ---------- acústica: dos bancos de peines (sin convolución) sobre música y efectos.
+    // Dentro del tubo: eco metálico corto y denso. Fuera: pocos ecos lejanos y suaves + viento.
+    // Todo pasa por un paso alto (los graves no se tocan) y va a master, no a la turbina.
+    if (!options.noSpace) {
+      const bank = (delays, fb, hp, lp) => {
+        const inG = ctx.createGain(), out = ctx.createGain(); out.gain.value = 0;
+        const hpF = ctx.createBiquadFilter(); hpF.type = 'highpass'; hpF.frequency.value = hp;
+        inG.connect(hpF);
+        for (const dt of delays) {
+          const d = ctx.createDelay(0.5); d.delayTime.value = dt;
+          const f = ctx.createGain(); f.gain.value = fb;
+          const l = ctx.createBiquadFilter(); l.type = 'lowpass'; l.frequency.value = lp;
+          hpF.connect(d); d.connect(l); l.connect(f); f.connect(d); l.connect(out);
+        }
+        out.connect(n.master);
+        return { inG, out };
+      };
+      n.spIn = ctx.createGain(); n.spIn.gain.value = 0.24;
+      n.spInside = bank([0.017, 0.023, 0.031], 0.62, 350, 3600);
+      n.spOutside = bank([0.09, 0.15], 0.2, 200, 2200);
+      n.spInside.out.gain.value = 1;
+      n.spIn.connect(n.spInside.inG); n.spIn.connect(n.spOutside.inG);
+      n.musicFilter.connect(n.spIn); n.sfx.connect(n.spIn);
+      // viento por fuera: ruido paso banda muy bajo que solo suena fuera
+      n.wind = ctx.createGain(); n.wind.gain.value = 0; n.wind.connect(n.master);
+      n.wSrc = ctx.createBufferSource(); n.wSrc.buffer = n.noise; n.wSrc.loop = true;
+      n.wHP = ctx.createBiquadFilter(); n.wHP.type = 'highpass'; n.wHP.frequency.value = 220;
+      n.wBP = ctx.createBiquadFilter(); n.wBP.type = 'bandpass'; n.wBP.frequency.value = 650; n.wBP.Q.value = 0.5;
+      n.wLfo = ctx.createOscillator(); n.wLfo.frequency.value = 0.22;
+      n.wLfoG = ctx.createGain(); n.wLfoG.gain.value = 180;
+      n.wLfo.connect(n.wLfoG); n.wLfoG.connect(n.wBP.frequency);
+      n.wSrc.connect(n.wHP); n.wHP.connect(n.wBP); n.wBP.connect(n.wind);
+      n.wSrc.start(0, 0.7); n.wLfo.start();
+    }
 
     // onda de pulso al 25 %
     const H = 24, re = new Float32Array(H), im = new Float32Array(H);
@@ -645,6 +681,23 @@ export function createAudio(options = {}) {
       if (!toggled && now - state.lastHoverT < 0.033 && state.lastHoverT >= 0) return;
       state.lastHoverT = now;
       updateHover(now, toggled);
+    }),
+    // dentro (false) o fuera (true) del tubo: cambia el eco y el viento. Llamable cada fotograma.
+    setSpace: safe(function (outside) {
+      outside = !!outside;
+      if (outside === state.outside || !ctx || !nodes || !nodes.spInside) return;
+      state.outside = outside;
+      const now = ctx.currentTime;
+      const to = (g, v, tc) => { g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.setTargetAtTime(v, now, tc); };
+      to(nodes.spInside.out.gain, outside ? 0 : 1, outside ? 0.05 : 0.12);
+      to(nodes.spOutside.out.gain, outside ? 0.4 : 0, outside ? 0.25 : 0.08);
+      to(nodes.spIn.gain, outside ? 0.16 : 0.24, 0.2);
+      to(nodes.wind.gain, outside ? 0.018 : 0, outside ? 0.5 : 0.15);
+      // «whoomp» de presión al salir: seno breve y ruido grave-medio (todo por encima de 100 Hz)
+      if (outside && !state.muted && !state.paused) {
+        sweep('sine', 260, 120, now + 0.005, 0.28, 0.07, nodes.sfx, 0.02);
+        noiseHit(now + 0.005, 0.35, 0.05, nodes.sfx, 'bandpass', 500, 250, 0.8, 0.03);
+      }
     }),
     get available() { return true; },
     // solo para pruebas: programar la música hasta t (OfflineAudioContext)

@@ -507,6 +507,7 @@ function frame(now) {
   renderer.update(game, s, theta, dt, { reduceFx: settings.reduceFx, intro: state === 'countdown' && countdown > 0.6 ? Math.min(1, (countdown - 0.6) / 2.4) : 0, mascot: state === 'attract' && (ui.screen === 'title' || ui.screen === 'shop') });
   renderer.render();
   audio.setSpeed(game.speedMS, game.level);
+  if (state !== 'paused' && state !== 'countdown') audio.setSpace?.(!!renderer.outside && (state === 'play' || state === 'dying') && game.alive);   // en pausa se conserva: al reanudar no hay «whoomp» falso
   audio.setHover?.(!!game.hero && (state === 'play' || state === 'countdown') && game.alive, Math.min(1, game.speedMS / 100));
   if (state === 'play' || state === 'countdown' || state === 'dying') {
     ui.hud({ jumps: game.hero ? { n: game.charges, part: game.charges < 2 ? game.coinAcc / 10 : 0, free: game.boostOn } : null, mult: game.variant === 'arcade' ? mult : 0, points: game.variant === 'arcade' ? Math.round(points + game.coinsGot * 10) : 0, adv: game.mode === 'adventure' ? { p: game.progress, power: game.power, powerT: game.powerT, shield: game.shield, n: advStage + 1 } : null, padDir: state === 'play' ? padDirection() : 0, distM: game.distanceM, speedMS: state === 'countdown' && game.frame === 0 ? 0 : game.speedMS, level: game.level, coins: game.coinsGot, timeLeft: mode === 'timetrial' ? game.timeLeft : null, mode, invul: game.invul > 0, best: bestAtStart[mode] || 0, countdown: state === 'countdown' ? Math.ceil(countdown) : 0 });
