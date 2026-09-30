@@ -37,6 +37,8 @@ static double js_sign(double x) { return x > 0 ? 1 : x < 0 ? -1 : x; }
 #define ARC_COMPRESS 0.4
 #define ARC_GAP_ROWS 6
 #define ARC_CAMP_ROWS 22
+#define ARC_EARLY_T 25
+#define ARC_EARLY_SKIP 2
 #define ARC_WALL_LEAD 5
 #define ARC_WALL_MAX_BOXES 18
 #define ARC_WALL_MAX_FIRST 24
@@ -322,6 +324,8 @@ static void spawn_new_boxes(Game *g, int k) {
       for (i = 0; i < g->nGaps; i++) if (g->gaps[i].to + 40 > k) nearGap = 1;
       if (!nearGap) { g->wallWorld = g->world; g->wallLead = ARC_WALL_LEAD; event(g, EV_WALL_SOON, NULL); return; }
     }
+    /* arranque amable: una fila de cada ARC_EARLY_SKIP queda libre (sin tocar una barra en curso) */
+    if (g->time < ARC_EARLY_T && !g->hasColl && k % ARC_EARLY_SKIP == 0) return;
   }
   if (--g->gap >= 1) return;
   g->gap = 0;
@@ -368,7 +372,10 @@ static int pick_location(Game *g) {           /* BoxManager::pickRandomLocation 
   return l;
 }
 
-static double pick_height(Game *g) { return rng_prob(&g->rng, g->wave->c) ? R_UNITS : SHORT_H; }
+static double pick_height(Game *g) {
+  double h = rng_prob(&g->rng, g->wave->c) ? R_UNITS : SHORT_H;
+  return g->arcade && g->time < ARC_EARLY_T ? SHORT_H : h;   /* arranque amable: sin cajas altas */
+}
 static int pick_color(Game *g) { return rng_int(&g->rng, 0, 1000) % 10; }
 
 static void start_collection(Game *g) {

@@ -121,17 +121,18 @@ console.log('Zorro (salto)');
   const { Zorro, JUMP_T } = await import('../app/src/sim/zorro.js');
   // quieto en el carril 0 y saltando justo antes de cada caja corta de ese carril: no debe chocar con ellas
   const g = new Zorro({ seed: 11 });
-  let jumped = 0, hitShort = 0, hitTall = 0;
+  let jumped = 0, hitShort = 0, hitTall = 0, lastTarget = -1e9;   // lastTarget: fila de la última caja saltada
   const lane0 = (b) => !b.hit && b.lane === 0;
-  for (let i = 0; i < 60 * 40 && g.alive; i++) {
+  for (let i = 0; i < 60 * 90 && g.alive; i++) {
     const cur = g.s;
     const next = g.boxes.filter(lane0).map((b) => b.k - cur).filter((d) => d > 0).sort((a, b) => a - b)[0];
     // salta cuando la caja está a media duración de salto (en filas)
     const rowsHalf = (g.v / 13.176) * 60 * JUMP_T * 0.5;
     const jump = next !== undefined && next < rowsHalf + 0.3 && next > rowsHalf - 0.6 && !g.inAir;
     const vBefore = g.v;
+    if (jump) lastTarget = cur + next;
     const ev = g.step({ steer: 0, jump });
-    for (const e of ev) { if (e.type === 'jump') jumped++; if (e.type === 'crash') { const b = g.boxes.find((x) => x.id === e.id); if (b && b.tall) hitTall++; else if (b && !b.joined && vBefore > 2.5) hitShort++; } }
+    for (const e of ev) { if (e.type === 'jump') jumped++; if (e.type === 'crash') { const b = g.boxes.find((x) => x.id === e.id); if (b && b.tall) hitTall++; else if (b && !b.joined && vBefore > 2.5 && (b.k - lastTarget < 0.5 || b.k - lastTarget > 2.2 * rowsHalf)) hitShort++; } }   // dos cajas más juntas que un salto (2,2 × media) no se pueden saltar las dos
     g.invul = 0; g.boostOn = true; g.level = 1; g.alive = true;   // los pilares no acaban la prueba
   }
   ok(jumped > 5, `salta (${jumped} saltos)`);
