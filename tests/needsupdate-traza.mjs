@@ -1,0 +1,20 @@
+import puppeteer from 'puppeteer';
+const BASE = process.env.HIP_URL;
+const browser = await puppeteer.launch({ headless: 'new', args: ['--use-angle=metal'] });
+const page = await browser.newPage();
+await page.setViewport({ width: 844, height: 390, deviceScaleFactor: 2, isMobile: true, hasTouch: true, isLandscape: true });
+await page.goto(BASE + '?q=media', { waitUntil: 'networkidle0' });
+await page.waitForFunction(() => window.__hip && window.__hip.game);
+await new Promise((r) => setTimeout(r, 1000));
+const out = await page.evaluate(() => new Promise((res) => {
+  const h = window.__hip, r = h.renderer; h.start('arcade', 7);
+  let P = Object.getPrototypeOf(r.life.mat); while (P && !Object.getOwnPropertyDescriptor(P, 'needsUpdate')) P = Object.getPrototypeOf(P);
+  const d = Object.getOwnPropertyDescriptor(P, 'needsUpdate'); const cnt = {};
+  Object.defineProperty(P, 'needsUpdate', { set(v) { const s = new Error().stack.split('\n').slice(2, 4).map((x) => x.trim().replace(/\?t=\d+/, '').replace(/^.*\/src\//, '')).join(' < '); cnt[s] = (cnt[s] || 0) + 1; d.set.call(this, v); }, configurable: true });
+  const A = (p) => { let D; while (p && !(D = Object.getOwnPropertyDescriptor(p, 'alphaTest'))) p = Object.getPrototypeOf(p); return [p, D]; };
+  const [AP, AD] = A(Object.getPrototypeOf(r.life.mat));
+  if (AD && AD.set) Object.defineProperty(AP, 'alphaTest', { get: AD.get, set(v) { const s = 'alphaTest ' + new Error().stack.split('\n')[2].trim().replace(/^.*\/src\//, ''); cnt[s] = (cnt[s] || 0) + 1; AD.set.call(this, v); }, configurable: true });
+  setTimeout(() => res(cnt), 5000);
+}));
+for (const [k, v] of Object.entries(out).sort((a, b) => b[1] - a[1]).slice(0, 12)) console.log(v, k);
+await browser.close();
