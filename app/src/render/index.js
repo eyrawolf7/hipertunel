@@ -29,10 +29,10 @@ const DEG = Math.PI / 180;
 const INV_FOG = new THREE.Color(0x0b0822);
 const BOOST_BLUE = new THREE.Color(0x3fb6ff).multiplyScalar(2);
 const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, uBlur: { value: 0 }, uFlash: { value: new THREE.Vector4(1, 1, 1, 0) }, uVig: { value: 0.1 }, uCA: { value: 0.0 }, uVigCol: { value: new THREE.Color(0x2b2257) }, uTime: { value: 0 }, uSat: { value: 1.14 }, uCon: { value: 1.12 }, uLo: { value: new THREE.Color(0.95, 0.98, 1.07) }, uHi: { value: new THREE.Color(1.05, 1.0, 0.93) } },
+  uniforms: { tDiffuse: { value: null }, uBlur: { value: 0 }, uFlash: { value: new THREE.Vector4(1, 1, 1, 0) }, uVig: { value: 0.1 }, uCA: { value: 0.0 }, uVigCol: { value: new THREE.Color(0x2b2257) }, uTime: { value: 0 }, uSat: { value: 1.14 }, uExp: { value: 1 }, uWake: { value: new THREE.Vector2(0, 0) }, uCon: { value: 1.12 }, uLo: { value: new THREE.Color(0.95, 0.98, 1.07) }, uHi: { value: new THREE.Color(1.05, 1.0, 0.93) } },
   vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragmentShader: /* glsl */`
-    uniform sampler2D tDiffuse; uniform float uBlur; uniform vec4 uFlash; uniform float uVig; uniform float uCA; uniform float uTime; uniform float uSat; uniform vec3 uVigCol; uniform float uCon; uniform vec3 uLo; uniform vec3 uHi;
+    uniform sampler2D tDiffuse; uniform float uBlur; uniform vec4 uFlash; uniform float uVig; uniform float uCA; uniform float uTime; uniform float uSat; uniform float uExp; uniform vec2 uWake; uniform vec3 uVigCol; uniform float uCon; uniform vec3 uLo; uniform vec3 uHi;
     varying vec2 vUv;
     void main(){
       vec2 c = vec2(0.5, 0.52); vec2 d = vUv - c; float r = length(d);
@@ -43,6 +43,10 @@ const GradeShader = {
         vec2 uv = vUv - d * amt * t;
         acc += vec3(texture2D(tDiffuse, uv + d * uCA).r, texture2D(tDiffuse, uv).g, texture2D(tDiffuse, uv - d * uCA).b) * w; tot += w; }
       vec3 col = acc / tot;
+      // luz de ojo al salir/entrar del tubo: exposición global y, al entrar, los paneles se encienden de los bordes (cerca) al centro (lejos)
+      float wk = 1.0;
+      if (uWake.x > 0.0) { float n = clamp(r / 0.7, 0.0, 1.0); wk = 1.0 - uWake.x * mix(0.4, 1.0, n) * (1.0 - smoothstep(1.0 - uWake.y, 1.3 - uWake.y, n)); }  // en el centro el dip es de un 40 %: se lee
+      col *= uExp * wk;
       float l = dot(col, vec3(0.2126, 0.7152, 0.0722)); col = mix(vec3(l), col, uSat);
       col = max(vec3(0.0), (col - 0.18) * uCon + 0.18);                 // contraste alrededor del gris medio (lineal)
       // virado partido: sombras hacia el frío, luces hacia el cálido (luz de tarde estilizada)
@@ -281,7 +285,7 @@ export class Renderer {
     return null;
   }
 
-  update(game, s, theta, dt, { reduceFx = false, intro = 0, mascot = false } = {}) {
+  update(game, s, theta, dt, { reduceFx = false, intro = 0, mascot = false, calm = false } = {}) {
     this.time += dt;
     const tr = this.track;
     tr.sync(game);
@@ -421,6 +425,17 @@ export class Renderer {
     styleUniforms.uSunDirV.value.copy(this.tunnel.uniforms.uKey.value).transformDirection(cam.matrixWorldInverse);
     const gapNear = game.gaps.some((g) => g.from - s < 34 && g.to - s > -6);
     const outside = game.fold < 29 || gapNear;
+    // luz de ojo: al salir la imagen se sobreexpone y se adapta en ~0,4 s; al entrar se oscurece un
+    // poco y los paneles se van encendiendo de los bordes (cerca) al centro (lejos) en ~0,65 s. Es
+    // posproceso (la niebla es blanca en los mundos claros y lavaba las cajas): el dip es suave
+    if (this.eyeOut === undefined || game.frame < 2 || mascot || calm) { this.eyeOut = outside; this.eyeT = 9; }
+    else if (outside !== this.eyeOut) { this.eyeOut = outside; this.eyeT = 0; }
+    this.eyeT += dt;
+    const eyeK = reduceFx ? 0.4 : 1;
+    let eyeExp = 1, eyeDip = 0, eyeWake = 1.3;
+    if (this.eyeOut) eyeExp = 1 + 0.28 * eyeK * Math.max(0, (Math.exp(-this.eyeT / 0.14) - 0.05) / 0.95);
+    else if (this.eyeT < 0.65) { eyeDip = 0.2 * eyeK; eyeWake = 1.3 * this.eyeT / 0.65; }
+    this.eyeExp = eyeExp; this.eyeDip = eyeDip; this.eyeWake = eyeWake;
     const fogFar = (outside ? 190 : 120) * (1 + 0.3 * (this.landT > 0 ? this.landT / 1.5 : 0));
     if (this.landT > 0) this.landT -= dt;
     this.tunnel.uniforms.uFogFar.value += (fogFar - this.tunnel.uniforms.uFogFar.value) * Math.min(1, dt * 2);
@@ -476,6 +491,7 @@ export class Renderer {
       else if (c.vigT > 0) { g.uVigCol.value.copy(c.vigCol).multiplyScalar(1.6); g.uVig.value = 0.5; c.vigT -= dt; }
       else g.uVig.value = 0.1;
       g.uTime.value = this.time;
+      g.uExp.value = this.eyeExp; g.uWake.value.set(this.eyeDip, this.eyeWake);
       g.uFlash.value.set(c.flashCol.r, c.flashCol.g, c.flashCol.b, c.flash * (reduceFx ? 0.4 : 1));
     }
     c.flash = Math.max(0, c.flash - dt * 2.5);

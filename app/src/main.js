@@ -496,7 +496,7 @@ function frame(now) {
   let dth = game.theta - prev.theta;
   if (dth > Math.PI) dth -= Math.PI * 2; else if (dth < -Math.PI) dth += Math.PI * 2;
   const theta = prev.theta + dth * a;
-  renderer.update(game, s, theta, dt, { reduceFx: settings.reduceFx, intro: state === 'countdown' && countdown > 0.6 ? Math.min(1, (countdown - 0.6) / 2.4) : 0, mascot: state === 'attract' && (ui.screen === 'title' || ui.screen === 'shop') });
+  renderer.update(game, s, theta, dt, { reduceFx: settings.reduceFx, intro: state === 'countdown' && countdown > 0.6 ? Math.min(1, (countdown - 0.6) / 2.4) : 0, mascot: state === 'attract' && (ui.screen === 'title' || ui.screen === 'shop'), calm: state === 'attract' });
   renderer.render();
   audio.setSpeed(game.speedMS, game.level);
   audio.setHover?.(!!game.hero && (state === 'play' || state === 'countdown') && game.alive, Math.min(1, game.speedMS / 100));
