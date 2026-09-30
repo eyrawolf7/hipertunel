@@ -532,10 +532,19 @@ export function createAudio(options = {}) {
       noiseHit(t, 0.12, 0.3, nodes.sfx, 'bandpass', 700, 2200, 1.1, 0.03);
       sweep('sine', 260, 150, t, 0.1, 0.06, nodes.sfx, 0.02);
     },
-    nearMiss(t) {
+    // caja que pasa a 1-2 carriles: «fsss» corto paneado hacia su lado (o.pan -1..1, o.near 0..1)
+    pass(t, o = {}) {
+      const near = clamp(o.near ?? 0.5, 0, 1), side = o.pan < 0 ? -1 : 1;
       const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
       let dest = nodes.sfx;
-      if (p) { p.pan.value = Math.random() < 0.5 ? -0.6 : 0.6; p.connect(nodes.sfx); dest = p; }
+      if (p) { p.pan.value = side * (0.35 + 0.45 * near); p.connect(nodes.sfx); dest = p; }
+      noiseHit(t, 0.16, 0.06 + 0.14 * near, dest, 'bandpass', 1500 + 900 * near, 600, 1.1, 0.02);
+      sweep('sine', 700 + 300 * near, 330, t, 0.1, 0.02 + 0.03 * near, dest, 0.01);
+    },
+    nearMiss(t, o = {}) {
+      const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+      let dest = nodes.sfx;
+      if (p) { p.pan.value = o.pan < 0 ? -0.6 : o.pan > 0 ? 0.6 : (Math.random() < 0.5 ? -0.6 : 0.6); p.connect(nodes.sfx); dest = p; }
       noiseHit(t, 0.25, 0.25, dest, 'bandpass', 3200, 700, 1.5, 0.02);
       sweep('sine', 1400, 500, t, 0.15, 0.04, dest, 0.01);
     },
