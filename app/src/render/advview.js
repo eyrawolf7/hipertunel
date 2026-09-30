@@ -69,12 +69,18 @@ export class AdvView {
     if (Math.abs(x) < 1e-4 && Math.abs(y) < 1e-4) y = -1e-3;                    // justo delante: hacia el suelo
     const inside = Math.abs(x) < nx && Math.abs(y) < ny;
     if (inside) { const k = Math.min(nx / Math.abs(x || 1e-9), ny / Math.abs(y || 1e-9)); x *= k; y *= k; }
+    const pin = { x, y };                                                       // sitio sin desplazar (con él se mira si hay cajas debajo)
+    if (this._crowd > 0.01) {                                                   // sobre cajas: se aparta hacia el borde, nunca hacia el centro
+      const m = Math.hypot(x * camera.aspect, y) || 1, d = 1.5 * r * this._crowd;
+      x += x / m * d; y += y / m * d;
+    }
+    x = Math.max(-0.93, Math.min(0.93, x)); y = Math.max(-0.9, Math.min(0.9, y));
     const f = camera.getWorldDirection(this._dir);
     const depth = Math.max(0.5, -this._view.copy(p).applyMatrix4(camera.matrixWorldInverse).z);
     this._ray.set(x, y, 0.5).unproject(camera).sub(camera.position).normalize();
     p.copy(camera.position).addScaledVector(this._ray, depth / Math.max(0.2, this._ray.dot(f)));
     this.ghost.scale.setScalar(2 * r * depth * Math.tan(camera.fov * Math.PI / 360));
-    this.ghostInfo = { pinned: inside, natural: { x: v.x, y: v.y }, r };
+    this.ghostInfo = { pinned: inside, natural: { x: v.x, y: v.y }, pin, r };
     return true;
   }
 
@@ -109,8 +115,7 @@ export class AdvView {
       if (this.place(track, game, ghost.s, lane, this.ghost.position, 0.5) && this.pinGhost(camera, gap)) {
         const fade = Math.min(1, (gap - 0.6) / 3, (game.kLast - 2 - ghost.s) / 8);
         // si cae encima de una caja se atenúa (con fundido) para no taparla ni parecer parte de ella
-        const gp = this.ghost.position, r = this.ghostInfo.r, asp = camera.aspect;
-        const gx = this._ndc.copy(gp).project(camera); const px = gx.x, py = gx.y;
+        const r = this.ghostInfo.r, asp = camera.aspect, px = this.ghostInfo.pin.x, py = this.ghostInfo.pin.y;
         let over = false;
         for (const b of game.boxes) {
           if (b.hit || b.k < game.s || b.k > game.kLast) continue;
@@ -120,7 +125,7 @@ export class AdvView {
           if (Math.hypot((q.x - px) * asp, q.y - py) < r * 2.2 + 0.03) { over = true; break; }
         }
         this._crowd += ((over ? 1 : 0) - this._crowd) * Math.min(1, dt * 8);
-        this.ghost.visible = true; this.ghost.material.opacity = (0.85 + 0.1 * Math.sin(this.t * 6)) * (1 - 0.7 * this._crowd) * Math.max(0, fade);
+        this.ghost.visible = true; this.ghost.material.opacity = (0.85 + 0.1 * Math.sin(this.t * 6)) * (1 - 0.3 * this._crowd) * Math.max(0, fade);
       }
     }
     const m = this.ghost.material, look = arc && this.ghost.visible;
