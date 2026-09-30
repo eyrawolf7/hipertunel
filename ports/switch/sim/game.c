@@ -365,8 +365,8 @@ static void spawn_new_boxes(Game *g, int k) {
       a = g->waveA1[g->waveIdx] * ARC_HARD_DENS;
       mw->a = hard && mw->interval < 0 ? (a < 1 ? a : 1) : g->waveA1[g->waveIdx];
     }
-    /* arranque amable: una fila de cada ARC_EARLY_SKIP queda libre (sin tocar una barra en curso) */
-    if (g->time < ARC_EARLY_T && !g->hasColl && k % ARC_EARLY_SKIP == 0) return;
+    /* arranque amable: una fila de cada ARC_EARLY_SKIP queda libre (sin tocar una barra en curso ni la caja por acampar) */
+    if (g->time < ARC_EARLY_T && !g->hasColl && g->campRows < ARC_CAMP_ROWS && k % ARC_EARLY_SKIP == 0) return;
   }
   if (--g->gap >= 1) return;
   g->gap = 0;

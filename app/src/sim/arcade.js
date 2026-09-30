@@ -168,8 +168,9 @@ export class Arcade extends Game {
     w.b = hard ? w.b0 * HARD_ROLL : w.b0;
     w.c = hard ? Math.min(1, w.c0 * HARD_TALL) : w.c0;
     w.a = hard && w.interval < 0 ? Math.min(1, w.a1 * HARD_DENS) : w.a1;
-    // arranque amable: en los primeros EARLY_T s, una fila de cada EARLY_SKIP queda libre (sin tocar una barra en curso)
-    if (this.time < EARLY_T && !this.coll && row.k % EARLY_SKIP === 0) return;
+    // arranque amable: en los primeros EARLY_T s, una fila de cada EARLY_SKIP queda libre (sin tocar una barra
+    // en curso ni la caja que toca por acampar: quedarse quieto sigue sin salir gratis)
+    if (this.time < EARLY_T && !this.coll && this.campRows < CAMP_ROWS && row.k % EARLY_SKIP === 0) return;
     super.spawnNewBoxes(row);
   }
 
