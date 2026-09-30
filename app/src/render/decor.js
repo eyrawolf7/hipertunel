@@ -67,7 +67,7 @@ export class Decor {
     if (m) {
       const o = m.clone(true);
       // el decorado queda por debajo del umbral del bloom: solo brillan bombillas y cristales
-      o.traverse((c) => { if (c.isMesh && c.material) { c.material = c.material.clone(); c.material.envMapIntensity = 0.1; if ('roughness' in c.material) { c.material.roughness = 1; c.material.metalness = 0; } /* sin brillo de plástico */ c.material.fog = false; if (c.material.color) c.material.color.multiplyScalar(0.9); if (c.material.color) aerial(c.material); } });
+      o.traverse((c) => { if (c.isMesh && c.material) { c.material = c.material.clone(); c.material.envMapIntensity = 0.1; if ('roughness' in c.material) { c.material.roughness = 1; c.material.metalness = 0; } /* sin brillo de plástico */ c.material.fog = false; if (c.material.transparent) c.material.forceSinglePass = true; if (c.material.color) c.material.color.multiplyScalar(0.9); if (c.material.color) aerial(c.material); } });
       return o;
     }
     return this.make[name]();

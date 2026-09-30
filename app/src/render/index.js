@@ -503,7 +503,7 @@ export class Renderer {
     this.decor.update(game, tr, cam, true, dt);   // se ve también por los arcos del túnel
     this.adv.update(game, tr, dt, this.ghostGame, this.camera);
     this.life.update(cam, this.look, this.upS, outside, this.themeIdx, dt, this.quality !== 'baja' && !reduceFx && ambient, this.cam.invert);
-    this.wild.update(game, tr, cam, this.look, this.upS, outside, this.themeIdx, dt, this.quality !== 'baja' && !reduceFx && ambient && this.cam.invert < 0.5);
+    this.wild.update(game, tr, cam, this.look, this.upS, outside, this.themeIdx, dt, this.quality === 'alta' && !reduceFx && ambient && this.cam.invert < 0.5);
     this.renderer.setClearColor(this.fogColor, 1);
 
     // impulso: 0,4 s de azul eléctrico en juntas y anillos (nunca en los carriles)

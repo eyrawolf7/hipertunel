@@ -29,15 +29,18 @@ const KIND = [
   { tex: 'leaf', cols: [0x7fc24a, 0xa8d45a, 0xe6c35a], size: 0.32, glow: false },   // islas: hojas
   { tex: 'leaf', cols: [0x4fae4a, 0x8fd060, 0x3f8f3a], size: 0.36, glow: false },   // selva: hojas
   { tex: 'dot', cols: [0x9dfff0, 0xd8ff8a], size: 0.22, glow: true },               // noche: luciérnagas
-  { tex: 'leaf', cols: [0xffb0c8, 0xffd6a0, 0xff9ab8], size: 0.7, glow: false },   // templo: pétalos
+  { tex: 'leaf', cols: [0xffb0c8, 0xffd6a0, 0xff9ab8], size: 0.45, glow: false },   // templo: pétalos
   { tex: 'dot', cols: [0xffa050, 0xff6a30], size: 0.18, glow: true },               // volcán: brasas
 ];
 
+const Z_AXIS = new THREE.Vector3(0, 0, 1);
+
 export class Life {
   constructor(scene) {
+    this._qz = new THREE.Quaternion();
     this.tex = { leaf: leafTexture(), dot: dotTexture() };
     this.geo = new THREE.PlaneGeometry(1, 1);
-    this.mat = new THREE.MeshBasicMaterial({ map: this.tex.leaf, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false, alphaTest: 0.05 });
+    this.mat = new THREE.MeshBasicMaterial({ map: this.tex.leaf, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false, alphaTest: 0.05, forceSinglePass: true });
     this.mesh = new THREE.InstancedMesh(this.geo, this.mat, N);
     this.mesh.frustumCulled = false; this.mesh.count = 0; this.mesh.renderOrder = 2;
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -96,7 +99,7 @@ export class Life {
       p.flut += dt * 3; p.rot += p.spin * dt;
       p.pos.addScaledVector(up, (K.glow ? 0.15 * Math.sin(p.flut) : -0.35) * dt).addScaledVector(right, 0.3 * Math.sin(p.flut * 0.7) * dt);
       q.setFromRotationMatrix(m.lookAt(cam.position, p.pos, up));
-      q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), p.rot));
+      q.multiply(this._qz.setFromAxisAngle(Z_AXIS, p.rot));   // sin crear objetos por partícula
       const s = K.size * (outside ? 0.6 : 1) * (0.7 + 0.6 * ((p.col & 7) / 7)) * (K.glow ? 1 : 0.9 + 0.3 * Math.abs(Math.sin(p.flut)));
       sc.set(s, s * (K.tex === 'leaf' ? 1.4 : 1), s);
       m.compose(p.pos, q, sc);
@@ -149,7 +152,7 @@ export class Wildlife {
     this._r = new THREE.Vector3(); this._d = new THREE.Vector3(); this._n = new THREE.Vector3(); this._s = new THREE.Vector3(); this._w = new THREE.Vector3();
     const plane = new THREE.PlaneGeometry(1, 1);
     // aves
-    this.birdMat = new THREE.MeshBasicMaterial({ map: birdTexture(), transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false, alphaTest: 0.05 });
+    this.birdMat = new THREE.MeshBasicMaterial({ map: birdTexture(), transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false, alphaTest: 0.05, forceSinglePass: true });
     this.birds = new THREE.InstancedMesh(plane, this.birdMat, NB);
     this.birds.frustumCulled = false; this.birds.count = 0; this.birds.renderOrder = 2;
     this.birds.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -162,7 +165,7 @@ export class Wildlife {
     }
     // lluvia y ceniza (una sola malla; se cambia la textura según el mundo)
     this.tex = { streak: streakTexture(), dot: dotTexture() };
-    this.precMat = new THREE.MeshBasicMaterial({ map: this.tex.streak, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false, alphaTest: 0.03 });
+    this.precMat = new THREE.MeshBasicMaterial({ map: this.tex.streak, transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: false, alphaTest: 0.03, forceSinglePass: true });
     this.prec = new THREE.InstancedMesh(plane, this.precMat, NP);
     this.prec.frustumCulled = false; this.prec.count = 0; this.prec.renderOrder = 2;
     this.prec.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -293,5 +296,7 @@ export class Wildlife {
     const kind = w === 1 ? 'rain' : w === 4 ? 'ash' : null;
     this.updateBirds(game, track, cam, look, up, vis && outside && (w === 0 || w === 3), dt, w);
     this.updatePrecip(cam, look, up, vis && outside && !!kind, kind || this.kind, dt);
+    this.birds.visible = vis && this.birds.count > 0;
+    this.prec.visible = vis && this.prec.count > 0;
   }
 }
