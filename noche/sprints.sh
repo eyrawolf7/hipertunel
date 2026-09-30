@@ -22,6 +22,10 @@ json.dump(d, open(p, 'w'), ensure_ascii=False, indent=1)
 EOF
   echo "=== sprint $id · $(date +%H:%M)" | tee -a "$LOG"
   sh "$REPO/noche/turno.sh" 23:59 4 >> "$LOG" 2>&1
+  # si la ronda dejó trabajo sin commitear, se guarda como WIP en su rama (si no, bloquea las siguientes)
+  if [ -n "$(git -C "$WT" status --porcelain --untracked-files=no)" ]; then
+    git -C "$WT" add -u && env GIT_AUTHOR_NAME=eyrawolf7 GIT_AUTHOR_EMAIL=eyrawolf7@users.noreply.github.com GIT_COMMITTER_NAME=eyrawolf7 GIT_COMMITTER_EMAIL=eyrawolf7@users.noreply.github.com git -C "$WT" commit -q -m "WIP $id (fin de sprint)" && echo "    WIP guardado en $(git -C "$WT" branch --show-current)" | tee -a "$LOG"
+  fi
   estado=$(python3 -c "import json,sys;print([t['estado'] for t in json.load(open('$EST/tareas.json'))['tareas'] if t['id']=='$id'][0])")
   echo "=== fin sprint $id · $(date +%H:%M) · $estado" | tee -a "$LOG"
   # versión de prueba en la web (solo prueba/), fuera del entorno del turno (que no puede publicar)

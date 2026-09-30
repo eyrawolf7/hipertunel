@@ -28,6 +28,11 @@ Antes de nada lee `CLAUDE.md` (reglas de diseño que no se rompen), `docs/CONTRA
 10. **Anota** en `tareas.json` (estado `hecha`, rama, commit, nota corta con las cifras antes/después) y añade al final de `.noche/progreso.md` un bloque de 5-10 líneas: qué hiciste, cifras, qué aprendiste que sirva a las siguientes rondas, y lo que queda por mirar. Guarda las capturas de antes/después en `.noche/capturas/<id>/`.
 11. **Informe**: reescribe `.noche/INFORME.md` para Víctor (en español de España, informal, corto): tabla de tareas (hecha/bloqueada/propuesta, rama, una línea de qué cambia y cómo probarlo), las métricas del bot de la noche frente a las de partida, y lo que necesita que él decida. Luego termina la ronda.
 
+## Trabajo a medias (importante)
+
+- Si se te acaba la ronda sin terminar, **antes de acabar haz commit de lo que tengas en la rama de la tarea** con el mensaje «WIP <id>: …» y apunta en `progreso.md` qué falta. Nunca dejes archivos sin commitear al terminar.
+- Si al empezar encuentras el árbol con cambios sin commitear, son de una ronda anterior de TU carril: haz commit de ellos como «WIP» en la rama en la que estés (`git branch --show-current`) y sigue con tu tarea. No te quedes parado por eso.
+
 ## Límites (no se negocian)
 
 - Prohibido publicar: nada de `git push`, `gh`, `npm run build`, `npm run android`, ni tocar `index.html`, `hipertunel-movil.html` o `hipertunel.apk`. No cambies `git config` ni los remotos.
