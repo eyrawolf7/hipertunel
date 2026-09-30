@@ -125,7 +125,7 @@ typedef struct {
 
   /* modo Arcade (app/src/sim/arcade.js): capa encima del clásico */
   int arcade;
-  double waveA0[MAX_WAVES];
+  double waveA0[MAX_WAVES], waveA1[MAX_WAVES], waveB0[MAX_WAVES], waveC0[MAX_WAVES];
   double campRows; int campLane, camps;
   double trickT; int tricks, tricksTotal, trickCoins, easyWalls;
   int wallWorld, wallLead, wallAfter, walls, smashes, seenWorld; double worldT;
