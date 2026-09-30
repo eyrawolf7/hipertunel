@@ -678,10 +678,16 @@ function stepSim() {
   if (state === 'attract' && (!game.alive || game.s > 4000)) attractGame((Math.random() * 1e9) | 0);
 }
 
+let idleAcc = 0;
 function frame(now) {
   requestAnimationFrame(frame);
   let dt = (now - last) / 1000; last = now;
   if (!(dt > 0)) dt = 0; if (dt > 0.1) dt = 0.1;
+  // título, menús, pausa y fin a 30 fps: no hace falta más y el móvil no se calienta en reposo
+  if (state === 'attract' || state === 'over' || state === 'paused') {
+    idleAcc += dt; if (idleAcc < 1 / 31) return;
+    dt = Math.min(0.1, idleAcc); idleAcc = 0;
+  } else idleAcc = 0;
   if (fps.el) { fps.buf.push(dt); if (fps.buf.length > 120) fps.buf.shift(); }
   input.poll();
 

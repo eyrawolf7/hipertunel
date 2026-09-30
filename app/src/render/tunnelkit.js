@@ -135,6 +135,17 @@ export class TunnelKit {
     this.load();
   }
 
+  // calidad media/baja: piedra y cristal sin mapa de relieve ni de rugosidad (lo más caro por
+  // píxel en una GPU de móvil; a la velocidad del juego apenas se nota)
+  setLite(on) {
+    this._lite = on;
+    if (!this.stoneMat || !this._maps) return;
+    const m = this._maps;
+    this.stoneMat.normalMap = on ? null : m.nrm; this.stoneMat.roughnessMap = on ? null : m.orm; this.stoneMat.roughness = on ? 0.9 : 1;
+    this.crystalMat.normalMap = on ? null : m.cn;
+    this.stoneMat.needsUpdate = true; this.crystalMat.needsUpdate = true;
+  }
+
   async load() {
     const kit = await loadModel('kit/tunnel_kit');
     if (!kit) return;
@@ -145,6 +156,8 @@ export class TunnelKit {
     patch(stoneMat, false); patch(crystalMat, true);
     stylize(stoneMat, { rim: 0.06, key: 'kit-stone' }); stylize(crystalMat, { rim: 0.6, key: 'kit-crystal' });
     this.stoneMat = stoneMat; this.crystalMat = crystalMat;
+    this._maps = { nrm, orm, cn };
+    if (this._lite != null) this.setLite(this._lite);
     kit.updateMatrixWorld(true);
     for (const name of ['tile_stone', 'tile_arch', 'tile_crystal', 'tile_crystal_arch']) {
       // un objeto de Blender con dos materiales llega como varias primitivas: se instancian todas y

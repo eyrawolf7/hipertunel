@@ -62,7 +62,9 @@ export class Renderer {
     this.canvas = canvas;
     this.quality = quality;
     const low = quality === 'baja';
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !low, powerPreference: 'high-performance', stencil: false });
+    // sin antialias en el lienzo: la escena se dibuja en el render target del composer (con MSAA
+    // propio en alta); el del lienzo solo costaba memoria y ancho de banda (en el móvil, calor)
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false, depth: low });
     this.renderer.setClearColor(0xffffff, 1);
     this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = 1.0;
@@ -93,6 +95,7 @@ export class Renderer {
 
     this.composer = null;
     this.setQuality(quality);
+    this.kit.onReady2 = () => this.kit.setLite?.(this.quality !== 'alta');
 
     this.fr = makeFrame(); this.fr2 = makeFrame(); this.sp = {};
     this.look = new THREE.Vector3(0, 0, -1);
@@ -109,7 +112,8 @@ export class Renderer {
 
   setQuality(q) {
     this.quality = q;
-    const dpr = Math.min(window.devicePixelRatio || 1, q === 'alta' ? 2 : q === 'media' ? 1.5 : 1);
+    this.kit?.setLite?.(q !== 'alta');
+    const dpr = Math.min(window.devicePixelRatio || 1, q === 'alta' ? 2 : q === 'media' ? 1.25 : 1);
     this.renderer.setPixelRatio(dpr);
     if (this.composer) { for (const p of this.composer.passes) p.dispose?.(); this.composer.dispose?.(); }
     if (q === 'baja') { this.composer = null; this.bloom = null; this.grade = null; this.resize(); return; }
@@ -128,7 +132,7 @@ export class Renderer {
   resize() {
     const w = this.canvas.clientWidth || innerWidth, h = this.canvas.clientHeight || innerHeight;
     this.renderer.setSize(w, h, false);
-    if (this.composer) { this.composer.setSize(w, h); this.bloom?.setSize(w / 2, h / 2); }
+    if (this.composer) { this.composer.setSize(w, h); const k = this.quality === 'alta' ? 2 : 4; this.bloom?.setSize(w / k, h / k); }
     this.camera.aspect = w / h;
     this.baseFov = fovFor(this.camera.aspect);
     this.camera.fov = this.baseFov;
