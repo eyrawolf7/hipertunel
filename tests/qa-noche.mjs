@@ -171,14 +171,14 @@ await run('g', async () => {
     out.total1 = g.tricksTotal; out.coins1 = g.coinsGot - c0; out.done = evs.includes('trickDone');
     // segunda pirueta demasiado tarde: aterriza a medias → tropiezo, pierde las monedas de la racha
     while (g.flight() && g.landIn > 0.2) step(false);
-    const c1 = g.coinsGot; step(true);
+    const c1 = g.coinsGot; out.racha = g.trickCoins; step(true);
     for (let i = 0; i < 60 && g.trickT >= 0; i++) step(false);
-    out.fail = evs.find((e) => e.startsWith('trickFail')); out.coinsTrasFallo = g.coinsGot - c0; out.c1 = c1 - c0; out.trickTFin = g.trickT;
+    out.fail = evs.find((e) => e.startsWith('trickFail')); out.coinsTrasFallo = g.trickCoins; out.c1 = c1 - c0; out.trickTFin = g.trickT;
     return out;
   });
   rec('g', 'pedir pirueta fuera del salto no hace nada', r.trickFuera === -1 && r.totalFuera === 0, { t: r.trickFuera, total: r.totalFuera });
   rec('g', 'en el salto la pirueta arranca, se completa (trickDone) y da monedas', r.enVuelo && r.trickT >= 0 && r.total1 === 1 && r.done && r.coins1 >= 5, r);
-  rec('g', 'aterrizar a mitad de otra pirueta = tropiezo y pierde las monedas de la racha', !!r.fail && r.fail !== 'trickFail:0' && r.coinsTrasFallo === 0 && r.trickTFin === -1, { fail: r.fail, c1: r.c1, tras: r.coinsTrasFallo });
+  rec('g', 'aterrizar a mitad de otra pirueta = tropiezo y pierde las monedas de la racha', !!r.fail && r.racha > 0 && r.fail === 'trickFail:' + r.racha && r.coinsTrasFallo === 0 && r.trickTFin === -1, { fail: r.fail, racha: r.racha, tras: r.coinsTrasFallo });   // las monedas sueltas que caigan en el salto no cuentan
   await page.close();
   // tocar la pantalla en el salto hace la pirueta y no pausa (toque real, con la partida en marcha)
   const b = await open();
