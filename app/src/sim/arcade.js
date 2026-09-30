@@ -31,13 +31,18 @@ const WALL_WAIT = 3;            // s tras entrar en un mundo
 const COMPRESS = 0.4;           // cajas por oleada respecto al guion original
 const GAP_ROWS = 6;             // filas vacías entre oleadas (20 en el original)
 export const CAMP_ROWS = 22;    // filas en un carril antes de que te echen una caja encima
+const HARD_WORLD = 4;           // desde el mundo 3 (world 4) el Arcade aprieta un poco más:
+const HARD_ROLL = 0.3;          // - la probabilidad de caja fija se multiplica por esto (más rodantes)
+const HARD_GAP = 3;             // - las filas de respiro entre oleadas bajan de 6 a esto
+const HARD_DENS = 1.5;          // - la densidad por fila se multiplica por esto
+const HARD_TALL = 1.5;          // - y la de pilar alto (hasta 1)
 
 export class Arcade extends Game {
   constructor({ seed = 1, easyWalls = 0 } = {}) {
     super({ mode: 'classic', seed });
     this.variant = 'arcade';
     for (const w of this.waves) {
-      w.a0 = w.a;
+      w.a0 = w.a; w.a1 = w.a; w.b0 = w.b; w.c0 = w.c;
       if (w.n > 0 && w.n < 1000) w.n = Math.max(6, Math.round(w.n * COMPRESS));
     }
     this.waveLeft = this.wave.n;
@@ -53,15 +58,22 @@ export class Arcade extends Game {
 
   incrementWave() {
     super.incrementWave();
-    this.gap = Math.min(this.gap, GAP_ROWS);
+    this.gap = Math.min(this.gap, this.world >= HARD_WORLD ? HARD_GAP : GAP_ROWS);
     // cuanto más dura la partida, más cajas por fila (hasta el doble a los 4 min)
     const w = this.wave;
     if (w.interval < 0) w.a = Math.min(1, w.a0 * (1 + Math.min(1, this.time / 240)));
+    w.a1 = w.a;
   }
 
   spawnNewBoxes(row) {
     const clear = Math.ceil(Math.max(this.v, this.vTarget) * 60 / R_UNITS * 0.75);   // + el margen que ya había ≈ 1 s
-    for (const g of this.gaps) if (row.k > g.to && row.k <= g.to + 1 + clear) return;
+    for (const g of this.gaps) {
+      if (row.k > g.to && row.k <= g.to + 1 + clear) {
+        // al aterrizar, el respiro entre oleadas sigue siendo de 6 filas también en los mundos duros
+        if (this.world >= HARD_WORLD) this.gap = Math.max(this.gap, GAP_ROWS);
+        return;
+      }
+    }
     if (this.wallAfter > 0) { this.wallAfter--; return; }
     if (this.wallLead > 0) { if (--this.wallLead === 0) this.spawnWall(row); return; }
     if (this.wallWorld !== this.world && !this.inverted && this.time >= 20 && this.time - this.worldT >= WALL_WAIT
@@ -71,6 +83,12 @@ export class Arcade extends Game {
       this.event('wallSoon', {});
       return;
     }
+    // mundos 3-4: más rodantes, más pilares y algo más de densidad (sin gastar rng: solo cambian
+    // las probabilidades)
+    const w = this.wave, hard = this.world >= HARD_WORLD;
+    w.b = hard ? w.b0 * HARD_ROLL : w.b0;
+    w.c = hard ? Math.min(1, w.c0 * HARD_TALL) : w.c0;
+    w.a = hard && w.interval < 0 ? Math.min(1, w.a1 * HARD_DENS) : w.a1;
     super.spawnNewBoxes(row);
   }
 

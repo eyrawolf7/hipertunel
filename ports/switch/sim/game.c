@@ -37,6 +37,11 @@ static double js_sign(double x) { return x > 0 ? 1 : x < 0 ? -1 : x; }
 #define ARC_COMPRESS 0.4
 #define ARC_GAP_ROWS 6
 #define ARC_CAMP_ROWS 22
+#define ARC_HARD_WORLD 4
+#define ARC_HARD_ROLL 0.3
+#define ARC_HARD_GAP 3
+#define ARC_HARD_DENS 1.5
+#define ARC_HARD_TALL 1.5
 #define ARC_WALL_LEAD 5
 #define ARC_WALL_MAX_BOXES 18
 #define ARC_WALL_MAX_FIRST 24
@@ -313,7 +318,11 @@ static void spawn_new_boxes(Game *g, int k) {
   /* Arcade: 1 s sin cajas al aterrizar del salto entre mundos (arcade.js spawnNewBoxes) */
   if (g->arcade) {
     int i, clear = (int)ceil((g->v > g->vTarget ? g->v : g->vTarget) * 60 / R_UNITS * 0.75);
-    for (i = 0; i < g->nGaps; i++) if (k > g->gaps[i].to && k <= g->gaps[i].to + 1 + clear) return;
+    for (i = 0; i < g->nGaps; i++) if (k > g->gaps[i].to && k <= g->gaps[i].to + 1 + clear) {
+      /* al aterrizar, el respiro entre oleadas sigue siendo de 6 filas también en los mundos duros */
+      if (g->world >= ARC_HARD_WORLD && g->gap < ARC_GAP_ROWS) g->gap = ARC_GAP_ROWS;
+      return;
+    }
     if (g->wallAfter > 0) { g->wallAfter--; return; }
     if (g->wallLead > 0) { if (--g->wallLead == 0) arc_spawn_wall(g, k); return; }
     if (g->wallWorld != g->world && !game_inverted(g) && g->time >= 20 && g->time - g->worldT >= ARC_WALL_WAIT
@@ -321,6 +330,16 @@ static void spawn_new_boxes(Game *g, int k) {
       int nearGap = 0;
       for (i = 0; i < g->nGaps; i++) if (g->gaps[i].to + 40 > k) nearGap = 1;
       if (!nearGap) { g->wallWorld = g->world; g->wallLead = ARC_WALL_LEAD; event(g, EV_WALL_SOON, NULL); return; }
+    }
+    /* mundos 3-4: más rodantes y algo más de densidad (sin gastar rng) */
+    {
+      Wave *mw = &g->waves[g->waveIdx];
+      int hard = g->world >= ARC_HARD_WORLD;
+      double a, c = g->waveC0[g->waveIdx] * ARC_HARD_TALL;
+      mw->c = hard ? (c < 1 ? c : 1) : g->waveC0[g->waveIdx];
+      mw->b = hard ? g->waveB0[g->waveIdx] * ARC_HARD_ROLL : g->waveB0[g->waveIdx];
+      a = g->waveA1[g->waveIdx] * ARC_HARD_DENS;
+      mw->a = hard && mw->interval < 0 ? (a < 1 ? a : 1) : g->waveA1[g->waveIdx];
     }
   }
   if (--g->gap >= 1) return;
@@ -832,10 +851,12 @@ const char *event_name(EventType t) {
 static void arcade_increment(Game *g) {
   Wave *w = &g->waves[g->waveIdx];
   double t;
-  if (g->gap > ARC_GAP_ROWS) g->gap = ARC_GAP_ROWS;
+  int gapMax = g->world >= ARC_HARD_WORLD ? ARC_HARD_GAP : ARC_GAP_ROWS;
+  if (g->gap > gapMax) g->gap = gapMax;
   /* cuanto más dura la partida, más cajas por fila (hasta el doble a los 4 min) */
   t = g->time / 240; if (t > 1) t = 1;
   if (w->interval < 0) { double a = g->waveA0[g->waveIdx] * (1 + t); w->a = a < 1 ? a : 1; }
+  g->waveA1[g->waveIdx] = w->a;
 }
 
 void game_init_arcade(Game *g, uint32_t seed) {
@@ -844,7 +865,7 @@ void game_init_arcade(Game *g, uint32_t seed) {
   g->arcade = 1;
   for (i = 0; i < g->nWaves; i++) {
     Wave *w = &g->waves[i];
-    g->waveA0[i] = w->a;
+    g->waveA0[i] = w->a; g->waveA1[i] = w->a; g->waveB0[i] = w->b; g->waveC0[i] = w->c;
     if (w->n > 0 && w->n < 1000) { int n = (int)js_round(w->n * ARC_COMPRESS); w->n = n > 6 ? n : 6; }
   }
   g->waveLeft = g->wave->n;
