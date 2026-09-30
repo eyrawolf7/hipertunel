@@ -61,10 +61,27 @@ for (const [w, h] of TAMANOS) {
         const W = innerWidth, H = innerHeight;
         const card = document.querySelector('.scr-over .over-card');
         const c = card.getBoundingClientRect();
+        // los cristales de la esquina (.od*) asoman a propósito: se exige que quepan en pantalla;
+        // cualquier otro hijo (texto, botones) que sobresalga de la tarjeta sí es un desborde
+        const esDeco = (e) => { for (let p = e; p && p !== card; p = p.parentElement) if (/(^|\s)od(-|\s|$)/.test(p.getAttribute('class') || '')) return true; return false; };
+        let decoR = 0, decoL = 1; const desbordan = [];
+        // botones y pista salen de la tarjeta a propósito (margen negativo): tienen que caber en pantalla
+        const fuera = [...document.querySelectorAll('.scr-over [data-nav], .scr-over .oc-hint')].filter((e) => { const r = e.getBoundingClientRect(); return r.bottom > innerHeight + 1 || r.right > innerWidth + 1 || r.left < -1; }).map((e) => (e.getAttribute('class') || e.tagName) + ' b' + Math.round(e.getBoundingClientRect().bottom));
+        const nBtn = document.querySelectorAll('.scr-over [data-nav]').length;
+        for (const e of card.querySelectorAll('*')) {
+          const r = e.getBoundingClientRect();
+          if (!r.width && !r.height) continue;
+          if (esDeco(e)) {
+            decoR = Math.max(decoR, r.right);
+            // solape real de cada cristal con la caja proyectada del zorro
+            if (r.left < (x1 + 1) / 2 * W && r.right > (x0 + 1) / 2 * W && r.top < (1 - y0) / 2 * H && r.bottom > (1 - y1) / 2 * H) decoL = 0;
+          }
+          else if (r.right > c.right + 1 || r.left < c.left - 1) desbordan.push((e.getAttribute('class') || e.tagName) + ':' + Math.round(Math.max(r.right - c.right, c.left - r.left)));
+        }
         return {
           visible: g.visible && mallas > 0, delante, W, H, dist: Math.round(hp.game.distanceM), caja: !!hp.renderer.deathFocus,
           fox: { l: (x0 + 1) / 2 * W, r: (x1 + 1) / 2 * W, t: (1 - y1) / 2 * H, b: (1 - y0) / 2 * H },
-          card: { l: c.left, r: c.right, t: c.top, b: c.bottom }, desborda: card.scrollWidth > card.clientWidth + 1,
+          card: { l: c.left, r: c.right, t: c.top, b: c.bottom }, desborda: desbordan.length > 0, hijos: desbordan.slice(0, 3).join(','), deco: decoR, decoL, fuera, nBtn,
           vigOn: !!document.querySelector('.scr-over.on'),
         };
       });
@@ -75,15 +92,15 @@ for (const [w, h] of TAMANOS) {
     const entero = m.visible && m.delante && f.l >= 0 && f.r <= m.W && f.t >= 0 && f.b <= m.H;
     const izq = (f.l + f.r) / 2 < m.W / 2;
     const libre = f.r <= c.l;
-    const tarjeta = c.l >= 0 && c.r <= m.W - 2 && c.t >= 0 && c.b <= m.H && !m.desborda;
+    const tarjeta = c.l >= 0 && c.r <= m.W - 2 && c.t >= 0 && c.b <= m.H && !m.desborda && m.deco <= m.W && m.decoL > 0 && m.fuera.length === 0 && m.nBtn >= 2;
     if (modo === 'arcade') { dists.add(m.dist); if (m.caja) cajas++; }
     const ok = entero && izq && libre && tarjeta;
     if (!ok) fail++;
-    filas.push(`  ${modo} seed ${seed} (${m.dist} m): zorro x ${f.l.toFixed(0)}-${f.r.toFixed(0)} y ${f.t.toFixed(0)}-${f.b.toFixed(0)} · tarjeta ${c.l.toFixed(0)}-${c.r.toFixed(0)} · ${entero ? 'entero' : 'FUERA'} ${izq ? 'izq' : 'NO-IZQ'} ${libre ? 'libre' : 'TAPADO'} ${tarjeta ? 'tarjeta-ok' : 'TARJETA-MAL'}`);
+    filas.push(`  ${modo} seed ${seed} (${m.dist} m): zorro x ${f.l.toFixed(0)}-${f.r.toFixed(0)} y ${f.t.toFixed(0)}-${f.b.toFixed(0)} · tarjeta ${c.l.toFixed(0)}-${c.r.toFixed(0)} · ${entero ? 'entero' : 'FUERA'} ${izq ? 'izq' : 'NO-IZQ'} ${libre ? 'libre' : 'TAPADO'} ${tarjeta ? 'tarjeta-ok' : `TARJETA-MAL (y ${c.t.toFixed(0)}-${c.b.toFixed(0)} de ${m.H}, desborda ${m.desborda} ${m.hijos}, cristales ${m.decoL ? 'sin tapar' : 'TAPAN'} hasta ${m.deco.toFixed(0)}, fuera [${m.fuera}], botones ${m.nBtn})`}`);
     if (out && i < 2 && (modo === 'arcade' || modo === 'adventure')) await page.screenshot({ path: `${out}fin-${modo}-${w}x${h}-${seed}.png` });
   }
   // no vale pasar en vacío: muertes distintas y con caja golpeada
-  const variado = dists.size >= Math.min(5, N) && cajas >= 1;
+  const variado = dists.size >= Math.min(5, N) && cajas >= Math.min(3, N);
   if (!variado) { fail++; filas.push(`  FALLA: muertes de Arcade poco variadas (${dists.size} distancias, ${cajas} contra caja)`); }
   const malos = filas.filter((l) => /FALLA|FUERA|NO-IZQ|TAPADO|TARJETA-MAL/.test(l));
   console.log(`${w}×${h}: ${filas.length - (variado ? 0 : 1) - malos.filter((l) => !/FALLA: muertes/.test(l)).length}/${filas.length - (variado ? 0 : 1)} bien · ${dists.size} distancias · ${cajas} contra caja · errores ${errs.length}`);
