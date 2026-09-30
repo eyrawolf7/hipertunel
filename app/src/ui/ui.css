@@ -1986,3 +1986,37 @@
   .htui .si-sw { width: 1.55em; height: 1.55em; }
   .htui .si-name { font-size: .75em; }
 }
+
+/* ---------- fondo de los menús: escena desenfocada y cálida (arenisca dorada) ----------
+   Solo cuando hay un menú encima; la partida no lleva ningún velo. En calidad baja no se desenfoca. */
+.htui { --fondo-tinte: sepia(.55) saturate(1.5) brightness(1.08) contrast(1.1); --fondo-blur: .55em; }
+.htui .vig-title, .htui .vig-menu, .htui .vig-dim {
+  -webkit-backdrop-filter: blur(var(--fondo-blur)) var(--fondo-tinte);
+  backdrop-filter: blur(var(--fondo-blur)) var(--fondo-tinte);
+}
+.htui.htui-q-baja { --fondo-blur: 0px; }
+/* la portada desenfoca menos y deja nítido al zorro (abajo a la derecha) */
+.htui .vig-title {
+  --fondo-blur: .15em;
+  -webkit-mask-image: radial-gradient(ellipse 17% 30% at 84% 67%, transparent 40%, #000 120%);
+  mask-image: radial-gradient(ellipse 17% 30% at 84% 67%, transparent 40%, #000 120%);
+}
+.htui.htui-q-baja .vig-title { --fondo-blur: 0px; }
+/* la tienda también enseña al zorro */
+.htui .scr-shop .vig-menu {
+  -webkit-mask-image: radial-gradient(ellipse 19% 33% at 84% 66%, transparent 40%, #000 120%);
+  mask-image: radial-gradient(ellipse 19% 33% at 84% 66%, transparent 40%, #000 120%);
+}
+/* la pantalla de fin aclaraba el velo a la izquierda con una máscara, que también dejaba la escena
+   sin desenfocar; ahora se aclara con el propio degradado y el desenfoque llega a toda la pantalla */
+.htui .scr-over .vig-dim {
+  -webkit-mask-image: none; mask-image: none;
+  background:
+    linear-gradient(90deg, rgba(255, 244, 222, .16) 0, rgba(255, 244, 222, .16) 18%, transparent 30%),
+    radial-gradient(circle at 58% 50%, rgba(46, 30, 72, .3), rgba(22, 14, 36, .72));
+}
+/* mapa y tienda casi vacíos: desenfoque suave para que el túnel se siga adivinando */
+.htui .scr-map .vig-menu, .htui .scr-shop .vig-menu { --fondo-blur: .15em; }
+.htui.htui-q-baja .scr-map .vig-menu, .htui.htui-q-baja .scr-shop .vig-menu { --fondo-blur: 0px; }
+/* portada, mapa y tienda: tinte más ligero para que se conserve el color y la profundidad del túnel */
+.htui .vig-title, .htui .scr-map .vig-menu, .htui .scr-shop .vig-menu { --fondo-tinte: sepia(.62) saturate(1.4) brightness(1.06) contrast(1.08); }
