@@ -66,6 +66,9 @@ const HARD_ROLL = 0.3;          // - la probabilidad de caja fija se multiplica 
 const HARD_GAP = 3;             // - las filas de respiro entre oleadas bajan de 6 a esto
 const HARD_DENS = 1.5;          // - la densidad por fila se multiplica por esto
 const HARD_TALL = 1.5;          // - y la de pilar alto (hasta 1)
+const GRAZE_MIN = 0.8;          // roce: distancia lateral a la caja (en carriles) entre estos dos valores
+const GRAZE_MAX = 1.6;
+const GRAZE_T = 2.5;            // s mínimos entre dos roces que dan moneda (sin granja)
 
 export class Arcade extends Game {
   // forceSurface: solo para pruebas, todo el camino con esa superficie (con las mismas excepciones)
@@ -79,6 +82,7 @@ export class Arcade extends Game {
     }
     this.waveLeft = this.wave.n;
     this.campRows = 0; this.campLane = -1; this.camps = 0;
+    this.grazeT = 0; this.grazes = 0; this.grazeOn = true;
     this.trickT = -1; this.tricks = 0; this.tricksTotal = 0; this.trickCoins = 0;
     this.easyWalls = easyWalls;
     this.wallWorld = -1; this.wallLead = 0; this.wallAfter = 0; this.walls = 0; this.smashes = 0;
@@ -247,6 +251,25 @@ export class Arcade extends Game {
   // segundos que faltan para aterrizar (Infinity si no vuelas)
   get landIn() { const f = this.flight(); return f ? (f.b - this.s) / (this.v * 60 / R_UNITS) : Infinity; }
 
+  // roce («¡Por los pelos!»): una caja suelta (no del muro) cruza tu fila por el carril de al lado a
+  // más de 60 m/s. Da 1 moneda y avisa (`graze`); como mucho una cada GRAZE_T s. No toca el rng.
+  graze(s0) {
+    if (this.grazeT > 0) this.grazeT -= 1 / 60;
+    if (!this.grazeOn || this.grazeT > 0 || this.speedMS <= 60) return;
+    const hw = Math.PI / 6, closed = this.fold === FOLD_IN || this.fold === FOLD_OUT;
+    for (const b of this.boxes) {
+      if (b.hit || b.wall || b.k + 0.5 <= s0 || b.k + 0.5 > this.s) continue;
+      let d = this.theta - this.boxAngle(b);   // la misma posición que usa el choque (rodantes incluidas)
+      if (closed) d = Math.atan2(Math.sin(d), Math.cos(d));
+      const ad = Math.abs(d);
+      if (ad > hw * GRAZE_MIN && ad < hw * GRAZE_MAX) {
+        this.grazeT = GRAZE_T; this.grazes++; this.coinsGot++;
+        this.event('graze', { lane: b.lane, k: b.k });
+        break;
+      }
+    }
+  }
+
   step(input = {}) {
     const before = this.s;
     const startTrick = !!input.trick && this.alive && this.trickT < 0 && !!this.flight();
@@ -278,6 +301,7 @@ export class Arcade extends Game {
     const lane = this.laneOf();
     if (lane === this.campLane) this.campRows += this.s - before;
     else { this.campLane = lane; this.campRows = 0; }
+    this.graze(before);
     return this.events;
   }
 }

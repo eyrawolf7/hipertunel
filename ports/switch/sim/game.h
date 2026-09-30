@@ -41,7 +41,8 @@ typedef enum {
   EV_CAMP,                      /* Arcade: una caja va a por ti por quedarte en un carril */
   EV_TRICK, EV_TRICK_DONE, EV_TRICK_FAIL,  /* Arcade: piruetas en el salto entre mundos */
   EV_WALL, EV_SMASH,                       /* Arcade: muro de cartón y cartón roto */
-  EV_WALL_SOON                             /* Arcade: el muro viene (5 filas vacías antes) */
+  EV_WALL_SOON,                            /* Arcade: el muro viene (5 filas vacías antes) */
+  EV_GRAZE                                 /* Arcade: roce, 1 moneda */
 } EventType;
 
 typedef struct {
@@ -127,6 +128,7 @@ typedef struct {
   int arcade;
   double waveA0[MAX_WAVES], waveA1[MAX_WAVES], waveB0[MAX_WAVES], waveC0[MAX_WAVES];
   double campRows; int campLane, camps;
+  double grazeT; int grazes, grazeOn;
   double trickT; int tricks, tricksTotal, trickCoins, easyWalls;
   int wallWorld, wallLead, wallAfter, walls, smashes, seenWorld; double worldT;
   /* superficies (arcade.js): una por fila en un anillo de 128 (0 piedra, 1 cristal, 2 musgo, 3 lava, 4 hielo) */

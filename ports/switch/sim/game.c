@@ -55,6 +55,9 @@ static double js_sign(double x) { return x > 0 ? 1 : x < 0 ? -1 : x; }
 #define ARC_SURF_LAG 10
 #define ARC_SURF_STONE_PCT 45
 #define ARC_PAD_COOL 2
+#define ARC_GRAZE_MIN 0.8
+#define ARC_GRAZE_MAX 1.6
+#define ARC_GRAZE_T 2.5
 static double js_round(double x) { double r = floor(x); return (x - r >= 0.5) ? r + 1 : r; }
 
 double strip_half_width(double fold) {
@@ -812,6 +815,27 @@ double game_land_in(const Game *g) {
   if (!arc_flight(g, NULL, &b)) return INFINITY;
   return (b - g->s) / (g->v * 60 / R_UNITS);
 }
+/* roce (arcade.js graze): caja suelta por el carril de al lado a más de 60 m/s = 1 moneda */
+static void arc_graze(Game *g, double s0) {
+  const double hw = M_PI / 6;
+  int i;
+  if (g->grazeT > 0) g->grazeT -= 1.0 / 60;
+  if (!g->grazeOn || g->grazeT > 0 || game_speed_ms(g) <= 60) return;
+  for (i = 0; i < g->nBoxes; i++) {
+    const Box *b = &g->boxes[i];
+    double d, ad;
+    if (b->hit || b->wall || b->k + 0.5 <= s0 || b->k + 0.5 > g->s) continue;
+    d = g->theta - game_box_angle(g, b);
+    if (!is_open(g)) d = atan2(sin(d), cos(d));
+    ad = fabs(d);
+    if (ad > hw * ARC_GRAZE_MIN && ad < hw * ARC_GRAZE_MAX) {
+      Event *e;
+      g->grazeT = ARC_GRAZE_T; g->grazes++; g->coinsGot++;
+      event(g, EV_GRAZE, &e); e->lane = b->lane; e->k = b->k;
+      break;
+    }
+  }
+}
 int game_step(Game *g, double steer_in) { return game_step_in(g, steer_in, 0); }
 int game_step_in(Game *g, double steer_in, int trick) {
   double before = g->s;
@@ -845,6 +869,7 @@ int game_step_in(Game *g, double steer_in, int trick) {
     if (g->tricks && g->trickT < 0 && !arc_flight(g, NULL, NULL)) { g->tricks = 0; g->trickCoins = 0; }
     if (lane == g->campLane) g->campRows += g->s - before;
     else { g->campLane = lane; g->campRows = 0; }
+    arc_graze(g, before);
     n = g->nEvents;
   }
   return n;
@@ -901,7 +926,7 @@ double game_speed_ms(const Game *g) { return g->v * 60 * M_PER_UNIT; }
 
 const char *event_name(EventType t) {
   static const char *n[] = { "world", "wave", "spawn", "coin", "foldOrder", "foldStart", "foldEnd",
-                             "boost", "crash", "death", "camp", "trick", "trickDone", "trickFail", "wall", "smash", "wallSoon" };
+                             "boost", "crash", "death", "camp", "trick", "trickDone", "trickFail", "wall", "smash", "wallSoon", "graze" };
   return n[t];
 }
 
@@ -928,6 +953,7 @@ void game_init_arcade(Game *g, uint32_t seed) {
   }
   g->waveLeft = g->wave->n;
   g->campRows = 0; g->campLane = -1; g->camps = 0;
+  g->grazeT = 0; g->grazes = 0; g->grazeOn = 1;
   g->trickT = -1; g->tricks = 0; g->tricksTotal = 0; g->trickCoins = 0; g->easyWalls = 0;
   g->wallWorld = -1; g->wallLead = 0; g->wallAfter = 0; g->walls = 0; g->smashes = 0;
   g->seenWorld = g->world; g->worldT = 0;

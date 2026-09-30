@@ -424,6 +424,17 @@ function coinFly(e) {
   setTimeout(() => d.remove(), 420);
 }
 
+// chispa dorada en el borde de la vista, del lado de la caja rozada (nunca en el centro)
+function roceChispa(e) {
+  if (settings.reduceFx) return;
+  // jugador a un lado de la caja (theta mayor que su carril) = la caja queda a la izquierda de la vista
+  let off = game.theta - e.lane * (Math.PI / 6);
+  if (Math.abs(game.fold) === 30) off = Math.atan2(Math.sin(off), Math.cos(off));
+  const d = document.createElement('div'); d.className = 'roce-chispa ' + (off > 0 ? 'izq' : 'der');
+  document.body.appendChild(d);
+  setTimeout(() => d.remove(), 340);
+}
+
 // ---------------------------------------------------------------- bucle
 let last = performance.now();
 const fps = { buf: [], el: null };
@@ -491,6 +502,11 @@ function stepSim() {
     else if (e.type === 'trickFail') { coins = game.coinsGot; ui.toast(e.lost ? `¡Tropiezo! Pierdes ${e.lost} monedas${mult > 1 ? ` y la racha ×${mult}` : ''}` : mult > 1 ? `Tropiezo: racha perdida (×${mult})` : '¡Tropiezo! Acaba la pirueta antes de caer', 'info'); mult = 1; multDist = 0; audio.play('land'); buzz([40, 30, 40]); renderer.stumble?.(); }
     else if (e.type === 'noJump') { audio.play('whiff'); ui.jumpDenied?.(); }
     else if (e.type === 'charge') { audio.play('coin', { combo: 6 }); buzz([8, 20, 8]); ui.toast(e.why === 'near' ? '+1 salto · 5 roces seguidos' : '+1 salto', 'mission'); }
+    else if (e.type === 'graze') {   // roce con moneda (Arcade): aviso, sonido, racha, misión y chispa salen de aquí
+      coins = game.coinsGot;
+      if (state === 'play') { audio.play('nearMiss'); buzz(10); roceChispa(e); bumpMult('¡Por los pelos!'); }
+      if (state === 'play') for (const f of missions.event({ type: 'near' }, game)) ui.toast('Misión cumplida: ' + f.text, 'mission', DEFER);
+    }
     else if (e.type === 'jumpClose') { audio.play('nearMiss'); buzz(10); bumpMult('¡Al límite!'); }
     else if (e.type === 'land') { audio.play('land'); buzz(18); }
     else if (e.type === 'foldStart') { audio.play('foldStart'); buzz([12, 90, 12, 90, 12, 90, 30]); }   // ondulante
@@ -528,10 +544,11 @@ function stepSim() {
     const d = game.distanceM; fresh.push(...missions.tick(game, Math.max(0, d - missDist))); missDist = d;
     for (const f of fresh) { ui.toast('Misión cumplida: ' + f.text, 'mission', DEFER); audio.play('world'); buzz([20, 40, 20]); }
   }
-  // ¡Por los pelos!: una caja pasa rozando por el carril de al lado a más de 60 m/s (solo aviso)
+  // ¡Por los pelos!: una caja pasa rozando por el carril de al lado a más de 60 m/s (solo aviso; el
+  // Arcade lo hace en la simulación, con su moneda: suceso `graze`)
   let nearPlayed = false;
   const sheetOpen = game.fold !== 30 && game.fold !== -30;   // con la lámina abierta los carriles 0 y 11 no son vecinos
-  if (state === 'play' && game.alive && game.speedMS > 60 && (nearT -= STEP) <= 0) {
+  if (state === 'play' && !game.grazeOn && game.alive && game.speedMS > 60 && (nearT -= STEP) <= 0) {
     const hw = Math.PI / 6;
     for (const b of game.boxes) {
       if (b.hit || b.k + 0.5 <= prev.s || b.k + 0.5 > game.s) continue;
