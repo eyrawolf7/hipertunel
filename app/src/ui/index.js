@@ -398,13 +398,13 @@ export function createUI(root, handlers = {}) {
     if (!scr) return [];
     return $$('[data-nav]', scr).filter((el) => el.offsetParent !== null && !el.disabled);
   }
-  function setFocus(el, sound = true) {
+  function setFocus(el, sound = true, scroll = true) {
     if (!el || el === focused) return;
     if (focused) focused.classList.remove('is-focus');
     focused = el;
     el.classList.add('is-focus');
     try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); }
-    if (el.closest('.cards')) el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: sound ? 'smooth' : 'auto' });
+    if (scroll && el.closest('.cards')) el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: sound ? 'smooth' : 'auto' });
     if (sound) snd('menuMove');
   }
   // flechas del carrusel de Modos: solo se ven si hay más tarjetas fuera de la vista en ese lado
@@ -520,7 +520,7 @@ export function createUI(root, handlers = {}) {
   root.addEventListener('pointerover', (e) => {
     if (e.pointerType !== 'mouse') return;
     const el = e.target.closest('[data-nav]');
-    if (el && MENU_SCREENS.has(current) && screens[current].contains(el) && el !== focused) setFocus(el, false);
+    if (el && MENU_SCREENS.has(current) && screens[current].contains(el) && el !== focused) setFocus(el, false, false);   // al pasar el ratón no se mueve el carrusel (la tarjeta se iría de debajo del puntero)
   });
 
   if (H.keyboard !== false) {

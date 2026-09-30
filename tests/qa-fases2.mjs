@@ -113,7 +113,9 @@ rec('Sin fin no deja cpRec de una fase', !cpLeak.cp, cpLeak);
 
 // 5. Fase 2 con control y regalo; estado de la selva
 await page.evaluate(() => { localStorage.setItem('hipertunel-fases', JSON.stringify({ 0: { bits: 1, best: 1, time: 70 } })); window.__freeze = true; __hip.setPhase(1); __hip.start('phase'); });
-await botOn(); await invul();
+// inmortal también en la partida que se rehace desde el control (si solo lo es la primera, un choque del bot
+// —p. ej. en el musgo de la selva— hace que la repetición ya no sea la misma partida)
+await botOn(); await page.evaluate(() => { const P = Object.getPrototypeOf(__hip.game); window.__crash0 = Object.prototype.hasOwnProperty.call(P, 'crash') ? P.crash : undefined; P.crash = function (b) { b.hit = true; }; });
 await page.evaluate(() => { let n = 0; while (!__hip.cpRec && n++ < 60 * 90) __hip.tick(1); });
 const c2 = await page.evaluate(() => { const g = __hip.game; return { n: __hip.cpRec ? __hip.cpRec.length : 0, frame: g.frame, s: g.s, world: g.world, wave: g.waveIdx, lvl: g.level, boost: g.boostOn, curves: !!g.curves, theta: g.theta }; });
 await page.evaluate(() => { __hip.tick(240); delete __hip.game.crash; __hip.game.die(null); __hip.tick(1); window.__freeze = false; });
@@ -121,6 +123,7 @@ await toState('over', 4000); await sleep(900);
 await page.evaluate(() => { window.__freeze = true; });
 await click('.scr-over [data-act="restart"]'); await sleep(200);
 const b2 = await page.evaluate(() => { const g = __hip.game; return { frame: g.frame, s: g.s, theta: g.theta, world: g.world, wave: g.waveIdx, gift: __hip.giftNext }; });
+await page.evaluate(() => { const P = Object.getPrototypeOf(__hip.game); if (window.__crash0) P.crash = window.__crash0; else delete P.crash; });
 rec('Fase 2: «Desde el control» repone exacto (fotograma, s, theta, mundo, oleada)', b2.frame === c2.n && b2.s === c2.s && b2.theta === c2.theta && b2.world === c2.world && b2.wave === c2.wave && b2.gift, { b2, c2 });
 await toState('play', 6000); await botOn();
 await page.evaluate(() => __hip.tick(1));

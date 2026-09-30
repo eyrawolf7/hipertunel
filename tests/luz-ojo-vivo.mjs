@@ -9,7 +9,7 @@ import puppeteer from 'puppeteer';
 import { mkdirSync, writeFileSync } from 'node:fs';
 
 const opt = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith('--')).map((a) => { const [k, v] = a.slice(2).split('='); return [k, v ?? '1']; }));
-const seed = +(opt.seed || 3), W = +(opt.w || 844), H = +(opt.h || 390), SECS = +(opt.secs || 60);
+const seed = +(opt.seed || 3), W = +(opt.w || 844), H = +(opt.h || 390), SECS = +(opt.secs || 120);   // 60 s no llegan a 2 entradas con la máquina cargada
 const out = opt.shots ? new URL(opt.shots.endsWith('/') ? opt.shots : opt.shots + '/', `file://${process.cwd()}/`).pathname : null;
 if (out) mkdirSync(out, { recursive: true });
 let fails = 0;

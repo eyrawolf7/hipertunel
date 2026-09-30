@@ -19,7 +19,7 @@ await page.evaluate(() => {
   h.audio.setSpace = (v) => {
     const s = window.__sp; s.calls++;
     if (v) { s.outTrue++; if (h.state !== 'play' && h.state !== 'dying') s.menuTrue++; if (!h.renderer.outside) s.mismatch++; }
-    if (s.last !== v) { s.changes++; s.last = v; }
+    if (s.last !== v) { s.changes++; s.last = v; s.log = (s.log || []).concat([[h.game.frame, v, +h.game.fold.toFixed(2)]]).slice(-8); }
     return orig(v);
   };
 });
@@ -43,11 +43,14 @@ for (const [mode, seed] of [['classic', 3], ['arcade', 5]]) {
 // pausa y reanudar fuera: no se repite el «whoomp» (ningún cambio de espacio) ni se llama en pausa
 const before = await page.evaluate(() => ({ ...window.__sp, out: window.__hip.renderer.outside, state: window.__hip.state }));
 await page.keyboard.press('Escape'); await sleep(600);
-const paused = await page.evaluate(() => ({ ...window.__sp, state: window.__hip.state }));
+const paused = await page.evaluate(() => ({ ...window.__sp, state: window.__hip.state, frame: window.__hip.game.frame }));
 rec('en pausa se pasa por play antes (estaba jugando fuera) y no cambia el espacio', before.state === 'play' && before.out && paused.state === 'paused' && paused.changes === before.changes && paused.last === true, { before, paused });
 await page.keyboard.press('Escape'); await sleep(4500);
 const back = await page.evaluate(() => ({ ...window.__sp, state: window.__hip.state }));
-rec('al reanudar fuera no hay salida falsa (mismos cambios)', back.state === 'play' && back.changes === paused.changes, { paused, back });
+// un cambio en el primer medio segundo tras reanudar sería la salida falsa; más tarde puede ser la
+// partida de verdad (p. ej. el plegado que se cierra justo antes del salto entre mundos)
+const tras = (back.log || []).filter((x) => x[0] > paused.frame);
+rec('al reanudar fuera no hay salida falsa (ningún cambio en el primer medio segundo)', back.state === 'play' && tras.every((x) => x[0] > paused.frame + 30), { paused: { changes: paused.changes, frame: paused.frame }, back: { changes: back.changes, tras } });
 rec('sin errores de página', errors.length === 0, errors.slice(0, 3));
 await browser.close();
 console.log(fails ? `${fails} FALLOS` : 'Todo OK');

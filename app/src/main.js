@@ -498,11 +498,14 @@ function coinFly(e) {
 }
 
 // chispa dorada en el borde de la vista, del lado de la caja rozada (nunca en el centro)
+// jugador a un lado de la caja (theta mayor que su carril) = la caja queda a la izquierda de la vista
+function grazeSide(e) {
+  const off = game.theta - e.lane * (Math.PI / 6);
+  return Math.abs(game.fold) === 30 ? Math.atan2(Math.sin(off), Math.cos(off)) : off;
+}
 function roceChispa(e) {
   if (settings.reduceFx) return;
-  // jugador a un lado de la caja (theta mayor que su carril) = la caja queda a la izquierda de la vista
-  let off = game.theta - e.lane * (Math.PI / 6);
-  if (Math.abs(game.fold) === 30) off = Math.atan2(Math.sin(off), Math.cos(off));
+  const off = grazeSide(e);
   const d = document.createElement('div'); d.className = 'roce-chispa ' + (off > 0 ? 'izq' : 'der');
   document.body.appendChild(d);
   setTimeout(() => d.remove(), 340);
@@ -589,7 +592,7 @@ function stepSim() {
     else if (e.type === 'charge') { audio.play('coin', { combo: 6 }); buzz([8, 20, 8]); ui.toast(e.why === 'near' ? '+1 salto · 5 roces seguidos' : '+1 salto', 'mission'); }
     else if (e.type === 'graze') {   // roce con moneda (Arcade): aviso, sonido, racha, misión y chispa salen de aquí
       coins = game.coinsGot;
-      if (state === 'play') { audio.play('nearMiss'); buzz(10); roceChispa(e); bumpMult('¡Por los pelos!'); }
+      if (state === 'play') { audio.play('nearMiss', { pan: grazeSide(e) < 0 ? 1 : -1 }); buzz(10); roceChispa(e); bumpMult('¡Por los pelos!'); }
       if (state === 'play') for (const f of missions.event({ type: 'near' }, game)) ui.toast('Misión cumplida: ' + f.text, 'mission', DEFER);
     }
     else if (e.type === 'jumpClose') { audio.play('nearMiss'); buzz(10); bumpMult('¡Al límite!'); }
