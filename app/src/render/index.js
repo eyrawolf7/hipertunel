@@ -290,7 +290,7 @@ export class Renderer {
     return null;
   }
 
-  update(game, s, theta, dt, { reduceFx = false, intro = 0, mascot = false, calm = false } = {}) {
+  update(game, s, theta, dt, { reduceFx = false, intro = 0, mascot = false, calm = false, ambient = true } = {}) {
     this.time += dt;
     const tr = this.track;
     tr.sync(game);
@@ -382,7 +382,7 @@ export class Renderer {
     if (c.rollShake > 0) { cam.rotateZ((Math.random() * 2 - 1) * 0.08 * (c.rollShake / 0.25) * (reduceFx ? 0.3 : 1)); c.rollShake -= dt; }
     // peso de la cámara (solo primera persona; magnitudes en fracción del alto de pantalla, el centro
     // no se mueve más de ~1 %): bajón elástico al aterrizar, respiración y mirada que se adelanta al giro
-    const wt = this.weight, wGoal = game.alive && !this.third ? 1 - (V ? V.e : 0) : 0, air = game.jumpAt(camS) > 0.2;
+    const wt = this.weight, wGoal = game.alive && !this.third && ambient ? 1 - (V ? V.e : 0) : 0, air = game.jumpAt(camS) > 0.2;
     // el peso entra y sale suave: al morir o cambiar de vista no se endereza de golpe
     wt.on += (wGoal - wt.on) * Math.min(1, dt * 10); const wOn = wt.on > 0.01 ? wt.on : 0;
     const spd = Math.min(1, Math.max(0, (game.speedMS - 36) / 64));
@@ -455,7 +455,7 @@ export class Renderer {
     // luz de ojo: al salir la imagen se sobreexpone y se adapta en ~0,4 s; al entrar se oscurece un
     // poco y los paneles se van encendiendo de los bordes (cerca) al centro (lejos) en ~0,65 s. Es
     // posproceso (la niebla es blanca en los mundos claros y lavaba las cajas): el dip es suave
-    if (this.eyeOut === undefined || game.frame < 2 || mascot || calm) { this.eyeOut = outside; this.eyeT = 9; }
+    if (this.eyeOut === undefined || game.frame < 2 || mascot || calm || !ambient) { this.eyeOut = outside; this.eyeT = 9; }
     else if (outside !== this.eyeOut) { this.eyeOut = outside; this.eyeT = 0; }
     this.eyeT += dt;
     const eyeK = reduceFx ? 0.4 : 1;
@@ -502,8 +502,8 @@ export class Renderer {
     this.sky.update(cam, this._skyUp, outside ? 1 : 0, dt, this.cam.invert, this.fr.F);
     this.decor.update(game, tr, cam, true, dt);   // se ve también por los arcos del túnel
     this.adv.update(game, tr, dt, this.ghostGame, this.camera);
-    this.life.update(cam, this.look, this.upS, outside, this.themeIdx, dt, this.quality !== 'baja' && !reduceFx, this.cam.invert);
-    this.wild.update(game, tr, cam, this.look, this.upS, outside, this.themeIdx, dt, this.quality !== 'baja' && !reduceFx && this.cam.invert < 0.5);
+    this.life.update(cam, this.look, this.upS, outside, this.themeIdx, dt, this.quality !== 'baja' && !reduceFx && ambient, this.cam.invert);
+    this.wild.update(game, tr, cam, this.look, this.upS, outside, this.themeIdx, dt, this.quality !== 'baja' && !reduceFx && ambient && this.cam.invert < 0.5);
     this.renderer.setClearColor(this.fogColor, 1);
 
     // impulso: 0,4 s de azul eléctrico en juntas y anillos (nunca en los carriles)

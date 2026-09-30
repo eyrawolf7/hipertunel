@@ -24,7 +24,7 @@ const QS = new URLSearchParams(location.search);
 // ---------------------------------------------------------------- ajustes y récords
 const COARSE = matchMedia('(pointer: coarse)').matches;
 const IS_ANDROID_WEB = /Android/i.test(navigator.userAgent) && !window.Capacitor && location.protocol === 'https:';
-const DEFAULTS = { tilt: true, invert: false, sens: 1, quality: COARSE ? 'media' : 'alta', reduceFx: false, music: true, sound: true, vibe: true };
+const DEFAULTS = { tilt: true, invert: false, sens: 1, quality: COARSE ? 'media' : 'alta', reduceFx: false, ambient: true, music: true, sound: true, vibe: true };
 let settings = { ...DEFAULTS };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('hipertunel-ajustes') || '{}')); } catch (e) {}
 if (QS.get('q')) settings.quality = QS.get('q');
@@ -114,6 +114,7 @@ const ui = createUI($('ui'), {
     if (k === 'quality') renderer.setQuality(v);
     if (k === 'music') audio.setMusic(v);
     if (k === 'sound') audio.setMuted(!v);
+    if (k === 'ambient') audio.setAmbience(v);
     if (k === 'tilt' && v) input.requestTilt();
   },
   onCalibrate: () => { input.requestTilt(); input.calibrate(); },
@@ -135,7 +136,7 @@ pushRecords();
 pushMissions();
 applyCosmetics();
 ui.settings(settings);
-audio.setMusic(settings.music); audio.setMuted(!settings.sound);
+audio.setMusic(settings.music); audio.setMuted(!settings.sound); audio.setAmbience?.(settings.ambient !== false);
 
 // tocar la pantalla mientras juegas = pausa (el botón de continuar sale en el centro)
 input.onPress = () => { if (state === 'countdown' && renderer.introOn) skipIntro(); };
@@ -698,7 +699,7 @@ function frame(now) {
   let dth = game.theta - prev.theta;
   if (dth > Math.PI) dth -= Math.PI * 2; else if (dth < -Math.PI) dth += Math.PI * 2;
   const theta = prev.theta + dth * a;
-  renderer.update(game, s, theta, dt, { reduceFx: settings.reduceFx, intro: state === 'countdown' && countdown > 0.6 ? Math.min(1, (countdown - 0.6) / 2.4) : 0, mascot: state === 'attract' && (ui.screen === 'title' || ui.screen === 'shop'), calm: state === 'attract' });
+  renderer.update(game, s, theta, dt, { reduceFx: settings.reduceFx, ambient: settings.ambient !== false, intro: state === 'countdown' && countdown > 0.6 ? Math.min(1, (countdown - 0.6) / 2.4) : 0, mascot: state === 'attract' && (ui.screen === 'title' || ui.screen === 'shop'), calm: state === 'attract' });
   renderer.render();
   audio.setSpeed(game.speedMS, game.level);
   if (state !== 'paused' && state !== 'countdown') audio.setSpace?.(!!renderer.outside && (state === 'play' || state === 'dying') && game.alive);   // en pausa se conserva: al reanudar no hay «whoomp» falso

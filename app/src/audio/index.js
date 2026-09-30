@@ -72,7 +72,7 @@ function createNoop() {
   const st = { muted: false };
   return {
     unlock() {}, setMuted(b) { st.muted = !!b; }, get muted() { return st.muted; },
-    setMusic() {}, setWorld() {}, setSpeed() {}, setHover() {}, setSpace() {}, setSurface() {}, play() {}, pause() {},
+    setMusic() {}, setWorld() {}, setSpeed() {}, setHover() {}, setSpace() {}, setAmbience() {}, setSurface() {}, play() {}, pause() {},
     get available() { return false; },
   };
 }
@@ -84,7 +84,7 @@ export function createAudio(options = {}) {
 
   const state = {
     muted: false, music: true, world: 0, paused: false,
-    ms: 0, level: 0, lastSpeedT: -1, outside: false,
+    ms: 0, level: 0, lastSpeedT: -1, outside: false, ambience: true,
     hover: false, hoverSpeed: 0, lastHoverT: -1,
     step: 0, nextTime: 0, transitionT: -10, entrySteps: ENTRY_STEPS,
   };
@@ -160,6 +160,7 @@ export function createAudio(options = {}) {
       n.spInside = bank([0.017, 0.023, 0.031], 0.62, 350, 3600);
       n.spOutside = bank([0.09, 0.15], 0.2, 200, 2200);
       n.spInside.out.gain.value = 1;
+      if (!state.ambience) { n.spInside.out.gain.value = 0; n.spIn.gain.value = 0; }   // «Efectos de ambiente» apagado
       n.spIn.connect(n.spInside.inG); n.spIn.connect(n.spOutside.inG);
       n.musicFilter.connect(n.spIn); n.sfx.connect(n.spIn);
       // viento por fuera: ruido paso banda muy bajo que solo suena fuera
@@ -448,6 +449,21 @@ export function createAudio(options = {}) {
     return state.nextTime + k * sd;
   }
   const musicRuns = () => state.music && !state.paused && !state.muted && state.nextTime > ctx.currentTime - 0.2;
+
+  // eco y viento según dentro/fuera del tubo y el ajuste de ambiente; whoomp = al salir del tubo
+  function applySpace(whoomp) {
+    const now = ctx.currentTime, outside = state.outside, amb = state.ambience;
+    const to = (g, v, tc) => { g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.setTargetAtTime(v, now, tc); };
+    to(nodes.spInside.out.gain, amb && !outside ? 1 : 0, outside ? 0.05 : 0.12);
+    to(nodes.spOutside.out.gain, amb && outside ? 0.4 : 0, outside ? 0.25 : 0.08);
+    to(nodes.spIn.gain, amb ? (outside ? 0.16 : 0.24) : 0, 0.2);
+    to(nodes.wind.gain, amb && outside ? 0.018 : 0, outside ? 0.5 : 0.15);
+    // «whoomp» de presión al salir: seno breve y ruido grave-medio (todo por encima de 100 Hz)
+    if (whoomp && amb && outside && !state.muted && !state.paused) {
+      sweep('sine', 260, 120, now + 0.005, 0.28, 0.07, nodes.sfx, 0.02);
+      noiseHit(now + 0.005, 0.35, 0.05, nodes.sfx, 'bandpass', 500, 250, 0.8, 0.03);
+    }
+  }
 
   // segundos entre golpes del roce por superficie (a velocidad media): piedra, cristal, musgo, lava, hielo
   const ROLL_GAP = [[0.26, 0.36], [0.22, 0.36], [0.3, 0.42], [0.4, 0.7], [0.8, 1.0]];
@@ -774,17 +790,14 @@ export function createAudio(options = {}) {
       outside = !!outside;
       if (outside === state.outside || !ctx || !nodes || !nodes.spInside) return;
       state.outside = outside;
-      const now = ctx.currentTime;
-      const to = (g, v, tc) => { g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); g.setTargetAtTime(v, now, tc); };
-      to(nodes.spInside.out.gain, outside ? 0 : 1, outside ? 0.05 : 0.12);
-      to(nodes.spOutside.out.gain, outside ? 0.4 : 0, outside ? 0.25 : 0.08);
-      to(nodes.spIn.gain, outside ? 0.16 : 0.24, 0.2);
-      to(nodes.wind.gain, outside ? 0.018 : 0, outside ? 0.5 : 0.15);
-      // «whoomp» de presión al salir: seno breve y ruido grave-medio (todo por encima de 100 Hz)
-      if (outside && !state.muted && !state.paused) {
-        sweep('sine', 260, 120, now + 0.005, 0.28, 0.07, nodes.sfx, 0.02);
-        noiseHit(now + 0.005, 0.35, 0.05, nodes.sfx, 'bandpass', 500, 250, 0.8, 0.03);
-      }
+      applySpace(true);
+    }),
+    // «Efectos de ambiente»: apagado, sin eco del tubo, sin viento ni «whoomp» (el resto suena igual)
+    setAmbience: safe(function (on) {
+      on = on !== false;
+      if (on === state.ambience) return;
+      state.ambience = on;
+      if (ctx && nodes && nodes.spInside) applySpace(false);
     }),
     // roce de la superficie: una vez por fotograma en partida (on = jugando y viva). Cadencia por
     // superficie y velocidad; no suena parado, en pausa ni silenciado.

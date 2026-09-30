@@ -223,6 +223,7 @@ function settingsHTML() {
         </div>
       </div>
       ${toggleRow('reduceFx', 'eye', 'Menos efectos', 'Por si te mareas')}
+      ${toggleRow('ambient', 'sparkle', 'Efectos de ambiente', 'Partículas, respiración, luz y eco')}
       ${toggleRow('vibe', 'phone', 'Vibración', 'Motor, monedas y choques')}
       ${toggleRow('music', 'music', 'Música')}
       ${toggleRow('sound', 'sound', 'Efectos de sonido')}
@@ -364,7 +365,7 @@ export function createUI(root, handlers = {}) {
   let overShownAt = 0;
   let focused = null;
   const records = { classic: 0, survival: 0, timetrial: 0 };
-  const vals = { tilt: true, invert: false, sens: 1, quality: 'alta', reduceFx: false, music: true, sound: true, vibe: true };
+  const vals = { tilt: true, invert: false, sens: 1, quality: 'alta', reduceFx: false, ambient: true, music: true, sound: true, vibe: true };
 
   // ----- pantallas -----
   function show(name) {
