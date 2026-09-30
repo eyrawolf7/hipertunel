@@ -13,10 +13,12 @@ const rec = (ok, name, info) => { if (!ok) fallos++; console.log(`${ok ? 'PASA' 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------------------------------------------------------------- parte pura
+// como HapticsImpactType.fromString de Android: solo reconoce el enum de Capacitor y lo demás es HEAVY
+const androidStyle = (s) => ({ LIGHT: 'Light', MEDIUM: 'Medium' })[s] || 'Heavy';
 function banco() {
   const calls = [], agenda = []; let id = 0, ahora = 0;
   const plugin = {
-    impact: ({ style }) => { calls.push({ t: ahora, impact: style }); return Promise.resolve(); },
+    impact: ({ style }) => { calls.push({ t: ahora, impact: androidStyle(style) }); return Promise.resolve(); },
     vibrate: ({ duration }) => { calls.push({ t: ahora, vibrate: duration }); return Promise.resolve(); },
   };
   const timers = { set: (f, t) => { agenda.push({ id: ++id, at: ahora + t, f }); return id; }, clear: (i) => { const k = agenda.findIndex((a) => a.id === i); if (k >= 0) agenda.splice(k, 1); } };
@@ -120,7 +122,7 @@ async function abrir({ nativo = true, ajustes = null } = {}) {
     window.__hap = []; window.__web = [];
     const st = () => (window.__hip ? window.__hip.state : 'carga');
     if (nat) window.__hapticsPlugin = {
-      impact: ({ style }) => { window.__hap.push({ t: performance.now(), impact: style, st: st() }); return Promise.resolve(); },
+      impact: ({ style }) => { window.__hap.push({ t: performance.now(), impact: ({ LIGHT: 'Light', MEDIUM: 'Medium' })[style] || 'Heavy', st: st() }); return Promise.resolve(); },
       vibrate: ({ duration }) => { window.__hap.push({ t: performance.now(), vibrate: duration, st: st() }); return Promise.resolve(); },
     };
     navigator.vibrate = (p) => { window.__web.push({ t: performance.now(), p, st: st() }); return true; };

@@ -31,7 +31,8 @@ export function createHaptics({ plugin = null, web = true, timers = { set: (f, t
   const fire = (h) => {
     if (log) log.push(h);
     try {
-      const r = h.impact ? plugin.impact({ style: h.impact }) : plugin.vibrate({ duration: h.vibrate });
+      // el enum de Capacitor es 'LIGHT' | 'MEDIUM' | 'HEAVY' (otro texto cae en HEAVY en Android)
+      const r = h.impact ? plugin.impact({ style: h.impact.toUpperCase() }) : plugin.vibrate({ duration: h.vibrate });
       if (r && r.catch) r.catch(() => {});
     } catch (e) { /* el plugin no está: no pasa nada */ }
   };
