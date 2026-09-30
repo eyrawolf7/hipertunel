@@ -12,6 +12,7 @@ import { createShop, SHOP } from './shop.js';
 import { Adventure, STAGES, packGhost, unpackGhost, quantSteer } from './sim/adventure.js';
 import { Arcade } from './sim/arcade.js';
 import { Zorro } from './sim/zorro.js';
+import { GHOST_KEY, GhostRecorder, quantGhost, unpackRun, newGhostGame, stepGhost, ghostMatches } from './ghost.js';
 
 const VERSION = '0.61';
 const STEP = 1 / 60;
@@ -63,6 +64,11 @@ let coins = 0;
 let worldBase = 0;
 // Aventura: tramo elegido, progreso guardado (estrellas, mejor avance y fantasma) y la partida del fantasma
 let advStage = 0, advRec = [], ghostSteers = null, ghostGame = null, cpFrame = -1, cpPrefix = null;
+// Arcade: fantasma de la mejor partida (semilla + giros y piruetas de cada paso) y grabación de la actual
+let arcGhost = null, arcRec = null;
+const loadArcGhost = () => {
+  try { const best = bestScore('arcade'); const r = unpackRun(JSON.parse(localStorage.getItem(GHOST_KEY))); return r && best > 0 && r.score === best ? r : null; } catch (e) { return null; }
+};
 const loadAdv = () => { try { return JSON.parse(localStorage.getItem('hipertunel-aventura') || '{}'); } catch (e) { return {}; } };
 const saveAdv = (d) => { try { localStorage.setItem('hipertunel-aventura', JSON.stringify(d)); } catch (e) {} };
 const bitsOf = (e) => (e ? (e.bits ?? (e.stars >= 3 ? 7 : e.stars === 2 ? 3 : e.stars ? 1 : 0)) : 0);
@@ -146,6 +152,7 @@ function goLandscape() {
 // ---------------------------------------------------------------- estados
 function newGame(m, seed, fromCp = false) {
   if (m === 'daily' && seed === undefined) seed = daySeed(dayKey());
+  arcRec = null; arcGhost = null;
   if (m === 'adventure') {
     game = new Adventure({ stage: advStage });
     const saved = loadAdv()[advStage];
@@ -159,7 +166,12 @@ function newGame(m, seed, fromCp = false) {
       advRec = Array.from(cpPrefix); game.fromCheckpoint = true; game.events = [];
     } else { cpFrame = -1; cpPrefix = null; }
   } else if (m === 'zorro') { game = new Zorro({ seed: seed ?? ((Math.random() * 1e9) | 0) }); ghostGame = null; ghostSteers = null; }
-  else if (m === 'arcade') { game = new Arcade({ seed: seed ?? ((Math.random() * 1e9) | 0), easyWalls: Math.max(0, 3 - wallHints) }); ghostGame = null; ghostSteers = null; }
+  else if (m === 'arcade') {
+    const sd = seed ?? ((Math.random() * 1e9) | 0), easy = Math.max(0, 3 - wallHints);
+    game = new Arcade({ seed: sd, easyWalls: easy });
+    arcRec = new GhostRecorder({ seed: sd, easy });
+    arcGhost = loadArcGhost(); ghostGame = arcGhost ? newGhostGame(arcGhost) : null; ghostSteers = null;
+  }
   else { game = new Game({ mode: simMode(m), seed: seed ?? ((Math.random() * 1e9) | 0) }); ghostGame = null; ghostSteers = null; }
   renderer.ghostGame = ghostGame;
   renderer.third = m === 'zorro';
@@ -205,6 +217,7 @@ function startGame(m, quick = false, fromCp = false) {
   let seen = 0; try { seen = +(localStorage.getItem('hipertunel-partidas') || 0); localStorage.setItem('hipertunel-partidas', String(seen + 1)); } catch (e) {}
   if (m === 'zorro') setTimeout(() => ui.toast(input.hasTilt ? 'Toca la pantalla para saltar por encima de las cajas' : COARSE ? 'Desliza hacia arriba para saltar' : 'Salta con Espacio o ↑', 'mission'), 300);
   if (m === 'zorro') setTimeout(() => ui.toast('Los saltos se gastan: 10 monedas o 5 roces dan otro', 'info'), 3200);
+  else if (m === 'arcade' && arcGhost && ghostHints < 3) { ghostHints++; try { localStorage.setItem('hipertunel-pistas-fantasma', String(ghostHints)); } catch (e) {} setTimeout(() => ui.toast('Tu fantasma es tu mejor partida: ¡bate su ritmo!', 'mission'), 1200); }
   else if (seen < 3) setTimeout(() => ui.toast(input.hasTilt ? 'Inclina el móvil para girar · toca la pantalla para pausar' : (COARSE ? 'Toca a la izquierda o a la derecha para girar' : 'Gira con ← →'), 'info'), 300);
   padHint = seen < 3;
   if (seen >= 3 && !input.hasTilt && settings.tilt && COARSE) setTimeout(() => { if (!input.hasTilt) ui.toast('Sin giroscopio: toca a izquierda o derecha', 'info'); }, 1500);
@@ -229,12 +242,21 @@ function finish() {
   if (isArcade(mode)) list.sort((a, b) => b.score - a.score); else list.sort((a, b) => (b.distM ?? b.score) - (a.distM ?? a.score));
   const top = list.slice(0, 5); saveTop(mode, top);
   const isRecord = top[0] === me && list.length > 1;
+  // la mejor partida del Arcade se guarda entera para que sea tu fantasma (semilla + entradas)
+  if (mode === 'arcade' && arcRec && top[0] === me) { try { localStorage.setItem(GHOST_KEY, JSON.stringify(arcRec.pack({ rows: game.rowsPassed, score, distM }))); } catch (e) {} }
   if (isRecord) renderer.heroMood = 'record';
   try { const w = worldBase + visWorld - 1; if (w > maxWorld()) localStorage.setItem('hipertunel-mundo-max', String(Math.min(w, 4))); } catch (e) {}
   shop.add(game.coinsGot);
   const mr = missions.finish();
   const facts = isArcade(mode) ? endFacts(score, bestScoreAtStart, isRecord, ' puntos') : endFacts(distM, bestAtStart[mode] || 0, isRecord);
-  if (isArcade(mode)) facts.lines.unshift(`Racha máxima ×${maxMult} · ${fmtN(Math.round(distM))} m`); facts.lines = facts.lines.slice(0, 2);
+  if (isArcade(mode)) facts.lines.unshift(`Racha máxima ×${maxMult} · ${fmtN(Math.round(distM))} m`);
+  // fantasma (tu mejor partida anterior): dónde ibas respecto a él al acabar; sustituye a la línea del récord, que ya dice lo mismo
+  if (mode === 'arcade' && arcGhost && ghostGame) {
+    const dg = Math.round((ghostGame.s - game.s) * 4);
+    const line = game.rowsPassed > arcGhost.rows ? 'Pasaste a tu fantasma' : dg > 4 ? `Tu fantasma iba ${fmtN(dg)} m por delante` : dg < -4 ? `Le sacaste ${fmtN(-dg)} m a tu fantasma` : 'Ibas a la par que tu fantasma';
+    facts.lines = [facts.lines[0], line];
+  }
+  facts.lines = facts.lines.slice(0, 2);
   pushMissions();
   ui.over({ mode, distM, coins, score, best: isArcade(mode) ? top[0].score : (top[0].distM ?? top[0].score), isRecord, time: game.time, maxBoostTime: mode === 'classic' ? game.boostTotal : game.maxBoostTime, top: top.map((e) => ({ ...e, me: e === me })), missionsDone: mr.completed, facts, headline: facts.headline, rankUp: mr.rankUp, rank: missions.rank() });
   if (mr.rankUp) setTimeout(() => { if (state !== 'over') return; audio.play('record'); ui.toast(`¡Rango ${missions.rank().level}: ${missions.rank().name}!`, 'mission', { force: true }); }, 700);
@@ -346,14 +368,14 @@ function finishAdventure() {
 // vibración (móvil): se apaga con "Reducir efectos"
 const buzz = (p) => { if (settings.reduceFx || settings.vibe === false || state === 'attract') return; try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
 let nearT = 0, pendingChime = false, padHint = false, hitstop = 0;
-let flightT = 0, wasFlight = false, trickHints = 0, wallHints = 0, toastOk = false;
+let flightT = 0, wasFlight = false, ghostHints = 0, trickHints = 0, wallHints = 0, toastOk = false;
 // en pleno salto entre mundos solo se ven los avisos de la pirueta (el resto se descarta,
 // salvo los marcados con DEFER —misiones, punto de control, poderes, récord—, que esperan a aterrizar; la UI
 // enseña como mucho 2 a la vez, así que la cola guarda los 2 últimos)
 const DEFER = { defer: true };
 const toastQ = [];
 { const raw = ui.toast; ui.toast = (t, k, o) => { if (!toastOk && state === 'play' && game && game.flight && game.flight() && game.alive) { if (o && o.defer) { toastQ.push([t, k, o]); if (toastQ.length > 2) toastQ.shift(); } return; } raw(t, k, o); }; }
-try { trickHints = +(localStorage.getItem('hipertunel-pistas-pirueta') || 0); wallHints = +(localStorage.getItem('hipertunel-pistas-muro') || 0); } catch (e) {}
+try { ghostHints = +(localStorage.getItem('hipertunel-pistas-fantasma') || 0); trickHints = +(localStorage.getItem('hipertunel-pistas-pirueta') || 0); wallHints = +(localStorage.getItem('hipertunel-pistas-muro') || 0); } catch (e) {}
 
 // moneda que vuela desde donde la coges hasta el contador (por el borde, nunca por el centro)
 function coinFly(e) {
@@ -384,7 +406,19 @@ function stepSim() {
   }
   else input.steer(STEP, game.theta, false);
   const arc = state === 'play' && game.variant === 'arcade';
-  const ev = game.step({ steer, jump: state === 'play' && game.hero ? input.consumeJump() : false, trick: arc ? input.consumeTrick() : false });
+  // Arcade: el giro se juega en milésimas, tal cual se graba, y el fantasma repite los mismos pasos
+  const rec = arc && arcRec && game.alive;
+  if (rec) steer = quantGhost(steer);
+  const trick = arc ? input.consumeTrick() : false;
+  if (rec) {
+    arcRec.push(steer, trick);
+    if (ghostGame && ghostGame.alive) {
+      stepGhost(ghostGame, arcGhost);
+      // si no acaba donde se grabó (otras reglas) no sirve: se deja de usar en esta partida (el dato queda hasta el próximo récord)
+      if ((!ghostGame.alive && !ghostMatches(ghostGame, arcGhost)) || (ghostGame.alive && ghostGame.frame >= arcGhost.n)) { ghostGame = null; renderer.ghostGame = null; }
+    }
+  }
+  const ev = game.step({ steer, jump: state === 'play' && game.hero ? input.consumeJump() : false, trick });
   // pirueta: mientras vuelas (y 0,5 s después de caer) tocar la pantalla no pausa
   if (arc) {
     const fl = !!game.flight();
@@ -461,7 +495,8 @@ function stepSim() {
     }
   }
   // pasar tu récord se celebra en el momento (la marca dorada del túnel está en esa fila)
-  if (state === 'play' && !recAnnounced && bestAtStart[mode] > 0 && game.distanceM > bestAtStart[mode]) { recAnnounced = true; ui.toast('¡Récord superado!', 'mission', DEFER); audio.play('record'); buzz([20, 30, 20, 30, 40]); }
+  // el récord del Arcade es por puntos (racha y monedas), el de los demás modos por distancia
+  if (state === 'play' && !recAnnounced && (mode === 'arcade' ? bestScoreAtStart > 0 && Math.round(points + game.coinsGot * 10) > bestScoreAtStart : bestAtStart[mode] > 0 && game.distanceM > bestAtStart[mode])) { recAnnounced = true; ui.toast('¡Nuevo récord!', 'mission', DEFER); audio.play('record'); buzz([20, 30, 20, 30, 40]); }
   if (padHint && state === 'play' && game.pads.some((p) => !p.taken && (p.k - game.s) / Math.max(1e-3, game.v / 13.176 * 60) < 1.6 && p.k > game.s)) { padHint = false; ui.toast('Pisa las flechas azules para acelerar', 'boost'); }
   if (toastQ.length) {
     if (state === 'play' && game.alive && !(game.flight && game.flight())) for (const a of toastQ.splice(0)) ui.toast(...a);
@@ -510,7 +545,7 @@ function frame(now) {
   if (state !== 'paused' && state !== 'countdown') audio.setSpace?.(!!renderer.outside && (state === 'play' || state === 'dying') && game.alive);   // en pausa se conserva: al reanudar no hay «whoomp» falso
   audio.setHover?.(!!game.hero && (state === 'play' || state === 'countdown') && game.alive, Math.min(1, game.speedMS / 100));
   if (state === 'play' || state === 'countdown' || state === 'dying') {
-    ui.hud({ jumps: game.hero ? { n: game.charges, part: game.charges < 2 ? game.coinAcc / 10 : 0, free: game.boostOn } : null, mult: game.variant === 'arcade' ? mult : 0, points: game.variant === 'arcade' ? Math.round(points + game.coinsGot * 10) : 0, adv: game.mode === 'adventure' ? { p: game.progress, power: game.power, powerT: game.powerT, shield: game.shield, n: advStage + 1 } : null, padDir: state === 'play' ? padDirection() : 0, distM: game.distanceM, speedMS: state === 'countdown' && game.frame === 0 ? 0 : game.speedMS, level: game.level, coins: game.coinsGot, timeLeft: mode === 'timetrial' ? game.timeLeft : null, mode, invul: game.invul > 0, best: bestAtStart[mode] || 0, countdown: state === 'countdown' ? Math.ceil(countdown) : 0 });
+    ui.hud({ ghost: state === 'play' && ghostGame && arcGhost && ghostGame.alive ? Math.round((ghostGame.s - game.s) * 4) : null, jumps: game.hero ? { n: game.charges, part: game.charges < 2 ? game.coinAcc / 10 : 0, free: game.boostOn } : null, mult: game.variant === 'arcade' ? mult : 0, points: game.variant === 'arcade' ? Math.round(points + game.coinsGot * 10) : 0, adv: game.mode === 'adventure' ? { p: game.progress, power: game.power, powerT: game.powerT, shield: game.shield, n: advStage + 1 } : null, padDir: state === 'play' ? padDirection() : 0, distM: game.distanceM, speedMS: state === 'countdown' && game.frame === 0 ? 0 : game.speedMS, level: game.level, coins: game.coinsGot, timeLeft: mode === 'timetrial' ? game.timeLeft : null, mode, invul: game.invul > 0, best: bestAtStart[mode] || 0, countdown: state === 'countdown' ? Math.ceil(countdown) : 0 });
   }
   // en la web desde Android se ofrece la app; dentro de la app (Capacitor) no
   const apk = $('apk'); if (apk) apk.hidden = !(IS_ANDROID_WEB && state === 'attract');
@@ -529,5 +564,8 @@ window.__hip = {
   start: (m = 'classic', seed) => { startGame(m); if (seed !== undefined) newGame(m, seed); state = 'play'; },
   skipTo(rows) { while (game.s < rows && game.alive) { game.step({ steer: botSteer(game) }); renderer.track.sync(game); } prev = { s: game.s, theta: game.theta }; },
   step(n = 1, steer = null) { for (let i = 0; i < n; i++) { prev.s = game.s; prev.theta = game.theta; const ev = game.step({ steer: steer ?? botSteer(game) }); renderer.onEvents(ev, game); renderer.track.sync(game); } },
+  // n pasos por el bucle real (stepSim, con entrada, grabación, avisos y fantasma), sin esperar a los fotogramas
+  arcScore: () => Math.round(points + game.coinsGot * 10),
+  sim(n = 1) { for (let i = 0; i < n && state === 'play'; i++) { stepSim(); if (!game.alive) { state = 'dying'; overT = 0; } } },
   bot: botSteer, padDirection: () => padDirection(),
 };

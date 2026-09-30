@@ -482,7 +482,7 @@ export class Renderer {
     this.sky.inside = gapNear ? 0 : Math.max(0, Math.min(1, (game.fold - 20) / 10));
     this.sky.update(cam, this._skyUp, outside ? 1 : 0, dt, this.cam.invert, this.fr.F);
     this.decor.update(game, tr, cam, true, dt);   // se ve también por los arcos del túnel
-    this.adv.update(game, tr, dt, this.ghostGame);
+    this.adv.update(game, tr, dt, this.ghostGame, this.camera);
     this.life.update(cam, this.look, this.upS, outside, this.themeIdx, dt, this.quality !== 'baja' && !reduceFx, this.cam.invert);
     this.wild.update(game, tr, cam, this.look, this.upS, outside, this.themeIdx, dt, this.quality !== 'baja' && !reduceFx && this.cam.invert < 0.5);
     this.renderer.setClearColor(this.fogColor, 1);

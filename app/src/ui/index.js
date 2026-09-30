@@ -318,6 +318,7 @@ function hudHTML() {
   <div class="hud-tr">
     <div class="hud-dist hud-chip">${hudLeaves}<b data-hud="dist">0</b><span>m</span></div>
     <div class="hud-speed hud-chip">${hudLeaves}${ICON.speed}<b data-hud="speed">0</b> km/h</div>
+    <div class="hud-ghost" data-hud="ghost"></div>
     <div class="hud-mult hud-chip" data-hud="mult">${hudLeaves}<b data-hud="multN">×1</b><small data-hud="pts">0</small></div>
   </div>
   <div class="hud-count" data-hud="count"></div>
@@ -606,7 +607,7 @@ export function createUI(root, handlers = {}) {
   const hudEl = {
     coins: $('[data-hud="coins"]'), timer: $('[data-hud="timer"]'), timerBox: $('[data-hud="timerBox"]'),
     dist: $('[data-hud="dist"]'), speed: $('[data-hud="speed"]'), chevs: $('[data-hud="chevs"]'),
-    chev: $$('.chev'), distBox: $('.hud-dist'), padL: $('[data-hud="padL"]'), padR: $('[data-hud="padR"]'), advBar: $('[data-hud="advBar"]'), advIntro: $('[data-hud="advIntro"]'), mult: $('[data-hud="mult"]'), jumps: $('[data-hud="jumps"]'), jumpPips: $$('.hud-jumps i b'), multN: $('[data-hud="multN"]'), pts: $('[data-hud="pts"]'), advN: $('[data-hud="advN"]'), advP: $('[data-hud="advP"]'), advPow: $('[data-hud="advPow"]'),
+    ghost: $('[data-hud="ghost"]'), chev: $$('.chev'), distBox: $('.hud-dist'), padL: $('[data-hud="padL"]'), padR: $('[data-hud="padR"]'), advBar: $('[data-hud="advBar"]'), advIntro: $('[data-hud="advIntro"]'), mult: $('[data-hud="mult"]'), jumps: $('[data-hud="jumps"]'), jumpPips: $$('.hud-jumps i b'), multN: $('[data-hud="multN"]'), pts: $('[data-hud="pts"]'), advN: $('[data-hud="advN"]'), advP: $('[data-hud="advP"]'), advPow: $('[data-hud="advPow"]'),
   };
   const last = {};
   function hudReset() {
@@ -622,6 +623,13 @@ export function createUI(root, handlers = {}) {
       hudEl.dist.textContent = fmtInt(dist);
       const beyond = st.best > 0 && dist > st.best;
       if (beyond !== last.beyond) { last.beyond = beyond; hudEl.distBox.classList.toggle('gold', beyond); }
+    }
+    // fantasma del Arcade: metros por delante (▲) o por detrás (▼) de tu mejor partida; sin fantasma, oculto
+    const gh = st.ghost == null ? null : st.ghost;
+    if (gh !== last.gh) {
+      last.gh = gh;
+      const el = hudEl.ghost; el.classList.toggle('on', gh !== null);
+      if (gh !== null) el.textContent = `Fantasma ${gh >= 0 ? '▲' : '▼'} ${fmtInt(Math.abs(gh))} m`;
     }
     // flecha hacia la placa más cercana tras perder los impulsos (en el borde, nunca en el centro)
     // Aventura: avance del tramo y poder activo
