@@ -115,7 +115,7 @@ function titleHTML() {
       <div class="chip chip-rank">${ICON.sparkle}<span data-bind="rankName">Novato</span><b data-bind="rankLvl">1</b></div>
     </div>
     <div class="press">Pulsa para jugar</div>
-    <div class="chip chip-ver">v0.60</div>
+    <div class="chip chip-ver">v0.61</div>
   </div>
 </section>`;
 }
