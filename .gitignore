@@ -12,3 +12,4 @@ __pycache__/
 
 # estado del turno de noche (fuera de git)
 .noche/
+builds-noche/

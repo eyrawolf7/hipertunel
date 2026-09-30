@@ -2,6 +2,8 @@ Eres el turno de noche de Hipertúnel. Trabajas SOLO, sin nadie a quien pregunta
 
 Antes de nada lee `CLAUDE.md` (reglas de diseño que no se rompen), `docs/CONTRATO.md` y, en la carpeta de estado `.noche/`: `progreso.md` (qué han hecho las rondas anteriores y qué han aprendido) y `tareas.json`.
 
+**Comandos:** uno por llamada, sin `cd` (ya estás en la carpeta), sin encadenar con `;`/`&&`/`|` más de lo imprescindible, sin subshells `( … )` ni `&`. Los comandos largos o compuestos se deniegan automáticamente. Al lanzar a los críticos, díselo también en su encargo: «ejecuta comandos sencillos, uno por llamada, sin cd ni `;`; estás en <carpeta>».
+
 **Entorno ya preparado:** el servidor de desarrollo de esta copia ya está en marcha en `$HIP_URL` (http://localhost:5174/) y las variables `HIP_URL` y `HIP_PORT` ya están en el entorno: las pruebas las usan solas, así que NO las pongas delante de los comandos ni arranques otro servidor (si no responde, `npx vite --config app/vite.config.js --host` en segundo plano). Nada de `(... &)` ni de cadenas largas con `;`: un comando por llamada, que se lea bien.
 
 ## Pasos de la ronda
@@ -22,7 +24,7 @@ Antes de nada lee `CLAUDE.md` (reglas de diseño que no se rompen), `docs/CONTRA
 6. **Puerta**: `sh noche/puerta.sh` (la completa, con qa.mjs) tiene que salir en verde. Si falla, arréglalo; si no puedes en esta ronda, `git restore`/`git reset` a lo último bueno, suma 1 a `intentos` y, con 3 intentos, marca la tarea `"bloqueada"` explicando por qué.
 7. **Commit** en la rama de la tarea, con mensaje en español como los del repo y al final la línea `Co-Authored-By: Claude <noreply@anthropic.com>`.
 8. **Integración**: si la tarea es `"tipo": "segura"`, `git switch noche/<fecha>/todo` (la de integración), `git merge --no-ff noche/<fecha>/<id>`, `sh noche/puerta.sh rapida`; si choca o falla, `git merge --abort` o `git reset --hard HEAD~1` y anótalo (la rama suelta queda para Víctor). Las de `"tipo": "propuesta"` (mecánicas y funciones nuevas) NO se fusionan: se quedan en su rama para que Víctor las pruebe por separado.
-9. **Versión para el móvil** de cada rama terminada: `npx vite build --config app/vite.config.js` y copia el HTML de un solo archivo que salga en `dist/` a `.noche/builds/<id>.html` (no uses `npm run build`: está prohibido y escribe el index.html publicado).
+9. **Versión para el móvil** de cada rama terminada: `npx vite build --config app/vite.config.js` y copia el HTML de un solo archivo que salga en `dist/` a `builds-noche/<id>.html` (carpeta visible en la raíz de esta copia, fuera de git) (no uses `npm run build`: está prohibido y escribe el index.html publicado).
 10. **Anota** en `tareas.json` (estado `hecha`, rama, commit, nota corta con las cifras antes/después) y añade al final de `.noche/progreso.md` un bloque de 5-10 líneas: qué hiciste, cifras, qué aprendiste que sirva a las siguientes rondas, y lo que queda por mirar. Guarda las capturas de antes/después en `.noche/capturas/<id>/`.
 11. **Informe**: reescribe `.noche/INFORME.md` para Víctor (en español de España, informal, corto): tabla de tareas (hecha/bloqueada/propuesta, rama, una línea de qué cambia y cómo probarlo), las métricas del bot de la noche frente a las de partida, y lo que necesita que él decida. Luego termina la ronda.
 

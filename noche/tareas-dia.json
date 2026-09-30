@@ -1,0 +1,229 @@
+{
+ "nota": "Sprints de día (2026-09-30), validados por Víctor en el orden del crítico jugador: uno por sprint (solo una tarea 'pendiente' a la vez; el resto 'espera'). Las de noche ya 'hecha' están en main (v0.61). Novato/medio/bueno/experto son los niveles del BOT de pruebas, no modos de dificultad del juego (hay una sola dificultad).",
+ "tareas": [
+  {
+   "id": "arranque-amable",
+   "prioridad": 1,
+   "tipo": "propuesta",
+   "titulo": "Arranque del Arcade más amable",
+   "descripcion": "Primeros ~20 s con menos cajas altas y algo más de hueco entre oleadas; después igual que ahora. Solo en arcade.js (+ port a C con paridad); nada del Clásico. Una sola dificultad para todos: el buen jugador casi no debe notarlo.",
+   "criterio_hecho": "Con tests/diversion.mjs (bot-pro, 40 semillas): primer choque del novato ≥ 10 s, mediana del novato ≥ 45 s, cajas altas < 30 % de las muertes del novato, y la mediana del experto no baja más de un 5 %; muertes inevitables ≤ 1,5 %; puerta verde.",
+   "verificacion": [
+    "node tests/diversion.mjs",
+    "sh noche/puerta.sh"
+   ],
+   "critico": "critico-jugador",
+   "depende": [],
+   "estado": "pendiente",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "acampar-aviso",
+   "prioridad": 2,
+   "tipo": "propuesta",
+   "titulo": "Aviso de la caja por acampar",
+   "descripcion": "La caja que cae por quedarte en un carril (CAMP_ROWS) llega casi sin aviso: que su carril se encienda antes (es una caja que viene: regla 3). La caja sigue cayendo en TU carril (no en el de al lado).",
+   "criterio_hecho": "Siempre ≥ 0,6 s entre que se enciende el carril y llega la caja, también a velocidad máxima; muertes inevitables ≤ 1 %; quedarse quieto sigue matando en < 12 s.",
+   "verificacion": [
+    "node tests/diversion.mjs",
+    "sh noche/puerta.sh"
+   ],
+   "critico": "critico-jugador",
+   "depende": [],
+   "estado": "espera",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "misiones-alcance",
+   "prioridad": 3,
+   "tipo": "propuesta",
+   "titulo": "Misiones al alcance",
+   "descripcion": "Primera misión de cada rango fácil; las de cartón y piruetas solo salen en modos donde existen. Comprobar que el fin de partida tiene el botón grande de reintentar (Otra vez) bien visible y la frase «te faltaron X m/pts para tu récord».",
+   "criterio_hecho": "El novato cumple ≥ 1,5 misiones por partida en sus 3 primeras partidas (bot-pro); ninguna misión es imposible en el modo en que sale; qa verde.",
+   "verificacion": [
+    "node tests/diversion.mjs",
+    "node tests/qa.mjs"
+   ],
+   "critico": "critico-jugador",
+   "depende": [],
+   "estado": "espera",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "roce",
+   "prioridad": 4,
+   "tipo": "propuesta",
+   "titulo": "Rozar da chispa y 1 moneda",
+   "descripcion": "El roce («¡Por los pelos!») da una chispa en el borde de la vista (nunca en el centro) y 1 moneda. Solo Arcade (y fases), con port a C si toca la simulación.",
+   "criterio_hecho": "El bot medio roza de 3 a 10 veces por partida; su mediana no cambia más de un 3 %; nada en el 20 % central; dorado y paridad OK.",
+   "verificacion": [
+    "node tests/diversion.mjs",
+    "sh noche/puerta.sh"
+   ],
+   "critico": "critico-jugador",
+   "depende": [],
+   "estado": "espera",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "fases-a",
+   "prioridad": 5,
+   "tipo": "propuesta",
+   "titulo": "Fases (1/2): mapa, Fases 1 y 2, portal y estrellas",
+   "descripcion": "«Jugar» te lleva DIRECTO a la siguiente fase (el mapa detrás, accesible). Fase = mundo: Fase 1 Islas del cielo, Fase 2 Selva; 60-90 s en 3 tramos con punto de control (al morir vuelves al último, con un impulso de regalo); se gana llegando al portal (el salto entre mundos con piruetas; estrellas en el aire). Estrellas: superarla, sin chocar, 35 % de monedas (la tercera solo sin puntos de control). El tutorial de cartón y piruetas va dentro de la Fase 1. Tras el portal el botón grande es «Siguiente fase». El infinito sigue accesible como «Sin fin». Todo encima de la simulación (adventure.js o un archivo nuevo); nada de game.js ni waves.js.",
+   "criterio_hecho": "Bots (tests/aventura.mjs o bot-pro): el novato supera la Fase 1 en ≤ 3 intentos en ≥ 70 % de las semillas; cada fase dura 60-90 s con el bot medio; «Jugar» abre la siguiente fase (qa); fantasma y puntos de control deterministas; puerta verde.",
+   "verificacion": [
+    "node tests/aventura.mjs",
+    "sh noche/puerta.sh"
+   ],
+   "critico": "critico-jugador",
+   "depende": [],
+   "estado": "espera",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "fases-b",
+   "prioridad": 6,
+   "tipo": "propuesta",
+   "titulo": "Fases (2/2): Fases 3-5, jefes, Vuelta 2 y Sin fin",
+   "descripcion": "Fase 3 Noche (con jefe), 4 Templo, 5 Fuego (con jefe). 1 estrella abre la siguiente; con las 15, «Vuelta 2» (6 oleadas más tarde y +25 % de densidad). El Arcade infinito como «Sin fin», bien visible en el mapa, que se desbloquea al superar la Fase 1 y conserva su récord.",
+   "criterio_hecho": "La tasa del bot medio no sube de una fase a la siguiente (±10 puntos) y el bueno nunca queda por debajo del medio; el bueno saca 3 estrellas en la Fase 5 en < 30 % de los intentos; qa: «Sin fin» se desbloquea; puerta verde.",
+   "verificacion": [
+    "node tests/aventura.mjs",
+    "sh noche/puerta.sh"
+   ],
+   "critico": "critico-jugador",
+   "depende": [
+    "fases-a"
+   ],
+   "estado": "espera",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "fantasma-arcade",
+   "prioridad": 7,
+   "tipo": "propuesta",
+   "titulo": "Fantasma de tu mejor partida, con «nuevo récord» en vivo",
+   "descripcion": "Guardar semilla y entradas de la mejor partida (Sin fin / Arcade) y pintarla como fantasma translúcido que no tape el centro; aviso de «¡Nuevo récord!» justo al pasar la fila del récord.",
+   "criterio_hecho": "100 repeticiones de las entradas sin ninguna desincronía; el aviso salta en la fila exacta; el fantasma no ocupa el 20 % central; qa verde.",
+   "verificacion": [
+    "node tests/qa.mjs"
+   ],
+   "critico": "director-arte",
+   "depende": [],
+   "estado": "espera",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "reto-expertos",
+   "prioridad": 8,
+   "tipo": "propuesta",
+   "titulo": "Más reto en los mundos 3-4 (solo Sin fin y Vuelta 2)",
+   "descripcion": "Más rodantes y plegados en los mundos 3-4, solo en Sin fin y Vuelta 2.",
+   "criterio_hecho": "La mediana del experto baja de ~232 s a 150-180 s; muertes inevitables ≤ 1,5 %; el novato no nota nada (±5 %).",
+   "verificacion": [
+    "node tests/diversion.mjs"
+   ],
+   "critico": "critico-jugador",
+   "depende": [],
+   "estado": "espera",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "zorro-fin",
+   "prioridad": 110,
+   "tipo": "segura",
+   "titulo": "Zorro entero en el fin de partida",
+   "descripcion": "A 844×390 el zorro del fin de partida puede quedar fuera o tapado por la tarjeta. Ajustar el encuadre (render/index.js, outView rama de muerte) y/o la posición de la tarjeta.",
+   "criterio_hecho": "Caja del zorro proyectada entera en pantalla, a la izquierda y sin solaparse con la tarjeta a 667×375, 844×390 y 1280×720 en 10 muertes distintas.",
+   "verificacion": [
+    "capturas del fin de partida"
+   ],
+   "critico": "director-arte",
+   "depende": [],
+   "estado": "espera",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "modos-carrusel",
+   "prioridad": 111,
+   "tipo": "segura",
+   "titulo": "Elige modo: carrusel claro",
+   "descripcion": "A 844 caben 5,5 tarjetas y la última sale cortada sin pista de que se desliza. Flechas laterales como en la maqueta; ninguna tarjeta cortada sin indicarlo; «Recomendado» no se corta.",
+   "criterio_hecho": "En 1280 se ven las 8 enteras; en 844 hay flecha de carrusel y se navega con mando/teclado/toque; director ≥ 8/10.",
+   "verificacion": [
+    "capturas de Modos"
+   ],
+   "critico": "director-arte",
+   "depende": [],
+   "estado": "espera",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "retoques",
+   "prioridad": 112,
+   "tipo": "segura",
+   "titulo": "Retoques de menús y HUD",
+   "descripcion": "Tramos bloqueados de Aventura menos grises (piedra cálida al 70 %); el título de Pausa no pisa el marco y cada misión tiene barra; flecha de impulso vacía en azul oscuro translúcido (es del impulso) y menos saturada que la llena; al reanudar en pleno salto el «1» de la cuenta atrás no tapa el centro; quitar «Esc volver» en pantallas táctiles.",
+   "criterio_hecho": "Cada punto comprobado en captura; luminancia de las bloqueadas ≥ 55 % de la desbloqueada; ningún cruce de cajas en Pausa; nada del HUD en el 20 % central durante el salto y la cuenta atrás; director ≥ 8/10.",
+   "verificacion": [
+    "capturas de Aventura, Pausa, HUD"
+   ],
+   "critico": "director-arte",
+   "depende": [],
+   "estado": "espera",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  },
+  {
+   "id": "estudio-apk",
+   "prioridad": 113,
+   "tipo": "segura",
+   "titulo": "Estudio de los juegos de referencia (sala limpia)",
+   "descripcion": "Análisis ESTÁTICO de los APK de ~/Documents/Proyectos/apks-referencia/ (Sonic Dash xapk, WipEout Rush; el mod de Subway y 'sonic colors.apk' solo si se pueden leer sin ejecutarlos; NUNCA instalar ni ejecutar nada). Partir de referencias/analisis-runners.md (ya hecho). Sacar el FUNCIONAMIENTO, no el código: primer minuto y tutorial, curva de dificultad, recompensas/misiones/rachas diarias, poderes, sensación al chocar o recoger (juice), menús y flujo entre partidas, con cifras (tiempos, duraciones, probabilidades). Escribir referencias/fichas/<tema>.md (sin código copiado, redactado con nuestras palabras) y una lista de ideas para Hipertúnel ordenadas por impacto, marcando cuáles respetan las reglas de CLAUDE.md. Nada de modelos, animaciones, audio ni código de esos juegos entra en el nuestro.",
+   "criterio_hecho": "Fichas escritas en referencias/fichas/ y lista de ideas en .noche/INFORME.md; ningún archivo del juego cambiado en esta tarea.",
+   "verificacion": [
+    "git diff --stat main (solo referencias/ o nada)"
+   ],
+   "critico": null,
+   "depende": [],
+   "estado": "espera",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
+  }
+ ]
+}
