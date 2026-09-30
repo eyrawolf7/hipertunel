@@ -77,7 +77,13 @@
    "Bash(for:*)",
    "Bash(kill:*)",
    "Bash(pkill -f vite:*)",
-   "Bash(lsof:*)"
+   "Bash(lsof:*)",
+   "Bash(make:*)",
+   "Bash(make -f ports/switch/Makefile.desktop:*)",
+   "Bash(sh ports/switch/tools/switch-build.sh:*)",
+   "Bash(python3 ports/switch/tools/embed.py:*)",
+   "Bash(colima:*)",
+   "Bash(docker:*)"
   ],
   "deny": [
    "Bash(git push:*)",
