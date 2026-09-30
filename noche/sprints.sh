@@ -5,11 +5,12 @@
 # siguiente. Uso: sh noche/sprints.sh id1 id2 id3 …
 set -u
 REPO=$(cd "$(dirname "$0")/.." && pwd)
-WT="$REPO/../hipertunel-noche"
+CARRIL=${CARRIL:-noche}
+WT="$REPO/../hipertunel-$CARRIL"
 EST="$WT/.noche"
 LOG="$EST/logs/sprints.txt"
 # si ya hay un turno en marcha, espera a que acabe
-while pgrep -f "sh noche/turno.sh" > /dev/null; do sleep 30; done
+while [ -f "$WT/.noche/turno.pid" ] && kill -0 "$(cat "$WT/.noche/turno.pid")" 2>/dev/null; do sleep 30; done
 for id in "$@"; do
   python3 - "$EST/tareas.json" "$id" <<'EOF'
 import json, sys

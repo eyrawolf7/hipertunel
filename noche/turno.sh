@@ -16,9 +16,11 @@ REPO=$(cd "$(dirname "$0")/.." && pwd)
 HASTA=${1:-07:30}
 MAX=${2:-60}
 FECHA=$(date +%F)
-WT="$REPO/../hipertunel-noche"
+CARRIL=${CARRIL:-noche}              # carriles en paralelo: noche (5174), visual (5175), mecanica (5176)…
+WT="$REPO/../hipertunel-$CARRIL"
 EST="$WT/.noche"
-export HIPERTUNEL_NOCHE=1 HIP_PORT=5174 HIP_URL=http://localhost:5174/
+PORT=${PORT:-5174}
+export HIPERTUNEL_NOCHE=1 HIP_PORT=$PORT HIP_URL=http://localhost:$PORT/
 export GIT_AUTHOR_NAME=eyrawolf7 GIT_AUTHOR_EMAIL=eyrawolf7@users.noreply.github.com
 export GIT_COMMITTER_NAME=eyrawolf7 GIT_COMMITTER_EMAIL=eyrawolf7@users.noreply.github.com
 
@@ -31,13 +33,15 @@ fi
 
 # copia de trabajo y estado
 if [ ! -d "$WT" ]; then
-  git -C "$REPO" worktree add -B "noche/$FECHA/todo" "$WT" main || exit 1
+  if [ "$CARRIL" = noche ]; then git -C "$REPO" worktree add -B "noche/$FECHA/todo" "$WT" main || exit 1
+  else git -C "$REPO" worktree add --detach "$WT" "noche/$FECHA/todo" || exit 1; fi
   ln -s "$REPO/node_modules" "$WT/node_modules"
 fi
 mkdir -p "$EST/logs" "$EST/capturas" "$EST/builds"
-[ -f "$EST/tareas.json" ] || cp "$REPO/noche/tareas.json" "$EST/tareas.json"
+[ -f "$EST/tareas.json" ] || cp "$REPO/../hipertunel-noche/.noche/tareas.json" "$EST/tareas.json" 2>/dev/null || cp "$REPO/noche/tareas.json" "$EST/tareas.json"
 [ -f "$EST/progreso.md" ] || printf '# Turno de noche %s\n\n' "$FECHA" > "$EST/progreso.md"
 cp "$REPO/noche/ajustes.json" "$EST/ajustes.json"
+echo $$ > "$EST/turno.pid"
 cd "$WT" || exit 1
 
 # servidor de desarrollo de la copia, en su puerto
