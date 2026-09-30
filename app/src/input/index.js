@@ -123,6 +123,8 @@ export function createInput(target) {
       const t = st.trickQ || (held && !st.trickHeld);
       st.trickHeld = held; st.trickQ = false; return t;
     },
+    // al empezar o reanudar: lo que ya está pulsado (p. ej. la A del menú) no cuenta como salto
+    syncJump() { st.jumpHeld = st.keys.has('Space') || st.keys.has('ArrowUp') || st.keys.has('KeyW') || st.pad.a; st.jumpQ = false; },
     consumeJump() { const j = st.jumpQ || ((st.keys.has('Space') || st.keys.has('ArrowUp') || st.keys.has('KeyW') || st.pad.a) && !st.jumpHeld); st.jumpHeld = st.keys.has('Space') || st.keys.has('ArrowUp') || st.keys.has('KeyW') || st.pad.a; st.jumpQ = false; return j; },
     configure({ tilt, invert, sens }) { if (tilt !== undefined) st.tiltOn = tilt; if (invert !== undefined) st.invert = invert; if (sens !== undefined) st.sens = sens; },
     calibrate() { st.cal = st.raw; try { localStorage.setItem('hipertunel-cal2', String(st.cal)); } catch (e) {} },

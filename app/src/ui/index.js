@@ -427,6 +427,7 @@ export function createUI(root, handlers = {}) {
   }
   function confirm() {
     if (!MENU_SCREENS.has(current)) return;
+    root.classList.add('nav-kbd');
     if (!focused) { const it = navItems(); if (it[0]) setFocus(it[0], false); return; }
     press(focused);
   }
@@ -437,7 +438,7 @@ export function createUI(root, handlers = {}) {
       case 'map': snd('menuBack'); show('modes'); break;
       case 'settings': snd('menuBack'); show(settingsFrom === 'pause' ? 'pause' : 'title'); break;
       case 'pause': snd('menuBack'); call('onResume'); break;
-      case 'over': snd('menuBack'); call('onMenu'); break;
+      case 'over': if (performance.now() - overShownAt < 600) break; snd('menuBack'); call('onMenu'); break;
       default: break;
     }
   }
