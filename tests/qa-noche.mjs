@@ -390,6 +390,33 @@ await run('k', async () => {
   await page.close();
 });
 
+// l. avisos de misión en pleno salto entre mundos: esperan y salen al aterrizar (por el bucle real)
+await run('l', async () => {
+  const { page, errors } = await open();
+  const ready = await page.evaluate(() => {
+    window.__hip.start('arcade', 7); window.__freeze = true;
+    const h = window.__hip, g = h.game; g.crash = (x) => { x.hit = true; };
+    for (let i = 0; i < 60 * 240 && g.alive && !(g.flight() && g.landIn > 0.7); i++) h.step(1);
+    window.__fired = 0; window.__firedInFlight = false; window.__samples = [];
+    const m = h.missions, tick0 = m.tick.bind(m);
+    m.tick = (gg, d) => { const out = tick0(gg, d); if (!window.__fired && gg.flight()) { window.__fired++; window.__firedInFlight = true; out.push({ text: 'Prueba en vuelo' }); } return out; };
+    (function f() { window.__samples.push({ fl: !!g.flight(), n: [...document.querySelectorAll('.toast')].filter((t) => /Prueba en vuelo/.test(t.textContent)).length }); requestAnimationFrame(f); })();
+    window.__freeze = false;
+    return { fl: !!g.flight(), landIn: +g.landIn.toFixed(2), alive: g.alive, st: h.state };
+  });
+  rec('l', 'se llega a un salto entre mundos con tiempo de vuelo', ready.fl && ready.alive && ready.st === 'play', ready);
+  await sleep(4500);
+  const r = await page.evaluate(() => ({ fired: window.__fired, inFlight: window.__firedInFlight, s: window.__samples }));
+  const during = r.s.filter((x) => x.fl), after = r.s.filter((x) => !x.fl);
+  rec('l', 'la misión se cumple en pleno vuelo (mínimo 1 aviso exigido)', r.fired === 1 && r.inFlight, { fired: r.fired });
+  rec('l', 'con el salto en curso el aviso no está en pantalla', during.length > 10 && during.every((x) => x.n === 0), { fotogramasEnVuelo: during.length });
+  rec('l', 'tras aterrizar el aviso sale', after.some((x) => x.n >= 1), { fotogramasTrasVuelo: after.length });
+  const apariciones = r.s.filter((x, i) => x.n >= 1 && (i === 0 || r.s[i - 1].n === 0)).length;
+  rec('l', 'sale una sola vez (sin duplicados ni reapariciones)', r.s.every((x) => x.n <= 1) && apariciones === 1, { apariciones });
+  rec('l', 'sin errores', errors.length === 0, errors.slice(0, 3));
+  await page.close();
+});
+
 await browser.close();
 console.log(fails ? `${fails} FALLOS` : 'Todo OK');
 process.exit(fails ? 1 : 0);

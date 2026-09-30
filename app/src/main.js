@@ -13,7 +13,7 @@ import { Adventure, STAGES, packGhost, unpackGhost, quantSteer } from './sim/adv
 import { Arcade } from './sim/arcade.js';
 import { Zorro } from './sim/zorro.js';
 
-const VERSION = '0.60';
+const VERSION = '0.61';
 const STEP = 1 / 60;
 const $ = (id) => document.getElementById(id);
 const QS = new URLSearchParams(location.search);
@@ -196,7 +196,7 @@ function startGame(m, quick = false, fromCp = false) {
   missions.start(); missDist = 0; mult = 1; multDist = 0; points = 0; maxMult = 1; bestScoreAtStart = bestScore(m); lostAt = -1; killBox = null; recAnnounced = false; visWorld = 1;
   renderer.setRecordRow?.(bestAtStart[m] > 0 ? Math.round(bestAtStart[m] / 4) : -1);
   // reintento rápido: sin 3-2-1, solo un instante antes del ¡YA!
-  state = 'countdown'; countdown = quick ? 0.6 : 3; pendingChime = false; nearT = 0; input.syncJump();
+  state = 'countdown'; countdown = quick ? 0.6 : 3; pendingChime = false; nearT = 0; toastQ.length = 0; input.syncJump();
   // desde el menú (no en el reintento rápido): se ve al zorro y la cámara entra en su cabeza
   if (!quick && m !== 'zorro' && !settings.reduceFx) renderer.startIntro();
   ui.show('hud');
@@ -347,8 +347,12 @@ function finishAdventure() {
 const buzz = (p) => { if (settings.reduceFx || settings.vibe === false || state === 'attract') return; try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
 let nearT = 0, pendingChime = false, padHint = false, hitstop = 0;
 let flightT = 0, wasFlight = false, trickHints = 0, wallHints = 0, toastOk = false;
-// en pleno salto entre mundos solo se ven los avisos de la pirueta (el resto espera a aterrizar)
-{ const raw = ui.toast; ui.toast = (t, k, o) => { if (!toastOk && state === 'play' && game && game.flight && game.flight() && game.alive) return; raw(t, k, o); }; }
+// en pleno salto entre mundos solo se ven los avisos de la pirueta (el resto se descarta,
+// salvo los marcados con DEFER —misiones, punto de control, poderes, récord—, que esperan a aterrizar; la UI
+// enseña como mucho 2 a la vez, así que la cola guarda los 2 últimos)
+const DEFER = { defer: true };
+const toastQ = [];
+{ const raw = ui.toast; ui.toast = (t, k, o) => { if (!toastOk && state === 'play' && game && game.flight && game.flight() && game.alive) { if (o && o.defer) { toastQ.push([t, k, o]); if (toastQ.length > 2) toastQ.shift(); } return; } raw(t, k, o); }; }
 try { trickHints = +(localStorage.getItem('hipertunel-pistas-pirueta') || 0); wallHints = +(localStorage.getItem('hipertunel-pistas-muro') || 0); } catch (e) {}
 
 // moneda que vuela desde donde la coges hasta el contador (por el borde, nunca por el centro)
@@ -406,8 +410,8 @@ function stepSim() {
     else if (e.type === 'crumble') { audio.play('collapse'); buzz(25); }
     else if (e.type === 'creak') { audio.play('creak', { k: e.k }); buzz(e.k > 0.6 ? 12 : 6); }
     else if (e.type === 'zoneIn') { ui.toast('¡El suelo cruje! No te quedes quieto', 'mission'); audio.play('creak', { k: 0.5 }); }
-    else if (e.type === 'checkpoint') { cpFrame = advRec.length; cpPrefix = Float64Array.from(advRec); ui.toast('¡Punto de control!', 'mission'); audio.play('world'); }
-    else if (e.type === 'power') { const n = { magnet: 'Imán', x2: 'Monedas ×2', shield: 'Escudo' }[e.kind]; ui.toast(`¡${n}!`, 'mission'); audio.play('world'); buzz([10, 20, 10]); }
+    else if (e.type === 'checkpoint') { cpFrame = advRec.length; cpPrefix = Float64Array.from(advRec); ui.toast('¡Punto de control!', 'mission', DEFER); audio.play('world'); }
+    else if (e.type === 'power') { const n = { magnet: 'Imán', x2: 'Monedas ×2', shield: 'Escudo' }[e.kind]; ui.toast(`¡${n}!`, 'mission', DEFER); audio.play('world'); buzz([10, 20, 10]); }
     else if (e.type === 'shield') { ui.toast('El escudo te ha salvado', 'mission'); audio.play('crash'); renderer.flash(0xb58cff, 0.35); }
     else if (e.type === 'clear') { audio.play('record'); buzz([30, 40, 30, 40, 60]); }
     else if (e.type === 'jump') { audio.play('jump'); buzz(12); }
@@ -445,7 +449,7 @@ function stepSim() {
     const fresh = [];
     for (const e of ev) fresh.push(...missions.event(e, game));
     const d = game.distanceM; fresh.push(...missions.tick(game, Math.max(0, d - missDist))); missDist = d;
-    for (const f of fresh) { ui.toast('Misión cumplida: ' + f.text, 'mission'); audio.play('world'); buzz([20, 40, 20]); }
+    for (const f of fresh) { ui.toast('Misión cumplida: ' + f.text, 'mission', DEFER); audio.play('world'); buzz([20, 40, 20]); }
   }
   // ¡Por los pelos!: una caja pasa rozando por el carril de al lado a más de 60 m/s (solo aviso)
   if (state === 'play' && game.alive && game.speedMS > 60 && (nearT -= STEP) <= 0) {
@@ -453,12 +457,16 @@ function stepSim() {
     for (const b of game.boxes) {
       if (b.hit || b.k + 0.5 <= prev.s || b.k + 0.5 > game.s) continue;
       let d = game.theta - (b.lane * hw); d = Math.atan2(Math.sin(d), Math.cos(d));
-      if (Math.abs(d) > hw * 0.8 && Math.abs(d) < hw * 1.6) { audio.play('nearMiss'); buzz(10); nearT = 0.4; if (game.variant === 'arcade') bumpMult('¡Por los pelos!'); for (const f of missions.event({ type: 'near' }, game)) ui.toast('Misión cumplida: ' + f.text, 'mission'); break; }
+      if (Math.abs(d) > hw * 0.8 && Math.abs(d) < hw * 1.6) { audio.play('nearMiss'); buzz(10); nearT = 0.4; if (game.variant === 'arcade') bumpMult('¡Por los pelos!'); for (const f of missions.event({ type: 'near' }, game)) ui.toast('Misión cumplida: ' + f.text, 'mission', DEFER); break; }
     }
   }
   // pasar tu récord se celebra en el momento (la marca dorada del túnel está en esa fila)
-  if (state === 'play' && !recAnnounced && bestAtStart[mode] > 0 && game.distanceM > bestAtStart[mode]) { recAnnounced = true; ui.toast('¡Récord superado!', 'mission'); audio.play('record'); buzz([20, 30, 20, 30, 40]); }
+  if (state === 'play' && !recAnnounced && bestAtStart[mode] > 0 && game.distanceM > bestAtStart[mode]) { recAnnounced = true; ui.toast('¡Récord superado!', 'mission', DEFER); audio.play('record'); buzz([20, 30, 20, 30, 40]); }
   if (padHint && state === 'play' && game.pads.some((p) => !p.taken && (p.k - game.s) / Math.max(1e-3, game.v / 13.176 * 60) < 1.6 && p.k > game.s)) { padHint = false; ui.toast('Pisa las flechas azules para acelerar', 'boost'); }
+  if (toastQ.length) {
+    if (state === 'play' && game.alive && !(game.flight && game.flight())) for (const a of toastQ.splice(0)) ui.toast(...a);
+    else if (state !== 'play' || !game.alive) toastQ.length = 0;
+  }
   if (pendingChime && renderer.consumeLanding()) { pendingChime = false; audio.play('world'); buzz(30); }
   if (state === 'attract' && (!game.alive || game.s > 4000)) attractGame((Math.random() * 1e9) | 0);
 }
