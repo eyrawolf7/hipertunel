@@ -51,6 +51,18 @@ vWarn = aWarn; vKz = position.z / ${LEN.toFixed(1)}; vTile = fract(sin(dot(aC0, 
 float on = clamp((vWarn.a - 0.42) / 0.58, 0.0, 1.0);
 float vRimC = smoothstep(0.8, 0.95, dot(diffuseColor.rgb, vec3(0.3333)));
 diffuseColor.rgb *= mix(mix(vWarn.rgb, vec3(1.0), 0.35), vWarn.rgb * mix(vec3(1.0), vWarn.rgb, 0.6), on);` : `#include <color_fragment>
+// pared neutra (regla 3): el ocre de la piedra multiplicado por el sol dorado del mundo daba mostaza;
+// se le quita parte de la saturación, se compensa media luz cálida y el musgo pintado en las juntas
+// (verde, primo del carril encendido) pasa a un oliva apagado. Va antes del tinte por losa para que
+// el musgo se detecte sobre la textura y no sobre una losa algo verdosa.
+float mg = 0.0;
+{
+  float wl = dot(diffuseColor.rgb, vec3(0.3333));
+  mg = clamp((diffuseColor.g - diffuseColor.r * 0.9 - diffuseColor.b * 0.1) * 25.0, 0.0, 1.0);
+  diffuseColor.rgb = mix(diffuseColor.rgb, vec3(wl) * vec3(1.05, 0.88, 0.5), mg * 0.9);
+  diffuseColor.rgb = mix(vec3(wl), diffuseColor.rgb, 0.8);
+  diffuseColor.rgb *= mix(vec3(1.0), vec3(dot(uSunCol, vec3(0.3333))) / max(uSunCol, vec3(0.05)), 0.6);
+}
 // cada losa con su tono (±6 %) y alguna algo más verdosa, como piedra de verdad
 diffuseColor.rgb *= (0.94 + 0.12 * vTile) * mix(vec3(1.0), vec3(0.93, 1.02, 0.9), step(0.82, fract(vTile * 7.13)));
 // anillo tallado cada 8 filas (vWarn.x = 1 en esas losas): franja más oscura a ras de la losa con
@@ -97,6 +109,7 @@ float fresC = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 3
 vec3 glowC = mix(vWarn.rgb, vec3(1.0), 0.35);
 totalEmissiveRadiance += (vWarn.rgb * (0.06 + 0.3 * on) + glowC * vRimC * (0.1 + 0.3 * on) + glowC * fresC * (0.08 + 0.15 * on)) * uGlowK;` : `#include <emissivemap_fragment>
 totalEmissiveRadiance += uInlay * ribInlay * 1.4 + uSeamGlow * seamM * (1.0 - step(0.5, vWarn.z)) + vec3(1.0, 0.75, 0.2) * recBand * 1.1;
+totalEmissiveRadiance += vec3(0.1, 0.08, 0.04) * mg * (1.0 - step(0.5, vWarn.z));   // el musgo en sombra no se vuelve pizarra por la luz fría del mundo
 totalEmissiveRadiance += vec3(1.0) * sSpark * 0.6 * sCr + vec3(0.45, 0.06, 0.03) * (seamM * 0.6 + 0.02) * sLa + vec3(0.6, 0.1, 0.04) * pow(fract(sin(dot(floor(vMapUv * 28.0), vec2(39.3468, 11.135))) * 43758.5453), 30.0) * 0.9 * sLa;
 diffuseColor.rgb *= 1.0 - 0.6 * seamM * sIc;
 totalEmissiveRadiance += vec3(0.1, 0.14, 0.17) * sIc + vec3(0.03, 0.08, 0.09) * sCr;   // la luz cálida del mundo no los vuelve crema`);
