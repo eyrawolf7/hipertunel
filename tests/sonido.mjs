@@ -140,6 +140,20 @@ const data = await p.evaluate(async (world, level, speed, secs) => {
   } else {
     a.play('boost', { level: 1, delay: 2 }); a.play('coin', { combo: 2, delay: 4 }); a.play('crash', { delay: 6 });
   }
+  // paso lateral aislado: pico, duración y parte de la energía por debajo de 80 Hz (filtro RBJ de 2.º orden, dos pasadas)
+  solo = solo || {};
+  for (const [n, o] of [['pass', { pan: -1, near: 0 }], ['pass', { pan: 1, near: 1 }], ['nearMiss', { pan: 1 }]]) {
+    const c5 = new OfflineAudioContext(1, sr * 1.2, sr), a5 = createAudio({ context: c5 });
+    a5.unlock(); a5.setMusic(false); a5.play(n, o);
+    const d5 = (await c5.startRendering()).getChannelData(0); let pk = 0, e = 0, last = 0;
+    for (let i = 0; i < d5.length; i++) { const v = Math.abs(d5[i]); if (v > pk) pk = v; e += v * v; }
+    for (let i = 0; i < d5.length; i++) if (Math.abs(d5[i]) > pk * 0.03) last = i;
+    const w0 = 2 * Math.PI * 80 / sr, al = Math.sin(w0) / (2 * 0.7071), cs = Math.cos(w0), a0 = 1 + al;
+    const b0 = (1 - cs) / 2 / a0, b1 = (1 - cs) / a0, b2 = b0, a1 = -2 * cs / a0, a2 = (1 - al) / a0;
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0, lo = 0;
+    for (let i = 0; i < d5.length; i++) { const x = d5[i], y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = x; y2 = y1; y1 = y; lo += y * y; }
+    solo[`${n} ${JSON.stringify(o)}`] = `pico ${pk.toFixed(3)} dur ${(last / sr).toFixed(2)} s energía<80Hz ${(100 * lo / Math.max(e, 1e-12)).toFixed(2)} %`;
+  }
   a._scheduleUntil(secs);
   const buf = await ctx.startRendering();
   const ch = buf.getChannelData(0); let peak = 0, sum = 0; for (let i = 0; i < ch.length; i++) { const v = Math.abs(ch[i]); if (v > peak) peak = v; sum += v * v; }

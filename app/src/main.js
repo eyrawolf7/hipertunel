@@ -367,7 +367,7 @@ function finishAdventure() {
 
 // vibración (móvil): se apaga con "Reducir efectos"
 const buzz = (p) => { if (settings.reduceFx || settings.vibe === false || state === 'attract') return; try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
-let nearT = 0, pendingChime = false, padHint = false, hitstop = 0;
+let nearT = 0, passT = 0, pendingChime = false, padHint = false, hitstop = 0;
 let flightT = 0, wasFlight = false, ghostHints = 0, trickHints = 0, wallHints = 0, toastOk = false;
 // en pleno salto entre mundos solo se ven los avisos de la pirueta (el resto se descarta,
 // salvo los marcados con DEFER —misiones, punto de control, poderes, récord—, que esperan a aterrizar; la UI
@@ -486,13 +486,28 @@ function stepSim() {
     for (const f of fresh) { ui.toast('Misión cumplida: ' + f.text, 'mission', DEFER); audio.play('world'); buzz([20, 40, 20]); }
   }
   // ¡Por los pelos!: una caja pasa rozando por el carril de al lado a más de 60 m/s (solo aviso)
+  let nearPlayed = false;
+  const sheetOpen = game.fold !== 30 && game.fold !== -30;   // con la lámina abierta los carriles 0 y 11 no son vecinos
   if (state === 'play' && game.alive && game.speedMS > 60 && (nearT -= STEP) <= 0) {
     const hw = Math.PI / 6;
     for (const b of game.boxes) {
       if (b.hit || b.k + 0.5 <= prev.s || b.k + 0.5 > game.s) continue;
-      let d = game.theta - (b.lane * hw); d = Math.atan2(Math.sin(d), Math.cos(d));
-      if (Math.abs(d) > hw * 0.8 && Math.abs(d) < hw * 1.6) { audio.play('nearMiss'); buzz(10); nearT = 0.4; if (game.variant === 'arcade') bumpMult('¡Por los pelos!'); for (const f of missions.event({ type: 'near' }, game)) ui.toast('Misión cumplida: ' + f.text, 'mission', DEFER); break; }
+      let d = game.theta - (b.lane * hw); if (!sheetOpen) d = Math.atan2(Math.sin(d), Math.cos(d));
+      if (Math.abs(d) > hw * 0.8 && Math.abs(d) < hw * 1.6) { audio.play('nearMiss', { pan: d < 0 ? 1 : -1 }); nearPlayed = true; buzz(10); nearT = 0.4; if (game.variant === 'arcade') bumpMult('¡Por los pelos!'); for (const f of missions.event({ type: 'near' }, game)) ui.toast('Misión cumplida: ' + f.text, 'mission', DEFER); break; }
     }
+  }
+  // cajas que cruzas a 1-2 carriles suenan desde su lado (no cambia nada de la partida; máx. ~5 por segundo)
+  if ((passT -= STEP) < 0) passT = 0;
+  if (state === 'play' && game.alive && !nearPlayed && passT <= 0) {
+    const hw = Math.PI / 6;
+    let best = null, bestA = 9;
+    for (const b of game.boxes) {
+      if (b.hit || b.k + 0.5 <= prev.s || b.k + 0.5 > game.s) continue;
+      let d = (b.lane * hw) - game.theta; if (!sheetOpen) d = Math.atan2(Math.sin(d), Math.cos(d));
+      const a = Math.abs(d) / hw;
+      if (a >= 0.75 && a <= 2.5 && a < bestA) { best = d; bestA = a; }
+    }
+    if (best !== null) { audio.play('pass', { pan: best > 0 ? 1 : -1, near: 1 - (Math.max(1, bestA) - 1) / 1.5 }); passT = 0.2; }
   }
   // pasar tu récord se celebra en el momento (la marca dorada del túnel está en esa fila)
   // el récord del Arcade es por puntos (racha y monedas), el de los demás modos por distancia
