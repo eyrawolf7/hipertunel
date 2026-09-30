@@ -2093,3 +2093,18 @@
     radial-gradient(ellipse at 50% 45%, rgba(255, 214, 140, .10) 0, rgba(255, 214, 140, .10) 35%, rgba(30, 18, 8, .42) 100%),
     linear-gradient(rgba(40, 25, 10, .14), rgba(40, 25, 10, .14));
 }
+
+/* ---------- retoques ---------- */
+/* mapa: los tramos bloqueados, de piedra cálida en vez de gris frío (siguen más apagados que los abiertos) */
+.htui .scr-map .stage.locked { filter: sepia(.85) saturate(1.2) brightness(1); }
+.htui .scr-map .stage.locked .st { color: #8d8373; text-shadow: 0 .06em 0 rgba(30, 20, 10, .4); }
+/* pausa: el título pintado sobresale del marco; más aire arriba para que no pise los botones ni las misiones */
+.htui.has-titulo-pausa .pause-card { padding-top: 4em; }
+@media (max-height: 430px) { .htui.has-titulo-pausa .pause-card { padding-top: 3.6em; } }
+/* flecha de impulso vacía: azul oscuro translúcido (el azul es del impulso) y menos saturada que la llena */
+.htui.has-flecha-impulso-vacia .chev:not(.full) { filter: sepia(1) saturate(4.5) hue-rotate(180deg) brightness(.55); opacity: .8; }
+/* cuenta atrás: el número va encima del 20 % central, nunca dentro */
+.htui .hud-count { top: calc(27% - 12px); transform: translate(-50%, -100%); transform-origin: 50% 100%; line-height: 1; font-size: clamp(52px, 14vh, 120px); }
+@keyframes htCount { 0% { opacity: 0; transform: translate(-50%, -100%) scale(.3) rotate(-8deg); } 25% { opacity: 1; transform: translate(-50%, -100%) scale(1.15) rotate(2deg); } 45% { transform: translate(-50%, -100%) scale(1) rotate(0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -112%) scale(.9); } }
+/* «Esc volver» no tiene sentido sin teclado (la regla de .stone-chip lo volvía a mostrar) */
+@media (hover: none) { .htui .head-hint.stone-chip { display: none; } }
