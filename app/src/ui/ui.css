@@ -1989,7 +1989,7 @@
 
 /* ---------- fondo de los menús: escena desenfocada y cálida (arenisca dorada) ----------
    Solo cuando hay un menú encima; la partida no lleva ningún velo. En calidad baja no se desenfoca. */
-.htui { --fondo-tinte: sepia(.55) saturate(1.5) brightness(1.08) contrast(1.1); --fondo-blur: .55em; }
+.htui { --fondo-tinte: sepia(.32) saturate(1.5) brightness(1.08) contrast(1.1); --fondo-blur: .22em; }
 .htui .vig-title, .htui .vig-menu, .htui .vig-dim {
   -webkit-backdrop-filter: blur(var(--fondo-blur)) var(--fondo-tinte);
   backdrop-filter: blur(var(--fondo-blur)) var(--fondo-tinte);
@@ -1997,7 +1997,7 @@
 .htui.htui-q-baja { --fondo-blur: 0px; }
 /* la portada desenfoca menos y deja nítido al zorro (abajo a la derecha) */
 .htui .vig-title {
-  --fondo-blur: .15em;
+  --fondo-blur: .06em;
   -webkit-mask-image: radial-gradient(ellipse 17% 30% at 84% 67%, transparent 40%, #000 120%);
   mask-image: radial-gradient(ellipse 17% 30% at 84% 67%, transparent 40%, #000 120%);
 }
@@ -2013,10 +2013,53 @@
   -webkit-mask-image: none; mask-image: none;
   background:
     linear-gradient(90deg, rgba(255, 244, 222, .16) 0, rgba(255, 244, 222, .16) 18%, transparent 30%),
-    radial-gradient(circle at 58% 50%, rgba(46, 30, 72, .3), rgba(22, 14, 36, .72));
+    radial-gradient(circle at 58% 50%, rgba(46, 30, 72, .22), rgba(22, 14, 36, .55));
 }
 /* mapa y tienda casi vacíos: desenfoque suave para que el túnel se siga adivinando */
-.htui .scr-map .vig-menu, .htui .scr-shop .vig-menu { --fondo-blur: .15em; }
+.htui .scr-map .vig-menu { --fondo-blur: .05em; }
+.htui .scr-shop .vig-menu { --fondo-blur: .1em; }
 .htui.htui-q-baja .scr-map .vig-menu, .htui.htui-q-baja .scr-shop .vig-menu { --fondo-blur: 0px; }
 /* portada, mapa y tienda: tinte más ligero para que se conserve el color y la profundidad del túnel */
-.htui .vig-title, .htui .scr-map .vig-menu, .htui .scr-shop .vig-menu { --fondo-tinte: sepia(.62) saturate(1.4) brightness(1.06) contrast(1.08); }
+.htui .vig-title { --fondo-tinte: sepia(.6) saturate(1.25) brightness(1.04) contrast(1.12); }
+/* elige modo: la escena que hay detrás puede ser verdosa; un velo ámbar la devuelve a la arenisca */
+.htui .scr-modes .vig-menu {
+  --fondo-tinte: sepia(.45) saturate(1.4) brightness(1.05) contrast(1.1);
+  background: linear-gradient(rgba(255, 190, 100, .14), rgba(200, 130, 50, .18));
+}
+/* mapa y tienda: el cielo abierto se lava con mucho sepia; la calidez la pone un velo de color, que no depende de la escena */
+.htui .scr-map .vig-menu, .htui .scr-shop .vig-menu {
+  --fondo-tinte: sepia(.3) saturate(1.1) brightness(.96) contrast(1.12);
+  background:
+    linear-gradient(rgba(255, 196, 110, .16), rgba(190, 120, 50, .22)),
+    radial-gradient(120% 95% at 50% 45%, rgba(40, 22, 10, .12) 40%, rgba(30, 16, 6, .5) 100%),
+    linear-gradient(180deg, rgba(30, 16, 6, .28), transparent 30%, transparent 70%, rgba(30, 16, 6, .35));
+}
+/* ajustes, pausa y fin: mismo patrón (velo ámbar + tinte ligero) para que la escena no quede gris-oliva */
+.htui .scr-settings .vig-menu, .htui .scr-pause .vig-dim {
+  --fondo-blur: .14em;
+  --fondo-tinte: sepia(.4) saturate(1.5) brightness(1.05) contrast(1.05);
+  background: linear-gradient(rgba(255, 190, 100, .2), rgba(200, 130, 50, .24));
+}
+.htui.htui-q-baja .scr-settings .vig-menu, .htui.htui-q-baja .scr-pause .vig-dim { --fondo-blur: 0px; }
+.htui .scr-over .vig-dim {
+  --fondo-tinte: sepia(.4) saturate(1.5) brightness(1.05) contrast(1.05);
+  background:
+    linear-gradient(90deg, rgba(255, 190, 100, .18) 0, rgba(255, 190, 100, .18) 18%, transparent 30%),
+    linear-gradient(rgba(255, 190, 100, .14), rgba(200, 130, 50, .18)),
+    radial-gradient(circle at 58% 50%, rgba(60, 36, 14, .18), rgba(30, 16, 6, .5));
+}
+/* portada: velo ámbar a la izquierda y borde del zorro más suave */
+.htui .vig-title {
+  background: linear-gradient(90deg, rgba(255, 190, 100, .18), transparent 50%);
+  -webkit-mask-image: radial-gradient(ellipse 17% 30% at 84% 67%, transparent 25%, #000 140%);
+  mask-image: radial-gradient(ellipse 17% 30% at 84% 67%, transparent 25%, #000 140%);
+}
+/* calidad baja: sin ninguna pasada de filtro sobre la escena */
+.htui.htui-q-baja .vig { -webkit-backdrop-filter: none; backdrop-filter: none; }
+/* portada: el velo ámbar solo tiñe el borde izquierdo y casi no desenfoca, para conservar la profundidad del túnel */
+.htui .vig-title {
+  --fondo-blur: .06em;
+  background: linear-gradient(90deg, rgba(255, 190, 100, .1), transparent 40%);
+}
+.htui .scr-pause .vig-dim { --fondo-blur: .1em; }
+.htui.htui-q-baja .vig-title, .htui.htui-q-baja .scr-pause .vig-dim { --fondo-blur: 0px; }

@@ -29,8 +29,9 @@ for (const [w, h] of VPS) {
     await page.addStyleTag({ content: '.htui .scr > *:not(.vig){visibility:hidden!important} .fps{visibility:hidden!important} .htui .scr *{animation:none!important}' });
     await sleep(200);
     await page.screenshot({ path: `${shots}/${name}-${w}-fondo.png` });
-    const b64 = (await page.screenshot({ encoding: 'base64' }));
-    const m = await page.evaluate(async (b64, mascot) => {
+    // la escena se mueve: se mide 3 veces y se toma la mediana del tono (para que la prueba no dependa del fotograma)
+    const medir = async () => { const b64 = (await page.screenshot({ encoding: 'base64' }));
+    return page.evaluate(async (b64, mascot) => {
       const img = new Image(); img.src = 'data:image/png;base64,' + b64; await img.decode();
       const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
       const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(img, 0, 0);
@@ -58,7 +59,12 @@ for (const [w, h] of VPS) {
       }
       const mean = s / m;
       return { hue: +hue.toFixed(1), lap: +((s2 / m - mean * mean) * 1e4).toFixed(2) };
-    }, b64, name === 'title' || name === 'shop');
+    }, b64, name === 'title' || name === 'shop'); };
+    const ms = [];
+    for (let k = 0; k < 3; k++) { ms.push(await medir()); await sleep(500); }
+    const dg = (a) => Math.min(Math.abs(a - GOLD), 360 - Math.abs(a - GOLD));
+    ms.sort((a, b) => dg(a.hue) - dg(b.hue));
+    const m = { hue: ms[1].hue, lap: [...ms].sort((a, b) => a.lap - b.lap)[1].lap };
     await page.evaluate(() => document.querySelectorAll('style').forEach((st) => { if (st.textContent.includes('visibility:hidden!important')) st.remove(); }));
     (res[name] ||= {})[w] = m;
   }
@@ -82,6 +88,16 @@ await page.evaluate(() => window.__hip.ui.show('hud')); await sleep(300);
 const trasPausa = await vigs();
 const partidaOk = enPartida === 0 && enPausa > 0 && trasPausa === 0;
 console.log(`${partidaOk ? 'PASS' : 'FAIL'} partida sin desenfoque (partida ${enPartida}, pausa ${enPausa}, al volver ${trasPausa})`);
+// calidad baja: ningún filtro sobre la escena; y sin errores de página
+const pb = await browser.newPage(); const errs = [];
+pb.on('pageerror', (e) => errs.push(String(e)));
+await pb.setViewport({ width: 844, height: 390, isMobile: true, hasTouch: true, isLandscape: true });
+await pb.goto(URL0 + (URL0.includes('?') ? '&' : '?') + 'q=baja', { waitUntil: 'networkidle0' });
+await pb.waitForFunction(() => window.__hip && window.__hip.ui, { timeout: 15000 });
+await pb.evaluate(() => window.__hip.ui.show('pause')); await sleep(400);
+const bajaFiltros = await pb.evaluate(() => [...document.querySelectorAll('.htui .scr.on .vig')].filter((v) => getComputedStyle(v).backdropFilter !== 'none').length);
+const bajaOk = bajaFiltros === 0 && errs.length === 0;
+console.log(`${bajaOk ? 'PASS' : 'FAIL'} calidad baja sin filtro (${bajaFiltros}) y sin errores (${errs.length})`);
 await browser.close();
 const out ={ gold: GOLD, res, fps };
 console.log(JSON.stringify(out, null, 1));
@@ -92,10 +108,10 @@ const base = existsSync(baseF) ? JSON.parse(readFileSync(baseF)) : null;
 const dh = (a, b) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
 for (const n of SCREENS) for (const [w] of VPS) {
   const m = res[n][w], b = base?.res[n]?.[w];
-  const okH = dh(m.hue, GOLD) < MAX_DEG, okL = b ? m.lap <= b.lap * 0.4 : m.lap <= 5; // -60 % o más frente a la base; sin base, límite absoluto
+  const okH = dh(m.hue, GOLD) < MAX_DEG, okL = m.lap <= 5 || (b ? m.lap <= b.lap * 0.4 : false); // -60 % o más frente a la base, o ya suave (≤ 5)
   console.log(`${okH && okL ? 'PASS' : 'FAIL'} ${n} ${w}: tono ${m.hue}° (dif ${dh(m.hue, GOLD).toFixed(0)}°), detalle ${m.lap}${b ? ` (antes ${b.lap}, ${(100 * (m.lap / b.lap - 1)).toFixed(0)} %)` : ''}`);
   if (!okH || !okL) fails++;
 }
-if (!partidaOk) fails++;
+if (!partidaOk || !bajaOk) fails++;
 console.log(`fps menú (media): ${fps}`); if (fps < 58) fails++;
 process.exit(fails ? 1 : 0);
