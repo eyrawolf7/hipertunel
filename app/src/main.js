@@ -554,7 +554,7 @@ function frame(now) {
   let dth = game.theta - prev.theta;
   if (dth > Math.PI) dth -= Math.PI * 2; else if (dth < -Math.PI) dth += Math.PI * 2;
   const theta = prev.theta + dth * a;
-  renderer.update(game, s, theta, dt, { reduceFx: settings.reduceFx, intro: state === 'countdown' && countdown > 0.6 ? Math.min(1, (countdown - 0.6) / 2.4) : 0, mascot: state === 'attract' && (ui.screen === 'title' || ui.screen === 'shop') });
+  renderer.update(game, s, theta, dt, { reduceFx: settings.reduceFx, intro: state === 'countdown' && countdown > 0.6 ? Math.min(1, (countdown - 0.6) / 2.4) : 0, mascot: state === 'attract' && (ui.screen === 'title' || ui.screen === 'shop'), calm: state === 'attract' });
   renderer.render();
   audio.setSpeed(game.speedMS, game.level);
   if (state !== 'paused' && state !== 'countdown') audio.setSpace?.(!!renderer.outside && (state === 'play' || state === 'dying') && game.alive);   // en pausa se conserva: al reanudar no hay «whoomp» falso
