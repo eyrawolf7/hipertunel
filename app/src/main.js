@@ -209,6 +209,7 @@ function startGame(m, quick = false, fromCp = false) {
   renderer.setRecordRow?.(bestAtStart[m] > 0 ? Math.round(bestAtStart[m] / 4) : -1);
   // reintento rápido: sin 3-2-1, solo un instante antes del ¡YA!
   state = 'countdown'; countdown = quick ? 0.6 : 3; pendingChime = false; nearT = 0; toastQ.length = 0; input.syncJump();
+  vibDead = false; vibHist = []; rumbleT = 0; vibStop();
   // desde el menú (no en el reintento rápido): se ve al zorro y la cámara entra en su cabeza
   if (!quick && m !== 'zorro' && !settings.reduceFx) renderer.startIntro();
   ui.show('hud');
@@ -223,12 +224,12 @@ function startGame(m, quick = false, fromCp = false) {
   if (seen >= 3 && !input.hasTilt && settings.tilt && COARSE) setTimeout(() => { if (!input.hasTilt) ui.toast('Sin giroscopio: toca a izquierda o derecha', 'info'); }, 1500);
 }
 
-function pause() { if (state !== 'play' && state !== 'countdown') return; pausedFrom = state; state = 'paused'; pushMissions(); ui.show('pause'); audio.pause(true); }
+function pause() { if (state !== 'play' && state !== 'countdown') return; pausedFrom = state; state = 'paused'; vibStop(); pushMissions(); ui.show('pause'); audio.pause(true); }
 function resume() {
   // el mismo toque que ha pausado no debe pulsar también "Continuar", que sale debajo del dedo
   if (state !== 'paused' || performance.now() - pausedAt < 450) return;
   pausedAt = -1e9; state = 'countdown'; countdown = 1.0; ui.show('hud'); audio.pause(false); audio.play('countdown'); }
-function toMenu() { audio.pause(false); attract(); }
+function toMenu() { audio.pause(false); vibStop(); attract(); }
 
 function finish() {
   state = 'over'; overT = 0;
@@ -290,16 +291,19 @@ function endFacts(distM, best, isRecord, unit = ' m') {
 }
 const fmtN = (n) => n.toLocaleString('es-ES');
 
-// motor: pulsos cortitos y suaves, más seguidos cuanto más rápido vas (la vibración del móvil no
-// tiene intensidad, así que la "fuerza" es la frecuencia y el largo del pulso). Al acelerar con
-// una placa, un empujón más largo lo da el suceso de impulso.
-let rumbleT = 0;
+// motor: un tic al cruzar un anillo, pulsos cortitos y suaves, más seguidos cuanto más rápido vas
+// (la vibración del móvil no tiene intensidad, así que la "fuerza" es la frecuencia y el largo del
+// pulso). Por fuera del tubo casi no hay nada. Al acelerar con una placa, un empujón más seco lo da
+// el suceso de impulso.
+let rumbleT = 0, rumbleRow = 0;
 function engineRumble(dt) {
   if (state !== 'play' || !game.alive || settings.vibe === false || settings.reduceFx) return;
+  const row = Math.floor(game.s), ring = row !== rumbleRow; rumbleRow = row;
+  if ((rumbleT -= dt) > 0 || !ring) return;
+  if (game.fold < 29) { rumbleT = 0.55; buzz(3, 0); return; }
   const sp = Math.max(0, Math.min(1, (game.v - 1) / 4.5));
-  if ((rumbleT -= dt) > 0) return;
-  rumbleT = 0.34 - 0.2 * sp;
-  try { navigator.vibrate && navigator.vibrate(Math.round(5 + 6 * sp)); } catch (e) {}
+  rumbleT = 0.34 - 0.14 * sp;
+  buzz(Math.round(8 + 4 * sp), 0);
 }
 function bumpMult(why) {
   if (mult >= 5) return;
@@ -352,8 +356,6 @@ function finishAdventure() {
   const lines = [];
   if (ghostGame) { const dg = Math.round((ghostGame.s - game.s) * 4); lines.push(dg > 4 ? `Tu fantasma iba ${dg} m por delante` : dg < -4 ? `Le sacaste ${-dg} m a tu fantasma` : 'Ibas a la par que tu fantasma'); }
   if (game.cleared) {
-    // una vibración por cada estrella conseguida
-    if (stars) setTimeout(() => buzz([...Array(stars)].flatMap(() => [40, 120]).slice(0, -1)), 300);
     if (merged === 7) lines.push('¡Tramo perfecto!');
     else if (game.fromCheckpoint) lines.push('Desde el punto de control no vale la estrella sin chocar');
   } else {
@@ -365,8 +367,25 @@ function finishAdventure() {
   if (mr.rankUp) setTimeout(() => { if (state !== 'over') return; audio.play('record'); ui.toast(`¡Rango ${missions.rank().level}: ${missions.rank().name}!`, 'mission', { force: true }); }, 700);
 }
 
-// vibración (móvil): se apaga con "Reducir efectos"
-const buzz = (p) => { if (settings.reduceFx || settings.vibe === false || state === 'attract') return; try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
+// vibración (móvil): único punto de salida. Se apaga con el ajuste y con "Reducir efectos", y solo
+// suena jugando: ni en menús, pausa, cuenta atrás ni demo, y nada después de la muerte (el patrón
+// final es el último). Como mucho VIB_MAX pulsos en cualquier segundo; los tics del motor (prio 0)
+// ceden el hueco a los sucesos, y un suceso nuevo corta lo que quedaba del patrón anterior.
+const VIB_MAX = 12;
+let vibHist = [], vibBusy = 0, vibDead = false;
+function buzz(p, prio = 1, final = false, force = final) {
+  if (vibDead || state !== 'play' || settings.reduceFx || settings.vibe === false) return;
+  const now = performance.now();
+  if (prio === 0 && now < vibBusy) return;
+  const a = Array.isArray(p) ? p : [p], onsets = [];
+  let t = now;
+  for (let i = 0; i < a.length; i++) { if (i % 2 === 0 && a[i] > 0) onsets.push(t); t += a[i]; }
+  const h = vibHist.filter((x) => x <= now && x > now - 2000).concat(onsets);   // lo que aún no sonó se cancela
+  if (!force) for (let i = 0; i + VIB_MAX < h.length; i++) if (h[i + VIB_MAX] - h[i] < 1000) return;   // la muerte y el choque con impulso siempre suenan
+  vibHist = h; vibBusy = t; vibDead = final;
+  try { navigator.vibrate && navigator.vibrate(p); } catch (e) {}
+}
+function vibStop() { vibBusy = 0; try { navigator.vibrate && navigator.vibrate(0); } catch (e) {} }
 let nearT = 0, passT = 0, pendingChime = false, padHint = false, hitstop = 0;
 let flightT = 0, wasFlight = false, ghostHints = 0, trickHints = 0, wallHints = 0, toastOk = false;
 // en pleno salto entre mundos solo se ven los avisos de la pirueta (el resto se descarta,
@@ -433,13 +452,13 @@ function stepSim() {
   renderer.onEvents(ev, game);
   for (const e of ev) {
     if (state === 'attract') continue;
-    if (e.type === 'boost') { audio.play('boost', { level: e.level }); buzz(e.level === 3 ? [15, 40, 30] : [14 + e.level * 4]); if (e.level === 3) ui.toast('¡Velocidad máxima!', 'boost'); }
+    if (e.type === 'boost') { audio.play('boost', { level: e.level }); buzz(e.level === 3 ? [30, 50, 45] : 28); if (e.level === 3) ui.toast('¡Velocidad máxima!', 'boost'); }
     else if (e.type === 'crash') {
       if (!e.fatal) lostAt = game.time; else killBox = game.boxes.find((b) => b.id === e.id) || null;
       if (mult > 1 && !e.fatal) ui.toast(`Racha perdida (×${mult})`, 'info');
       mult = 1; multDist = 0;
-      audio.play(e.fatal ? 'death' : 'crash'); buzz(e.fatal ? [120, 60, 200] : [40, 30, 60]); if (!e.fatal) { ui.toast('¡Impulsos perdidos!', 'info'); hitstop = settings.reduceFx ? 0 : 0.07; } else if (!settings.reduceFx) hitstop = 0.08; }
-    else if (e.type === 'coin') { coins = game.coinsGot; audio.play('coin', { combo: e.combo }); buzz(e.combo >= 3 ? [12, 25, 12] : 10); coinFly(e); }
+      audio.play(e.fatal ? 'death' : 'crash'); buzz(e.fatal ? [120, 60, 200] : [40, 30, 60], 1, e.fatal, true); if (!e.fatal) { ui.toast('¡Impulsos perdidos!', 'info'); hitstop = settings.reduceFx ? 0 : 0.07; } else if (!settings.reduceFx) hitstop = 0.08; }
+    else if (e.type === 'coin') { coins = game.coinsGot; audio.play('coin', { combo: e.combo }); if (e.combo >= 3) buzz([12, 25, 12]); coinFly(e); }
     else if (e.type === 'fall') { ui.toast(game.boostOn || game.invul > 0 ? '¡Por poco! Caes y pierdes los impulsos' : '¡Al vacío!', 'info'); renderer.flash(0x000000, 0.35); }
     else if (e.type === 'crumble') { audio.play('collapse'); buzz(25); }
     else if (e.type === 'creak') { audio.play('creak', { k: e.k }); buzz(e.k > 0.6 ? 12 : 6); }
@@ -447,7 +466,7 @@ function stepSim() {
     else if (e.type === 'checkpoint') { cpFrame = advRec.length; cpPrefix = Float64Array.from(advRec); ui.toast('¡Punto de control!', 'mission', DEFER); audio.play('world'); }
     else if (e.type === 'power') { const n = { magnet: 'Imán', x2: 'Monedas ×2', shield: 'Escudo' }[e.kind]; ui.toast(`¡${n}!`, 'mission', DEFER); audio.play('world'); buzz([10, 20, 10]); }
     else if (e.type === 'shield') { ui.toast('El escudo te ha salvado', 'mission'); audio.play('crash'); renderer.flash(0xb58cff, 0.35); }
-    else if (e.type === 'clear') { audio.play('record'); buzz([30, 40, 30, 40, 60]); }
+    else if (e.type === 'clear') { audio.play('record'); buzz([30, 40, 30, 40, 60], 1, true); }
     else if (e.type === 'jump') { audio.play('jump'); buzz(12); }
     else if (e.type === 'wallSoon') { if (wallHints < 3) { wallHints++; try { localStorage.setItem('hipertunel-pistas-muro', String(wallHints)); } catch (x) {} ui.toast('¡Viene un muro! Busca el bloque de cartón y atraviésalo', 'boost'); } }
     else if (e.type === 'smash') { coins = game.coinsGot; audio.play('smash'); buzz([20, 15, 30]); ui.toast('¡Cartón roto! +5', 'mission'); }
@@ -458,7 +477,7 @@ function stepSim() {
     else if (e.type === 'charge') { audio.play('coin', { combo: 6 }); buzz([8, 20, 8]); ui.toast(e.why === 'near' ? '+1 salto · 5 roces seguidos' : '+1 salto', 'mission'); }
     else if (e.type === 'jumpClose') { audio.play('nearMiss'); buzz(10); bumpMult('¡Al límite!'); }
     else if (e.type === 'land') { audio.play('land'); buzz(18); }
-    else if (e.type === 'foldStart') audio.play('foldStart');
+    else if (e.type === 'foldStart') { audio.play('foldStart'); buzz([12, 90, 12, 90, 12, 90, 30]); }   // ondulante
     else if (e.type === 'foldOrder' && game.fold < 0) {
       // desde fuera, el plegado hacia dentro lleva a un mundo nuevo: se avisa con la distancia
       // aproximada (32 filas de recta + unos 600 fotogramas de plegado + 24 filas de tránsito)
@@ -582,5 +601,5 @@ window.__hip = {
   // n pasos por el bucle real (stepSim, con entrada, grabación, avisos y fantasma), sin esperar a los fotogramas
   arcScore: () => Math.round(points + game.coinsGot * 10),
   sim(n = 1) { for (let i = 0; i < n && state === 'play'; i++) { stepSim(); if (!game.alive) { state = 'dying'; overT = 0; } } },
-  bot: botSteer, padDirection: () => padDirection(),
+  bot: botSteer, padDirection: () => padDirection(), buzz: (p, prio, final, force) => buzz(p, prio, final, force),
 };
