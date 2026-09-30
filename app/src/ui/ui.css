@@ -1891,6 +1891,9 @@
 /* chip del HUD 496×184 (extremos ~100 px) y botón cuadrado 284×268 para la pausa */
 .htui.has-chip-crema .hud-chip:not(.hud-pause), .htui.has-chip-crema .toast:not(.toast-boost) { border-image: var(--img-chip-crema) 0 100 fill / 0 1.2em stretch; border-width: 0; padding-left: 1em; padding-right: 1.1em; }
 .htui.has-chip-crema .hud-coins.hud-chip { padding-left: .55em; }
+/* el pie del marco (línea turquesa) come unos píxeles: la distancia y los puntos no deben pisarlo */
+.htui.has-chip-crema .hud-dist.hud-chip { padding-top: .22em; padding-bottom: .34em; }
+.htui.has-chip-crema .hud-mult.hud-chip { padding-top: .28em; padding-bottom: .5em; }
 .htui.has-boton-cuadrado .hud-pause { border: 0; border-image: none; box-shadow: none; background: var(--img-boton-cuadrado) center / 100% 100% no-repeat; width: max(2.7em, 42px); height: max(2.55em, 40px); }
 .htui.has-boton-cuadrado .hud-pause > .hc-lf, .htui.has-boton-cuadrado .hud-pause > .hc-glow { display: none; }
 /* aviso de impulso 584×204 (extremos ~130 px) */

@@ -831,6 +831,12 @@ if (!ONLY && !opt.built) {
   if (n.status !== 0 && !lines.some((l) => l.startsWith('FAIL'))) rec(19, 'qa-noche.mjs terminó mal', false, (n.stderr || n.stdout).split('\n').slice(-3).join(' | '));
   if (lines.length < 40) rec(19, 'qa-noche.mjs ejecutó todas las secciones (≥ 40 comprobaciones)', false, lines.length);
 }
+// HUD sin textos fuera de su marco a 667×375, 844×390 y 1280×720: tests/hud-desbordes.mjs
+if (!ONLY && !opt.built) {
+  const hd = spawnSync(process.execPath, [new URL('./hud-desbordes.mjs', import.meta.url).pathname, `--url=${URL0}`], { encoding: 'utf8' });
+  const hl = hd.stdout.split('\n').filter((l) => /^(PASS|FAIL)/.test(l));
+  rec(20, 'HUD sin desbordes (hud-desbordes.mjs)', hd.status === 0 && hl.length === 12, { pasa: hl.filter((l) => l.startsWith('PASS')).length, fallos: hl.filter((l) => l.startsWith('FAIL')).map((l) => l.slice(0, 200)).slice(0, 2) });
+}
 writeFileSync(SHOTS + 'qa-report.json', JSON.stringify(results, null, 1));
 const fails = results.filter((r) => r.pass === false);
 console.log(`\n${results.filter((r) => r.pass === true).length} PASS · ${fails.length} FAIL`);
