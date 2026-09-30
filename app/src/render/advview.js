@@ -21,8 +21,8 @@ const ICONS = {
     // silueta de fantasma: cuerpo crema translúcido, contorno violeta oscuro grueso con halo crema y dos ojos
     g.lineJoin = 'round';
     const body = () => { g.beginPath(); g.moveTo(26, 104); g.lineTo(26, 62); g.arc(64, 62, 38, Math.PI, 0); g.lineTo(102, 104); g.lineTo(88, 94); g.lineTo(76, 106); g.lineTo(64, 94); g.lineTo(52, 106); g.lineTo(40, 94); g.closePath(); };
-    body(); g.strokeStyle = 'rgba(255,243,214,0.7)'; g.lineWidth = 16; g.stroke();
-    body(); g.strokeStyle = '#2a1247'; g.lineWidth = 9; g.stroke();
+    body(); g.strokeStyle = 'rgba(255,243,214,0.75)'; g.lineWidth = 22; g.stroke();
+    body(); g.strokeStyle = '#2a1247'; g.lineWidth = 14; g.stroke();
     body(); g.fillStyle = 'rgba(255,246,224,0.92)'; g.fill();
     g.fillStyle = '#2a1247'; for (const x of [50, 78]) { g.beginPath(); g.ellipse(x, 62, 6, 9, 0, 0, 7); g.fill(); }
   }),
@@ -41,7 +41,7 @@ export class AdvView {
     for (let i = 0; i < 4; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.tex.x2, depthWrite: false, fog: false })); s.visible = false; s.scale.setScalar(1.3); scene.add(s); this.pool.push(s); }
     this.ghost = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.tex.ghost, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
     this.ghost.visible = false; this.ghost.scale.setScalar(1.6); scene.add(this.ghost);
-    this.fr = makeFrame(); this.sp = {}; this.t = 0; this._ndc = new THREE.Vector3(); this._dir = new THREE.Vector3(); this._view = new THREE.Vector3(); this._ray = new THREE.Vector3(); this.ghostInfo = null; this._arcLook = false;
+    this.fr = makeFrame(); this.sp = {}; this.t = 0; this._ndc = new THREE.Vector3(); this._dir = new THREE.Vector3(); this._view = new THREE.Vector3(); this._ray = new THREE.Vector3(); this.ghostInfo = null; this._arcLook = false; this._bp = new THREE.Vector3(); this._crowd = 0;
   }
 
   place(track, game, s, lane, out, up) {
@@ -108,7 +108,19 @@ export class AdvView {
       const lane = ghost.theta / (Math.PI / 6), gap = ghost.s - game.s;
       if (this.place(track, game, ghost.s, lane, this.ghost.position, 0.5) && this.pinGhost(camera, gap)) {
         const fade = Math.min(1, (gap - 0.6) / 3, (game.kLast - 2 - ghost.s) / 8);
-        this.ghost.visible = true; this.ghost.material.opacity = (0.85 + 0.1 * Math.sin(this.t * 6)) * Math.max(0, fade);
+        // si cae encima de una caja se atenúa (con fundido) para no taparla ni parecer parte de ella
+        const gp = this.ghost.position, r = this.ghostInfo.r, asp = camera.aspect;
+        const gx = this._ndc.copy(gp).project(camera); const px = gx.x, py = gx.y;
+        let over = false;
+        for (const b of game.boxes) {
+          if (b.hit || b.k < game.s || b.k > game.kLast) continue;
+          if (!this.place(track, game, b.k + 0.5, b.lane, this._bp, 0.5)) continue;
+          const q = this._ndc.copy(this._bp).project(camera);
+          if (q.z > 1 || q.z < -1) continue;
+          if (Math.hypot((q.x - px) * asp, q.y - py) < r * 1.7 + 0.03) { over = true; break; }
+        }
+        this._crowd += ((over ? 1 : 0) - this._crowd) * Math.min(1, dt * 8);
+        this.ghost.visible = true; this.ghost.material.opacity = (0.85 + 0.1 * Math.sin(this.t * 6)) * (1 - 0.6 * this._crowd) * Math.max(0, fade);
       }
     }
     const m = this.ghost.material, look = arc && this.ghost.visible;

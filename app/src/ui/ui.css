@@ -1577,7 +1577,7 @@
 .htui .hud-speed.hud-chip { margin-top: 0; font-size: .82em; padding: .22em .75em .28em .45em; border-radius: .7em; color: var(--hudink); }
 .htui .hud-speed.hud-chip .ico { font-size: 1.25em; }
 .htui .hud-speed.hud-chip b { font-size: 1.2em; }
-.htui .hud-ghost { display: none; margin-top: .2em; font-size: .7em; font-weight: 700; padding: .12em .6em .16em; border-radius: 999px; background: rgba(43, 34, 87, .66); color: #fff3d6; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.htui .hud-ghost { display: none; margin-top: .35em; font-size: .8em; font-weight: 700; padding: .12em .65em .16em; border-radius: 999px; background: rgba(42, 18, 71, .8); color: #fff3d6; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .htui .hud-ghost.on { display: block; }
 .htui .hud-mult.hud-chip { position: relative; top: auto; right: auto; display: none; padding: .2em .7em .3em; flex-direction: column; align-items: center; gap: 0; color: var(--ink); }
 .htui .hud-mult.hud-chip.on { display: flex; }
