@@ -22,6 +22,7 @@ export function cloneGame(g) {
     if (v === null || typeof v !== 'object') return v;
     if (memo.has(v)) return memo.get(v);
     if (Array.isArray(v)) { const a = []; memo.set(v, a); for (const x of v) a.push(copy(x)); return a; }
+    if (v instanceof Map) { const m = new Map(); memo.set(v, m); for (const [k, x] of v) m.set(k, copy(x)); return m; }
     if (typeof v.next === 'function' && 'state' in v) { const r = makeRng(0); r.state = v.state; memo.set(v, r); return r; }
     const o = Object.create(Object.getPrototypeOf(v));
     memo.set(v, o);
@@ -38,7 +39,7 @@ export function verifyClone(makeGame, seed = 1000, frames = 300) {
   const b = cloneGame(a);
   const ea = [], eb = [];
   for (let i = 0; i < frames; i++) { ea.push(a.step(input(i))); eb.push(b.step(input(i))); }
-  const ser = (g) => JSON.stringify(g, (k, v) => (typeof v === 'function' ? undefined : v));
+  const ser = (g) => JSON.stringify(g, (k, v) => (typeof v === 'function' ? undefined : v instanceof Map ? [...v] : v));
   if (ser(a) !== ser(b) || JSON.stringify(ea) !== JSON.stringify(eb)) throw new Error('cloneGame: el clon se desvía del original');
 }
 

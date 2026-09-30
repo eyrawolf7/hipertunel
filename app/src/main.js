@@ -7,6 +7,7 @@ import { Renderer } from './render/index.js';
 import { createAudio } from './audio/index.js';
 import { createUI } from './ui/index.js';
 import { createInput } from './input/index.js';
+import { createVibe } from './input/vibe.js';
 import { createMissions } from './missions.js';
 import { createShop, SHOP } from './shop.js';
 import { Adventure, STAGES, packGhost, unpackGhost, quantSteer } from './sim/adventure.js';
@@ -271,13 +272,19 @@ const fmtN = (n) => n.toLocaleString('es-ES');
 // motor: pulsos cortitos y suaves, más seguidos cuanto más rápido vas (la vibración del móvil no
 // tiene intensidad, así que la "fuerza" es la frecuencia y el largo del pulso). Al acelerar con
 // una placa, un empujón más largo lo da el suceso de impulso.
+// La superficie (juntas de la piedra, cristal, musgo...) va aparte en input/vibe.js y manda: el
+// motor solo suena si cabe un pulso entre los suyos.
 let rumbleT = 0;
+const vibe = createVibe((ms) => { navigator.vibrate && navigator.vibrate(ms); });
+window.__vibe = vibe;   // gancho de pruebas: registro de pulsos
 function engineRumble(dt) {
-  if (state !== 'play' || !game.alive || settings.vibe === false || settings.reduceFx) return;
+  const on = state === 'play' && game.alive && settings.vibe !== false && !settings.reduceFx;
+  vibe.update(performance.now(), { on, surface: game.surfNow || 0 });
+  if (!on) return;
   const sp = Math.max(0, Math.min(1, (game.v - 1) / 4.5));
   if ((rumbleT -= dt) > 0) return;
+  if (!vibe.tryPulse(performance.now(), Math.round(5 + 6 * sp))) { rumbleT = 0; return; }
   rumbleT = 0.34 - 0.2 * sp;
-  try { navigator.vibrate && navigator.vibrate(Math.round(5 + 6 * sp)); } catch (e) {}
 }
 function bumpMult(why) {
   if (mult >= 5) return;
@@ -349,6 +356,8 @@ let nearT = 0, passT = 0, pendingChime = false, padHint = false, hitstop = 0;
 let flightT = 0, wasFlight = false, trickHints = 0, wallHints = 0, toastOk = false;
 // en pleno salto entre mundos solo se ven los avisos de la pirueta (el resto espera a aterrizar)
 { const raw = ui.toast; ui.toast = (t, k, o) => { if (!toastOk && state === 'play' && game && game.flight && game.flight() && game.alive) return; raw(t, k, o); }; }
+const SURF_HINT = [null, 'Suelo de cristal: el giro es más vivo', 'Suelo de musgo: el giro va más blando', 'Suelo de basalto: el giro es más pesado', 'Hielo: el suelo resbala'];
+let surfHints = []; try { surfHints = JSON.parse(localStorage.getItem('hipertunel-pistas-suelo') || '[]'); } catch (e) {}
 try { trickHints = +(localStorage.getItem('hipertunel-pistas-pirueta') || 0); wallHints = +(localStorage.getItem('hipertunel-pistas-muro') || 0); } catch (e) {}
 
 // moneda que vuela desde donde la coges hasta el contador (por el borde, nunca por el centro)
@@ -435,6 +444,14 @@ function stepSim() {
       if (!game.inverted) { if (game.gaps.some((g) => g.to + 1 > game.s)) pendingChime = true; else audio.play('world'); }
     }
   }
+  // suelo nuevo: aviso de una sola vez por superficie, cuando entra en la vista (se nota unos segundos después)
+  if (game.variant === 'arcade' && state === 'play' && game.alive && game.surfaceAt) {
+    const sf = game.surfaceAt(game.kLast);
+    if (sf > 0 && !surfHints.includes(sf)) {
+      surfHints.push(sf); try { localStorage.setItem('hipertunel-pistas-suelo', JSON.stringify(surfHints)); } catch (e) {}
+      ui.toast(SURF_HINT[sf], 'info');
+    }
+  }
   // Arcade: puntos = distancia × racha; cada 500 m sin chocar la racha sube
   if (game.variant === 'arcade' && (state === 'play' || state === 'dying')) {
     const d = game.distanceM - (game._pd || 0); game._pd = game.distanceM;
@@ -514,6 +531,7 @@ function frame(now) {
   renderer.update(game, s, theta, dt, { reduceFx: settings.reduceFx, intro: state === 'countdown' && countdown > 0.6 ? Math.min(1, (countdown - 0.6) / 2.4) : 0, mascot: state === 'attract' && (ui.screen === 'title' || ui.screen === 'shop') });
   renderer.render();
   audio.setSpeed(game.speedMS, game.level);
+  audio.setSurface?.(state === 'play' && game.alive && game.variant === 'arcade',game.surfNow || 0, Math.min(1, game.speedMS / 100), Math.min(1, Math.abs(game.omega) / 0.1));
   audio.setHover?.(!!game.hero && (state === 'play' || state === 'countdown') && game.alive, Math.min(1, game.speedMS / 100));
   if (state === 'play' || state === 'countdown' || state === 'dying') {
     ui.hud({ jumps: game.hero ? { n: game.charges, part: game.charges < 2 ? game.coinAcc / 10 : 0, free: game.boostOn } : null, mult: game.variant === 'arcade' ? mult : 0, points: game.variant === 'arcade' ? Math.round(points + game.coinsGot * 10) : 0, adv: game.mode === 'adventure' ? { p: game.progress, power: game.power, powerT: game.powerT, shield: game.shield, n: advStage + 1 } : null, padDir: state === 'play' ? padDirection() : 0, distM: game.distanceM, speedMS: state === 'countdown' && game.frame === 0 ? 0 : game.speedMS, level: game.level, coins: game.coinsGot, timeLeft: mode === 'timetrial' ? game.timeLeft : null, mode, invul: game.invul > 0, best: bestAtStart[mode] || 0, countdown: state === 'countdown' ? Math.ceil(countdown) : 0 });

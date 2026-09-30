@@ -68,7 +68,7 @@ function createNoop() {
   const st = { muted: false };
   return {
     unlock() {}, setMuted(b) { st.muted = !!b; }, get muted() { return st.muted; },
-    setMusic() {}, setWorld() {}, setSpeed() {}, setHover() {}, play() {}, pause() {},
+    setMusic() {}, setWorld() {}, setSpeed() {}, setHover() {}, setSurface() {}, play() {}, pause() {},
     get available() { return false; },
   };
 }
@@ -394,6 +394,9 @@ export function createAudio(options = {}) {
     n.hGl2.frequency.setTargetAtTime((620 + 260 * v) * 1.5, now, 0.15);
   }
 
+  // segundos entre golpes del roce por superficie (a velocidad media): piedra, cristal, musgo, lava, hielo
+  const ROLL_GAP = [[0.26, 0.36], [0.22, 0.36], [0.3, 0.42], [0.4, 0.7], [0.8, 1.0]];
+
   // ---------- efectos
   const SFX = {
     boost(t, o) {
@@ -548,6 +551,30 @@ export function createAudio(options = {}) {
       noiseHit(t, 0.25, 0.25, dest, 'bandpass', 3200, 700, 1.5, 0.02);
       sweep('sine', 1400, 500, t, 0.15, 0.04, dest, 0.01);
     },
+    // roce del suelo bajo la turbina, un golpecito por junta (surface: 0 piedra, 1 cristal, 2 musgo,
+    // 3 lava, 4 hielo). Todo tonal y cortito: sin ruido blanco y sin nada por debajo de 80 Hz.
+    roll(t, o = {}) {
+      const r = Math.random(), v = clamp(o.v ?? 0.5, 0, 1);
+      switch (o.surface | 0) {
+        case 1:      // cristal: tintineo tonal de ~2,5 kHz, muy suave
+          note('sine', 2500 * (0.97 + 0.06 * r), t, 0.05, 0.03, nodes.sfx, { a: 0.002, rel: 0.12, sus: 0.3 });
+          note('sine', 3750 * (0.98 + 0.04 * r), t, 0.03, 0.012, nodes.sfx, { a: 0.002, rel: 0.08, sus: 0.3 });
+          break;
+        case 2:      // musgo: golpe blando y apagado
+          sweep('sine', 320 * (0.92 + 0.16 * r), 200, t, 0.06, 0.05, nodes.sfx, 0.012);
+          break;
+        case 3:      // lava: burbujeo grave
+          sweep('sine', 200 + 30 * r, 270 + 50 * r, t, 0.1, 0.06, nodes.sfx, 0.02);
+          break;
+        case 4: {    // hielo: siseo tonal muy bajo que sube al derrapar (o.slip 0..1)
+          const k = 1 + 2.5 * clamp(o.slip ?? 0, 0, 1);
+          note('sine', 1800 * (0.97 + 0.06 * r), t, 0.22, 0.006 * k, nodes.sfx, { a: 0.08, rel: 0.16, sus: 0.7 });
+          break;
+        }
+        default:     // piedra: clic suave en la junta
+          sweep('sine', 700 * (0.9 + 0.2 * r), 380, t, 0.03, 0.05 * (0.6 + 0.4 * v), nodes.sfx, 0.003);
+      }
+    },
   };
 
   function duck(amount, time) {
@@ -654,6 +681,17 @@ export function createAudio(options = {}) {
       if (!toggled && now - state.lastHoverT < 0.033 && state.lastHoverT >= 0) return;
       state.lastHoverT = now;
       updateHover(now, toggled);
+    }),
+    // roce de la superficie: una vez por fotograma en partida (on = jugando y viva). Cadencia por
+    // superficie y velocidad; no suena parado, en pausa ni silenciado.
+    setSurface: safe(function (on, surface, speed01, slip) {
+      if (!ctx || !on || state.muted || state.paused) { state.rollNext = 0; return; }
+      const now = ctx.currentTime, v = clamp(+speed01 || 0, 0, 1);
+      if (!state.rollNext) { state.rollNext = now + 0.1; return; }
+      if (now < state.rollNext) return;
+      const s = surface | 0, g = ROLL_GAP[s] || ROLL_GAP[0];
+      SFX.roll(now + 0.005, { surface: s, v, slip });
+      state.rollNext = now + (g[0] + Math.random() * (g[1] - g[0])) / (0.7 + 0.6 * v);
     }),
     get available() { return true; },
     // solo para pruebas: programar la música hasta t (OfflineAudioContext)

@@ -13,9 +13,10 @@ const vert = /* glsl */`
 attribute vec4 aWarn;      // rgb color del aviso, a = intensidad (0 nada, ~0.4 apagado, 1 encendido)
 attribute vec3 aN;
 attribute vec2 aCell;      // x = carril, y = índice de fila
-varying vec2 vUv; varying vec4 vWarn; varying vec3 vN; varying vec3 vW; varying vec2 vCell;
+attribute float aSurf;     // superficie de la fila: 0 piedra, 1 cristal, 2 musgo, 3 lava, 4 hielo
+varying vec2 vUv; varying vec4 vWarn; varying vec3 vN; varying vec3 vW; varying vec2 vCell; varying float vSurf;
 void main(){
-  vUv = uv; vWarn = aWarn; vN = aN; vCell = aCell;
+  vUv = uv; vWarn = aWarn; vN = aN; vCell = aCell; vSurf = aSurf;
   vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz;
   gl_Position = projectionMatrix * viewMatrix * w;
 }`;
@@ -25,7 +26,7 @@ uniform vec3 uBase; uniform vec3 uBase2; uniform vec3 uSeam; uniform vec3 uFog; 
 uniform vec3 uCam; uniform vec3 uKey; uniform float uFogNear; uniform float uFogFar; uniform float uTime;
 uniform float uInvert; uniform vec2 uCellSize; uniform float uHit; uniform vec3 uRing; uniform float uOutside; uniform vec3 uSkyFill; uniform float uDark; uniform vec3 uInvBase;
 uniform vec3 uMoss; uniform float uGaps;
-varying vec2 vUv; varying vec4 vWarn; varying vec3 vN; varying vec3 vW; varying vec2 vCell;
+varying vec2 vUv; varying vec4 vWarn; varying vec3 vN; varying vec3 vW; varying vec2 vCell; varying float vSurf;
 float h21(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
 float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y); }
@@ -112,7 +113,31 @@ void main(){
   if (wa > 0.0) inv = mix(warn * 0.4, warn * 1.1, on) + warn * on * 0.3 + mix(warn, vec3(1.0), 0.5) * rim * 0.4;
   inv += neon * (grout * 0.55 + rim * 0.9) * (1.0 - clamp(wa * 2.0, 0.0, 1.0) * 0.6);
   col = mix(col, inv, max(uInvert, uDark));
-  float fog = smoothstep(uFogNear, uFogFar, camD);
+  // superficie (agarre del giro): se lee de lejos por el tono de toda la baldosa, nunca con el color
+  // de un carril ni con azul; los carriles con aviso no se tocan
+  if (vSurf > 0.5) {
+    float wk = 1.0 - clamp(wa * 2.0, 0.0, 1.0);
+    float sOff = smoothstep(0.1, 0.45, length(cross(normalize(uCam - vW), vec3(0.0, 0.0, 1.0))));   // aprox.: lejos del eje de la vista
+    if (vSurf < 1.5) {                                   // cristal: losa pulida gris-cian con destellos fuera del centro
+      float sp = pow(vn(p * 8.0 + vec2(uTime * 0.25, 0.0)), 24.0) * sOff;
+      col = mix(col, vec3(0.55, 0.78, 0.85) * (0.75 + 0.25 * lam), 0.65 * wk);
+      col += vec3(1.0) * (sp * 1.1 + pow(max(dot(N, H), 0.0), 14.0) * 0.3) * wk;
+    } else if (vSurf < 2.5) {                            // musgo: verde oscuro húmedo con manchas
+      float m = smoothstep(0.3, 0.7, vn(p * 1.3 + vCell.yx * 2.1));
+      vec3 mo = mix(vec3(0.22, 0.42, 0.2), vec3(0.1, 0.2, 0.11), m) * (0.6 + 0.5 * lam);
+      col = mix(col, mo, 0.88 * wk);
+    } else if (vSurf < 3.5) {                            // basalto: gris casi negro con juntas de brasa
+      col = mix(col, vec3(0.22, 0.19, 0.19) * (0.7 + 0.5 * blockId) * lam * 0.6, 0.85 * wk);
+      float ember = (grout + rim * 0.6) * (0.6 + 0.4 * sin(uTime * 1.5 + vCell.y * 0.7 + vCell.x));
+      col += vec3(0.45, 0.06, 0.03) * ember * 0.6 * wk;
+    } else {                                             // hielo: blanco lechoso con grietas oscuras
+      float cr = 1.0 - smoothstep(0.0, 0.03 + px * 2.0, abs(vn(p * 2.5) - 0.5) * 0.6);
+      col = mix(col, vec3(0.85, 0.91, 0.94) * (0.8 + 0.25 * lam), 0.88 * wk);
+      col *= 1.0 - 0.6 * cr * wk;
+      col += vec3(1.0) * pow(max(dot(N, H), 0.0), 20.0) * 0.4 * wk;
+    }
+  }
+  float fog = smoothstep(uFogNear, uFogFar, camD) * (1.0 - 0.55 * step(0.5, vSurf));
   col = mix(col, uFog, fog);
   col += uGlow * fog * (1.0 - fog) * 0.5 * smoothstep(80.0, 110.0, camD) * (1.0 - uOutside);
   col = mix(col, vec3(1.0, 0.25, 0.3), uHit * 0.35);
@@ -127,6 +152,7 @@ export class Tunnel {
     this.uv = new Float32Array(NQ * 4 * 2);
     this.warn = new Float32Array(NQ * 4 * 4);
     this.cell = new Float32Array(NQ * 4 * 2);
+    this.surf = new Float32Array(NQ * 4);
     const idx = new Uint32Array(NQ * 6);
     for (let q = 0; q < NQ; q++) { const v = q * 4; idx.set([v, v + 1, v + 2, v, v + 2, v + 3], q * 6); }
     for (let q = 0; q < NQ; q++) this.uv.set([0, 0, 1, 0, 1, 1, 0, 1], q * 8);
@@ -136,6 +162,7 @@ export class Tunnel {
     g.setAttribute('uv', new THREE.BufferAttribute(this.uv, 2));
     g.setAttribute('aWarn', new THREE.BufferAttribute(this.warn, 4).setUsage(THREE.DynamicDrawUsage));
     g.setAttribute('aCell', new THREE.BufferAttribute(this.cell, 2).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('aSurf', new THREE.BufferAttribute(this.surf, 1).setUsage(THREE.DynamicDrawUsage));
     this.geo = g;
     this.uniforms = {
       uBase: { value: new THREE.Color(0xffffff) }, uBase2: { value: new THREE.Color(0xdfe6f5) },
@@ -173,7 +200,9 @@ export class Tunnel {
       const ra = track.rings.get(k), rb = track.rings.get(k + 1);
       if (!ra || !rb) continue;
       if (game.inGap(k)) continue;           // carretera cortada: salto entre mundos
+      const sf = game.surfaceAt ? game.surfaceAt(k) : 0;
       for (let c = 0; c < LANES; c++, q++) {
+        this.surf[q * 4] = this.surf[q * 4 + 1] = this.surf[q * 4 + 2] = this.surf[q * 4 + 3] = sf;
         const b = sec.b, d = sec.d;
         const x0 = b[c * 2], y0 = b[c * 2 + 1], x1 = b[c * 2 + 2], y1 = b[c * 2 + 3];
         const o = q * 12;
@@ -205,7 +234,7 @@ export class Tunnel {
     for (let o = q * 12; o < NQ * 12; o++) P[o] = 0;
     this.geo.setDrawRange(0, q * 6);
     const a = this.geo.attributes;
-    a.position.needsUpdate = a.aN.needsUpdate = a.aWarn.needsUpdate = a.aCell.needsUpdate = true;
+    a.position.needsUpdate = a.aN.needsUpdate = a.aWarn.needsUpdate = a.aCell.needsUpdate = a.aSurf.needsUpdate = true;
     this.uniforms.uTime.value += dt;
   }
 }

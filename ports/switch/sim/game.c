@@ -46,6 +46,10 @@ static double js_sign(double x) { return x > 0 ? 1 : x < 0 ? -1 : x; }
 #define ARC_GRACE_T 0.12
 #define ARC_TRICK_T 0.4
 #define ARC_PERFECT_T 0.3
+#define ARC_SURF_SEG 56
+#define ARC_SURF_LAG 10
+#define ARC_SURF_STONE_PCT 45
+#define ARC_PAD_COOL 2
 static double js_round(double x) { double r = floor(x); return (x - r >= 0.5) ? r + 1 : r; }
 
 double strip_half_width(double fold) {
@@ -192,11 +196,26 @@ static void update_boxes(Game *g, int k);
 static void spawn_boosts(Game *g, int k);
 static void spawn_coins(Game *g, int k);
 
+/* superficies (arcade.js): agarre k y ganancia g del giro por superficie */
+static const double SURF_K[5] = { 1, 1, 0.45, 1, 0.22 }, SURF_G[5] = { 1, 1.15, 1, 0.85, 1 };
+static const int WORLD_SURF[5] = { -1, 2, 1, -1, 3 };   /* por tema de mundo: musgo, cristal, lava; -1 = piedra */
+static int surf_hash(int seg, int world) {
+  uint32_t h = (uint32_t)(seg + 1) * 0x9E3779B1u ^ (uint32_t)(world + 7) * 0x85EBCA6Bu;
+  h ^= h >> 15; h *= 0x2C1B3C6Du; h ^= h >> 12;
+  return (int)(h % 100);
+}
+int game_surface_at(const Game *g, int k) { return g->surf[k & 127]; }
+
 static void on_new_row(Game *g, int k) {
+  if (g->arcade) {
+    int w = WORLD_SURF[g->themeN % 5];
+    g->surf[k & 127] = (unsigned char)(w > 0 && surf_hash(k / ARC_SURF_SEG, g->world) >= ARC_SURF_STONE_PCT ? w : 0);
+  }
   if (g->worldRows > 0 && --g->worldRows == 0) {
     Event *e;
     g->world = g->world + 1 < 6 ? g->world + 1 : 6;
     event(g, EV_WORLD, &e); e->world = g->world;
+    if (g->arcade && !game_inverted(g)) g->themeN++;     /* tema visual: un salto por suceso fuera del estado invertido */
   }
   /* las cajas de esta fila las pone BoxManager::update en el fotograma siguiente */
   spawn_boosts(g, k);
@@ -276,7 +295,7 @@ static void increment_wave(Game *g) {
   g->hasColl = 0;
   g->gap = 20;
   g->curves = g->wave->curves;
-  if (g->wave->world >= 0) { g->world = g->wave->world; event(g, EV_WORLD, &e); e->world = g->world; }
+  if (g->wave->world >= 0) { g->world = g->wave->world; event(g, EV_WORLD, &e); e->world = g->world; if (g->arcade && !game_inverted(g)) g->themeN++; }
   if (g->wave->fold) begin_fold(g);
   event(g, EV_WAVE, &e); e->wave = g->waveIdx;
   if (g->arcade) arcade_increment(g);
@@ -539,7 +558,35 @@ static void update_fold(Game *g) {             /* Tunnel::updateFold */
 }
 
 /* ------------------------------------------------------------------ jugador */
+static int arc_flight_s(const Game *g, double s, double *a, double *b);
+/* superficie que se nota en la posición s (arcade.js gripAt): piedra donde el guion pide precisión */
+static int grip_id(const Game *g, double s) {
+  int id = g->surf[((int)floor(s) - ARC_SURF_LAG) & 127], cur = (int)floor(s), i;
+  if (id == 0) return 0;
+  if (is_open(g) || g->folding || game_inverted(g) || arc_flight_s(g, s, NULL, NULL) || g->padT > 0) return 0;
+  if (g->wallLead > 0) return 0;
+  for (i = 0; i < g->nBoxes; i++) {
+    const Box *b = &g->boxes[i];
+    if (b->wall && !b->hit && b->k >= cur - 2 && b->k <= cur + 14) return 0;
+  }
+  return id;
+}
+
 static void steer(Game *g, double a) {         /* Player::updateRotation */
+  if (g->arcade) {
+    int id = grip_id(g, g->s);
+    g->surfNow = id;
+    if (id != 0) {
+      g->omega += SURF_K[id] * ((fabs(a) < STEER_DEAD ? 0 : a * STEER_GAIN * SURF_G[id]) - g->omega);
+      g->theta += g->omega;
+      if (!is_open(g)) g->theta = wrap_angle(g->theta);
+      else {
+        if (g->theta > 5.9) g->theta = 5.9;
+        if (g->theta < -0.1) g->theta = -0.1;
+      }
+      return;
+    }
+  }
   g->omega = fabs(a) < STEER_DEAD ? 0 : a * STEER_GAIN;
   g->theta += g->omega;
   if (!is_open(g)) g->theta = wrap_angle(g->theta);
@@ -732,14 +779,15 @@ static void prune(Game *g) {
 
 static int game_step_core(Game *g, double steer_in);
 /* tramo de vuelo del salto entre mundos (arcade.js flight) */
-static int arc_flight(const Game *g, double *a, double *b) {
+static int arc_flight_s(const Game *g, double s, double *a, double *b) {
   int i;
   for (i = 0; i < g->nGaps; i++) {
     double fa = g->gaps[i].from - 3, fb = g->gaps[i].to + 1;
-    if (g->s > fa && g->s < fb) { if (a) *a = fa; if (b) *b = fb; return 1; }
+    if (s > fa && s < fb) { if (a) *a = fa; if (b) *b = fb; return 1; }
   }
   return 0;
 }
+static int arc_flight(const Game *g, double *a, double *b) { return arc_flight_s(g, g->s, a, b); }
 double game_land_in(const Game *g) {
   double b;
   if (!arc_flight(g, NULL, &b)) return INFINITY;
@@ -749,11 +797,14 @@ int game_step(Game *g, double steer_in) { return game_step_in(g, steer_in, 0); }
 int game_step_in(Game *g, double steer_in, int trick) {
   double before = g->s;
   int start = g->arcade && trick && g->alive && g->trickT < 0 && arc_flight(g, NULL, NULL);
-  int n = game_step_core(g, steer_in);
+  int n, i;
+  if (g->arcade && g->padT > 0) g->padT -= 1.0 / 60;
+  n = game_step_core(g, steer_in);
   if (g->arcade && g->alive) {
     int lane = game_lane(g);
     Event *e;
     double b;
+    for (i = 0; i < g->nEvents; i++) if (g->events[i].type == EV_BOOST) g->padT = ARC_PAD_COOL;
     if (g->world != g->seenWorld) { g->seenWorld = g->world; g->worldT = g->time; }
     if (start) { g->trickT = 0; event(g, EV_TRICK, &e); e->n = g->tricks + 1; }
     else if (g->trickT >= 0) {

@@ -848,6 +848,15 @@ if (!ONLY && !opt.built) {
   const mi = spawnSync(process.execPath, [new URL('./misiones.mjs', import.meta.url).pathname, '20', 'novato'], { encoding: 'utf8' });
   rec(24, 'Misiones al alcance (misiones.mjs)', mi.status === 0, mi.stdout.split('\n').filter((l) => /misiones cumplidas|FALLA|IMPOSIBLE/.test(l)).slice(0, 3));
 }
+// Superficies del Arcade (agarre): reglas de la simulación con el bot (tests/superficies.mjs) y su vibración (tests/vibe.mjs)
+if (!ONLY && !opt.built) {
+  const sf = spawnSync(process.execPath, [new URL('./superficies.mjs', import.meta.url).pathname, '--n=20'], { encoding: 'utf8', timeout: 480000 });
+  const sl = sf.stdout.split('\n').filter((l) => /^  [✓✗] /.test(l));
+  rec(22, 'Superficies: agarre, adelanto y muertes (superficies.mjs)', sf.status === 0 && sl.length >= 26, { comprobaciones: sl.length, fallos: sl.filter((l) => l.includes('✗')).map((l) => l.slice(0, 200)).slice(0, 3) });
+  const vb = spawnSync(process.execPath, [new URL('./vibe.mjs', import.meta.url).pathname, `--url=${URL0}`], { encoding: 'utf8', timeout: 240000 });
+  const vl = vb.stdout.split('\n').filter((l) => /^  [✓✗] /.test(l));
+  rec(23, 'Vibración de la superficie (vibe.mjs)', vb.status === 0 && vl.length >= 30, { comprobaciones: vl.length, fallos: vl.filter((l) => l.includes('✗')).map((l) => l.slice(0, 200)).slice(0, 3) });
+}
 writeFileSync(SHOTS + 'qa-report.json', JSON.stringify(results, null, 1));
 const fails = results.filter((r) => r.pass === false);
 console.log(`\n${results.filter((r) => r.pass === true).length} PASS · ${fails.length} FAIL`);
