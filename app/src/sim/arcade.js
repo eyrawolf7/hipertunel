@@ -30,7 +30,9 @@ const WALL_MAX_FIRST = 24;      // el primero de la partida, algo más fácil de
 const WALL_WAIT = 3;            // s tras entrar en un mundo
 const COMPRESS = 0.4;           // cajas por oleada respecto al guion original
 const GAP_ROWS = 6;             // filas vacías entre oleadas (20 en el original)
-export const CAMP_ROWS = 22;    // filas en un carril antes de que te echen una caja encima
+const EARLY_T = 25;             // s de arranque amable: sin cajas altas y con filas libres de más
+const EARLY_SKIP = 2;           // en ese arranque, una fila de cada 2 no sale caja nueva
+export const CAMP_ROWS = 22;   // filas en un carril antes de que te echen una caja encima
 
 export class Arcade extends Game {
   constructor({ seed = 1, easyWalls = 0 } = {}) {
@@ -71,7 +73,15 @@ export class Arcade extends Game {
       this.event('wallSoon', {});
       return;
     }
+    // arranque amable: en los primeros EARLY_T s, una fila de cada EARLY_SKIP queda libre (sin tocar una barra en curso)
+    if (this.time < EARLY_T && !this.coll && row.k % EARLY_SKIP === 0) return;
     super.spawnNewBoxes(row);
+  }
+
+  // arranque amable: nada de cajas altas en los primeros EARLY_T s (no gasta aleatoriedad extra)
+  pickHeight() {
+    const h = super.pickHeight();
+    return this.time < EARLY_T ? SHORT_H : h;
   }
 
   spawnWall(row) {
