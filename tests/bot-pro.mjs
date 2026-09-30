@@ -69,7 +69,8 @@ export function createBot(levelName, seed = 1) {
         else {
           const d = goalUnwrapped - th;
           const steer = Math.abs(d * 0.35) < 0.019 ? 0 : Math.max(-L.maxSteer, Math.min(L.maxSteer, d * 0.35));
-          om = steer * 0.2; th += om;
+          const gr = g.gripAt ? g.gripAt(g.s + rowsPerFrame * t) : null;   // agarre de la superficie (solo Arcade)
+          om = gr ? om + gr.k * (steer * 0.2 * gr.g - om) : steer * 0.2; th += om;
         }
         if (open) th = Math.max(-0.1, Math.min(5.9, th));
         const s = g.s + rowsPerFrame * t, c = Math.floor(s), f = s - c;

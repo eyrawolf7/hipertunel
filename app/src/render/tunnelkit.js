@@ -71,12 +71,26 @@ if (wearK > 0.0) {
   float crack = 1.0 - smoothstep(0.0, 0.015 + 0.05 * wearK, min(c1, c2));
   diffuseColor.rgb *= (1.0 - 0.8 * crack * wearK) * (1.0 - 0.25 * wearK);
 }
-float seamM = (1.0 - smoothstep(0.1, 0.15, dot(texture2D(map, vMapUv).rgb, vec3(0.2126, 0.7152, 0.0722)))) * step(0.13, vMapUv.y);   // solo la cara (las jambas de los arcos usan la franja de arriba del atlas, v < 0,13)`)
+float seamM = (1.0 - smoothstep(0.1, 0.15, dot(texture2D(map, vMapUv).rgb, vec3(0.2126, 0.7152, 0.0722)))) * step(0.13, vMapUv.y);   // solo la cara (las jambas de los arcos usan la franja de arriba del atlas, v < 0,13)
+// superficie (vWarn.z: 0 piedra, 1 cristal, 2 musgo, 3 lava, 4 hielo): se lee de lejos por el tono de
+// toda la losa, nunca con el color de un carril ni con azul
+float sCr = step(0.5, vWarn.z) * step(vWarn.z, 1.5), sMo = step(1.5, vWarn.z) * step(vWarn.z, 2.5), sLa = step(2.5, vWarn.z) * step(vWarn.z, 3.5), sIc = step(3.5, vWarn.z);
+float sLum = dot(diffuseColor.rgb, vec3(0.3333));
+float sMm = 0.5 + 0.5 * sin(vMapUv.x * 23.0 + vTile * 40.0) * sin(vMapUv.y * 17.0 + vTile * 11.0);
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(1.0), 0.35 * sCr);
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.27, 0.36, 0.16) * (0.45 + 0.55 * sLum), sMo * (0.55 + 0.25 * sMm));
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(sLum) * 0.3, 0.8 * sLa);
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.74, 0.8, 0.83) * (0.75 + 0.3 * sLum), 0.88 * sIc);
+float sSpark = pow(fract(sin(dot(floor(vMapUv * 60.0), vec2(12.9898, 78.233))) * 43758.5453), 60.0);`)
+      .replace('#include <roughnessmap_fragment>', crystal ? '#include <roughnessmap_fragment>' : `#include <roughnessmap_fragment>
+roughnessFactor *= 1.0 - 0.65 * (sCr + sIc);`)
       .replace('#include <emissivemap_fragment>', crystal ? `#include <emissivemap_fragment>
 float fresC = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 3.0);
 vec3 glowC = mix(vWarn.rgb, vec3(1.0), 0.35);
 totalEmissiveRadiance += (vWarn.rgb * (0.06 + 0.3 * on) + glowC * vRimC * (0.1 + 0.3 * on) + glowC * fresC * (0.08 + 0.15 * on)) * uGlowK;` : `#include <emissivemap_fragment>
-totalEmissiveRadiance += uInlay * ribInlay * 1.4 + uSeamGlow * seamM + vec3(1.0, 0.75, 0.2) * recBand * 1.1;`);
+totalEmissiveRadiance += uInlay * ribInlay * 1.4 + uSeamGlow * seamM + vec3(1.0, 0.75, 0.2) * recBand * 1.1;
+totalEmissiveRadiance += vec3(1.0) * sSpark * 0.8 * sCr + vec3(0.9, 0.3, 0.06) * (seamM * 1.1 + 0.03) * sLa;
+diffuseColor.rgb *= 1.0 - 0.3 * seamM * sIc;`);
     sh.uniforms.uGlowK = mat.userData.uGlowK; sh.uniforms.uInlay = kitU.uInlay; sh.uniforms.uSeamGlow = kitU.uSeamGlow;
   };
   mat.userData.uGlowK = { value: 1 };
@@ -150,6 +164,7 @@ export class TunnelKit {
       // un arco cada 4 filas: cada 2 formaban en el punto de fuga una doble fila de teclas de
       // piano blancas que tapaba el centro de la vista
       const archRow = (k & 3) === 0;
+      const sf = game.surfaceAt ? game.surfaceAt(k) : 0;      // superficie del Arcade (0 = piedra)
       for (let c = 0; c < LANES; c++) {
         // Aventura: carril hundido (no hay losa: se ve el vacío)
         if (game.isHole && game.isHole(k, c)) continue;
@@ -175,7 +190,7 @@ export class TunnelKit {
         const nx = -d[c * 2 + 1], ny = d[c * 2];
         n.copy(ra.X).multiplyScalar(nx).addScaledVector(ra.U, ny); g.aN0.setXYZ(i, n.x, n.y, n.z);
         n.copy(rb.X).multiplyScalar(nx).addScaledVector(rb.U, ny); g.aN1.setXYZ(i, n.x, n.y, n.z);
-        if (wa > 0) g.aWarn.setXYZW(i, wr, wg, wb, wa); else g.aWarn.setXYZW(i, k === this.recordRow ? 2 : (k & 7) === 0 ? 1 : 0, game.wearAt ? game.wearAt(k, c) : 0, 0, 0);
+        if (wa > 0) g.aWarn.setXYZW(i, wr, wg, wb, wa); else g.aWarn.setXYZW(i, k === this.recordRow ? 2 : (k & 7) === 0 ? 1 : 0, game.wearAt ? game.wearAt(k, c) : 0, sf, 0);
       }
       // lámina abierta: un faldón de sillería cuelga de cada borde, así la pista tiene grosor de
       // obra (como el anillo del concepto C·3) y no es una cinta de papel. Usa la losa lisa del
