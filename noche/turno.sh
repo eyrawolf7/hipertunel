@@ -53,7 +53,7 @@ fi
 echo "Turno de noche $FECHA hasta las $HASTA (máx. $MAX rondas). Copia: $WT" | tee -a "$EST/logs/turno.txt"
 for i in $(seq 1 "$MAX"); do
   [ "$(date +%H:%M)" \> "$HASTA" ] && [ "$(date +%H)" -lt 20 ] && { echo "Hora de parar ($HASTA)" | tee -a "$EST/logs/turno.txt"; break; }
-  grep -q '"estado": *"pendiente"' "$EST/tareas.json" || { echo "No quedan tareas pendientes" | tee -a "$EST/logs/turno.txt"; break; }
+  grep -qE '"estado": *"(pendiente|en_curso)"' "$EST/tareas.json" || { echo "No quedan tareas pendientes" | tee -a "$EST/logs/turno.txt"; break; }
   echo "--- ronda $i · $(date +%H:%M)" | tee -a "$EST/logs/turno.txt"
   claude -p "$(cat "$REPO/noche/RONDA.md")" \
     --settings "$EST/ajustes.json" --permission-mode acceptEdits --permission-prompts none \
