@@ -8,6 +8,9 @@ import { createAudio } from './audio/index.js';
 import { createUI } from './ui/index.js';
 import { createInput } from './input/index.js';
 import { createVibe } from './input/vibe.js';
+import { createHaptics } from './input/haptics.js';
+import { Capacitor } from '@capacitor/core';
+import { Haptics } from '@capacitor/haptics';
 import { createMissions } from './missions.js';
 import { createShop, SHOP } from './shop.js';
 import { Adventure, STAGES, packGhost, unpackGhost, quantSteer } from './sim/adventure.js';
@@ -23,7 +26,8 @@ const QS = new URLSearchParams(location.search);
 
 // ---------------------------------------------------------------- ajustes y récords
 const COARSE = matchMedia('(pointer: coarse)').matches;
-const IS_ANDROID_WEB = /Android/i.test(navigator.userAgent) && !window.Capacitor && location.protocol === 'https:';
+const IS_NATIVE = Capacitor.isNativePlatform();   // dentro de la app de Android (Capacitor)
+const IS_ANDROID_WEB = /Android/i.test(navigator.userAgent) && !IS_NATIVE && location.protocol === 'https:';
 const DEFAULTS = { tilt: true, invert: false, sens: 1, quality: COARSE ? 'media' : 'alta', reduceFx: false, ambient: true, music: true, sound: true, vibe: true };
 let settings = { ...DEFAULTS };
 try { Object.assign(settings, JSON.parse(localStorage.getItem('hipertunel-ajustes') || '{}')); } catch (e) {}
@@ -342,7 +346,7 @@ const fmtN = (n) => n.toLocaleString('es-ES');
 // dentro del tubo): el motor solo suena si cabe un pulso entre los suyos. Todo sale por buzz() como
 // pulsos de fondo (prio 0), así que cuenta para el tope de pulsos por segundo y cede a los sucesos.
 let rumbleT = 0, rumbleRow = 0, rumbleDue = false;
-const vibe = createVibe((ms, kind) => buzz(ms, 0, false, false, kind === 'suelo' ? VIB_SUELO : undefined));
+const vibe = createVibe((ms, kind, name) => buzz(ms, 0, false, false, kind === 'suelo' ? VIB_SUELO : undefined, name));
 window.__vibe = vibe;   // gancho de pruebas: registro de pulsos
 function engineRumble(dt) {
   const on = state === 'play' && game.alive && settings.vibe !== false && !settings.reduceFx;
@@ -458,7 +462,12 @@ let vibHist = [], vibBusy = 0, vibDead = false;
 // Los pulsos de fondo (motor y suelo) dejan VIB_EVT huecos por segundo libres para los sucesos, y
 // el suelo (VIB_SUELO) deja a su vez sitio a los tics del motor. Devuelve si el pulso ha salido.
 const VIB_EVT = 3, VIB_SUELO = 6;
-function buzz(p, prio = 1, final = false, force = final, max = prio === 0 ? VIB_MAX - VIB_EVT : VIB_MAX) {
+// En la app de Android sale por Haptics con intensidad (input/haptics.js); en la web, navigator.vibrate.
+// `name` es la superficie que pide el pulso (piedra, lava...) y solo sirve para elegir el golpe.
+// El gancho de pruebas `window.__hapticsPlugin` hace pasar la web por la ruta de la app con un plugin falso.
+const haptics = createHaptics({ plugin: IS_NATIVE ? Haptics : (window.__hapticsPlugin || null) });
+window.__haptics = haptics;
+function buzz(p, prio = 1, final = false, force = final, max = prio === 0 ? VIB_MAX - VIB_EVT : VIB_MAX, name) {
   if (vibDead || state !== 'play' || settings.reduceFx || settings.vibe === false) return false;
   const now = performance.now();
   if (prio === 0 && now < vibBusy) return false;
@@ -469,10 +478,10 @@ function buzz(p, prio = 1, final = false, force = final, max = prio === 0 ? VIB_
   // solo cuentan los segundos que incluyen algún pulso nuevo (con topes distintos, uno viejo ya lleno no bloquea)
   if (!force) for (let j = Math.max(max, h.length - onsets.length); j < h.length; j++) if (h[j] - h[j - max] < 1000) return false;   // la muerte y el choque con impulso siempre suenan
   vibHist = h; vibBusy = t; vibDead = final;
-  try { navigator.vibrate && navigator.vibrate(p); } catch (e) {}
+  haptics.play(p, name);
   return true;
 }
-function vibStop() { vibBusy = 0; try { navigator.vibrate && navigator.vibrate(0); } catch (e) {} }
+function vibStop() { vibBusy = 0; haptics.stop(); }
 let nearT = 0, passT = 0, pendingChime = false, padHint = false, hitstop = 0;
 let flightT = 0, wasFlight = false, ghostHints = 0, trickHints = 0, wallHints = 0, toastOk = false;
 // en pleno salto entre mundos solo se ven los avisos de la pirueta (el resto se descarta,
