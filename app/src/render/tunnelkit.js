@@ -17,7 +17,7 @@ const SKIRT_H = 1.5;                            // alto del faldón de piedra ba
 const HALF_W = 1.035, LEN = 4.0;
 
 // colores del anillo tallado y del brillo de las juntas (los pone el render según el mundo)
-export const kitU = { uInlay: { value: new THREE.Color(0xffc861) }, uSeamGlow: { value: new THREE.Color(0, 0, 0) } };
+export const kitU = { uInlay: { value: new THREE.Color(0xffc861) }, uSeamGlow: { value: new THREE.Color(0, 0, 0) }, uSurf: { value: 0 } };
 
 function patch(mat, crystal) {
   mat.onBeforeCompile = (sh) => {
@@ -44,7 +44,7 @@ vec3 objectTangent = normalize(_tx * tangent.x + _ny * tangent.y + _tz * tangent
       .replace('#include <begin_vertex>', `vec3 transformed = cellPos(position, _tx, _ny, _tz);
 vWarn = aWarn; vKz = position.z / ${LEN.toFixed(1)}; vTile = fract(sin(dot(aC0, vec3(12.9898, 78.233, 37.719))) * 43758.5453); vFacet = fract(sin(dot(position.xz, vec2(12.9898, 78.233))) * 43758.5453);`);
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec4 vWarn; varying float vFacet; varying float vTile; varying float vKz;\nuniform float uGlowK; uniform vec3 uInlay; uniform vec3 uSeamGlow;')
+      .replace('#include <common>', '#include <common>\nvarying vec4 vWarn; varying float vFacet; varying float vTile; varying float vKz;\nuniform float uGlowK; uniform float uSurf; uniform vec3 uInlay; uniform vec3 uSeamGlow;')
       .replace('#include <color_fragment>', crystal ? `#include <color_fragment>
 // cristal del aviso: apagado = pastel, encendido = color vivo. El canto claro de la textura
 // (vRimC) se aprovecha para que brille el borde de cada panel.
@@ -86,7 +86,9 @@ if (wearK > 0.0) {
 float seamM = (1.0 - smoothstep(0.1, 0.15, dot(texture2D(map, vMapUv).rgb, vec3(0.2126, 0.7152, 0.0722)))) * step(0.13, vMapUv.y);   // solo la cara (las jambas de los arcos usan la franja de arriba del atlas, v < 0,13)
 // superficie (vWarn.z: 0 piedra, 1 cristal, 2 musgo, 3 lava, 4 hielo): se lee de lejos por el tono de
 // toda la losa, nunca con el color de un carril ni con azul
-float sCr = step(0.5, vWarn.z) * step(vWarn.z, 1.5), sMo = step(1.5, vWarn.z) * step(vWarn.z, 2.5), sLa = step(2.5, vWarn.z) * step(vWarn.z, 3.5), sIc = step(3.5, vWarn.z);
+float sCr = 0.0, sMo = 0.0, sLa = 0.0, sIc = 0.0, sSpark = 0.0;
+if (uSurf > 0.5) {
+sCr = step(0.5, vWarn.z) * step(vWarn.z, 1.5); sMo = step(1.5, vWarn.z) * step(vWarn.z, 2.5); sLa = step(2.5, vWarn.z) * step(vWarn.z, 3.5); sIc = step(3.5, vWarn.z);
 float sLum = dot(diffuseColor.rgb, vec3(0.3333));
 vec3 sTint = diffuse / max(max(diffuse.r, max(diffuse.g, diffuse.b)), 0.001);   // tinte cálido del mundo: se compensa en cristal y hielo
 float sMm = 0.5 + 0.5 * sin(vMapUv.x * 23.0 + vTile * 40.0) * sin(vMapUv.y * 17.0 + vTile * 11.0);
@@ -96,7 +98,8 @@ diffuseColor.rgb = mix(diffuseColor.rgb, min(vec3(0.55, 0.78, 0.85) / sTint, vec
 diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.22, 0.42, 0.2), vec3(0.1, 0.2, 0.11), sMm) * (0.55 + 0.5 * sLum), 0.88 * sMo);
 diffuseColor.rgb = mix(diffuseColor.rgb, vec3(sLum) * vec3(0.22, 0.19, 0.19), 0.85 * sLa);
 diffuseColor.rgb = mix(diffuseColor.rgb, min(vec3(0.85, 0.91, 0.94) / sTint, vec3(1.3)) * (0.8 + 0.25 * sLum), 0.88 * sIc);
-float sSpark = pow(fract(sin(dot(floor(vMapUv * vec2(90.0, 16.0)), vec2(12.9898, 78.233))) * 43758.5453), 48.0) * sOff;`)
+sSpark = pow(fract(sin(dot(floor(vMapUv * vec2(90.0, 16.0)), vec2(12.9898, 78.233))) * 43758.5453), 48.0) * sOff;
+}`)
       .replace('#include <roughnessmap_fragment>', crystal ? '#include <roughnessmap_fragment>' : `#include <roughnessmap_fragment>
 roughnessFactor *= 1.0 - 0.65 * sCr - 0.8 * sIc;`)
       .replace('#include <fog_fragment>', crystal ? '#include <fog_fragment>' : `#ifdef USE_FOG
@@ -110,10 +113,12 @@ vec3 glowC = mix(vWarn.rgb, vec3(1.0), 0.35);
 totalEmissiveRadiance += (vWarn.rgb * (0.06 + 0.3 * on) + glowC * vRimC * (0.1 + 0.3 * on) + glowC * fresC * (0.08 + 0.15 * on)) * uGlowK;` : `#include <emissivemap_fragment>
 totalEmissiveRadiance += uInlay * ribInlay * 1.4 + uSeamGlow * seamM * (1.0 - step(0.5, vWarn.z)) + vec3(1.0, 0.75, 0.2) * recBand * 1.1;
 totalEmissiveRadiance += vec3(0.1, 0.08, 0.04) * mg * (1.0 - step(0.5, vWarn.z));   // el musgo en sombra no se vuelve pizarra por la luz fría del mundo
+if (uSurf > 0.5) {
 totalEmissiveRadiance += vec3(1.0) * sSpark * 0.6 * sCr + vec3(0.45, 0.06, 0.03) * (seamM * 0.6 + 0.02) * sLa + vec3(0.6, 0.1, 0.04) * pow(fract(sin(dot(floor(vMapUv * 28.0), vec2(39.3468, 11.135))) * 43758.5453), 30.0) * 0.9 * sLa;
 diffuseColor.rgb *= 1.0 - 0.6 * seamM * sIc;
-totalEmissiveRadiance += vec3(0.1, 0.14, 0.17) * sIc + vec3(0.03, 0.08, 0.09) * sCr;   // la luz cálida del mundo no los vuelve crema`);
-    sh.uniforms.uGlowK = mat.userData.uGlowK; sh.uniforms.uInlay = kitU.uInlay; sh.uniforms.uSeamGlow = kitU.uSeamGlow;
+totalEmissiveRadiance += vec3(0.1, 0.14, 0.17) * sIc + vec3(0.03, 0.08, 0.09) * sCr;   // la luz cálida del mundo no los vuelve crema
+}`);
+    sh.uniforms.uGlowK = mat.userData.uGlowK; sh.uniforms.uSurf = kitU.uSurf; sh.uniforms.uInlay = kitU.uInlay; sh.uniforms.uSeamGlow = kitU.uSeamGlow;
   };
   mat.userData.uGlowK = { value: 1 };
   mat.customProgramCacheKey = () => (crystal ? 'kit-crystal' : 'kit-stone');
@@ -179,6 +184,7 @@ export class TunnelKit {
     const closed = game.fold === 30 || game.fold === -30;
     const cnt = { tile_stone: 0, tile_arch: 0, tile_crystal: 0, tile_crystal_arch: 0 };
     const v = this._v, n = this._n;
+    let anySurf = 0;
     if (this.stoneMat) this.stoneMat.color.copy(tint);
     for (let k = kNear; k <= game.kLast; k++) {
       const ra = track.rings.get(k), rb = track.rings.get(k + 1);
@@ -187,6 +193,7 @@ export class TunnelKit {
       // piano blancas que tapaba el centro de la vista
       const archRow = (k & 3) === 0;
       const sf = game.surfaceAt ? game.surfaceAt(k) : 0;      // superficie del Arcade (0 = piedra)
+      if (sf) anySurf = 1;
       for (let c = 0; c < LANES; c++) {
         // Aventura: carril hundido (no hay losa: se ve el vacío)
         if (game.isHole && game.isHole(k, c)) continue;
@@ -242,6 +249,7 @@ export class TunnelKit {
       for (const im of vm.list) im.count = cnt[key] || 0;
       for (const a of Object.values(vm.attrs)) a.needsUpdate = true;
     }
+    kitU.uSurf.value = anySurf;      // sin superficie especial por delante el sombreador se salta ese bloque
     if (this.crystalMat) this.crystalMat.userData.uGlowK.value = dark ? 1.4 : 1;
   }
 }
