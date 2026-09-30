@@ -37,8 +37,26 @@ export class TunnelProps {
     Promise.all(['rib_stone', 'crystal_cluster', 'vine_edge', 'vine_hang'].map((n) => loadModel(n))).then(([rib, cry, vine, hang]) => {
       if (rib) this.rib = instanced(rib, 12 * 6, scene);
       if (cry) this.cry = instanced(cry, 12 * 6 + 40, scene);
-      if (vine) this.vine = instanced(vine, 160, scene);
-      if (hang) { hang.traverse((o) => { if (o.isMesh) o.material.side = THREE.DoubleSide; }); this.hang = instanced(hang, 80, scene); }
+      // el verde de las enredaderas era primo del carril encendido (regla 3): oliva apagado
+      const olive = (model) => model.traverse((o) => {
+        if (!o.isMesh || o.userData.olive || Array.isArray(o.material)) return;   // el modelo viene de la caché: una sola vez
+        o.userData.olive = true;
+        o.material = o.material.clone();
+        const hsl = {}; o.material.color.getHSL(hsl);
+        o.material.color.setHSL(0.2, hsl.s * 0.4, hsl.l * 0.85);
+        const col = o.geometry.attributes.color;   // las hojas llevan el verde en los vértices
+        if (!col) return;
+        o.geometry = o.geometry.clone();
+        const a = o.geometry.attributes.color, c = new THREE.Color();
+        for (let i = 0; i < a.count; i++) {
+          c.fromBufferAttribute(a, i).getHSL(hsl);
+          c.setHSL(0.2, hsl.s * 0.4, hsl.l * 0.85);
+          a.setXYZ(i, c.r, c.g, c.b);
+        }
+        a.needsUpdate = true;
+      });
+      if (vine) { olive(vine); this.vine = instanced(vine, 160, scene); }
+      if (hang) { olive(hang); hang.traverse((o) => { if (o.isMesh) o.material.side = THREE.DoubleSide; }); this.hang = instanced(hang, 80, scene); }
       this.ready = !!(rib || cry || vine);
     });
   }

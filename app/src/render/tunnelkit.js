@@ -60,8 +60,8 @@ float mg = 0.0;
   float wl = dot(diffuseColor.rgb, vec3(0.3333));
   mg = clamp((diffuseColor.g - diffuseColor.r * 0.9 - diffuseColor.b * 0.1) * 25.0, 0.0, 1.0);
   diffuseColor.rgb = mix(diffuseColor.rgb, vec3(wl) * vec3(1.05, 0.88, 0.5), mg * 0.9);
-  diffuseColor.rgb = mix(vec3(wl), diffuseColor.rgb, 0.8);
-  diffuseColor.rgb *= mix(vec3(1.0), vec3(dot(uSunCol, vec3(0.3333))) / max(uSunCol, vec3(0.05)), 0.6);
+  diffuseColor.rgb = mix(vec3(wl), diffuseColor.rgb, 0.6);
+  diffuseColor.rgb *= mix(vec3(1.0), vec3(dot(uSunCol, vec3(0.3333))) / max(uSunCol, vec3(0.05)), 0.85);
 }
 // cada losa con su tono (±6 %) y alguna algo más verdosa, como piedra de verdad
 diffuseColor.rgb *= (0.94 + 0.12 * vTile) * mix(vec3(1.0), vec3(0.93, 1.02, 0.9), step(0.82, fract(vTile * 7.13)));
