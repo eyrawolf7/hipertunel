@@ -9,6 +9,7 @@
 // reflejos de X ms».
 import fs from 'node:fs';
 import { createBot, LEVELS, makeGame } from './bot-pro.mjs';
+import { createWatcher, verifyClone } from './injustas.mjs';
 // las misiones guardan en localStorage: uno en memoria (Node no lo tiene y avisa al tocarlo)
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
 const { createMissions } = await import('../app/src/missions.js');
@@ -43,9 +44,11 @@ function play(mode, seed, level) {
   const mark = (kind) => { if (r.first[kind] === undefined) r.first[kind] = g.time; if (kind !== 'impulso' && g.time >= r.last.t) r.last = { t: g.time, kind }; };
   const kindOf = (b, camp) => (b.wall ? 'muro' : camp ? 'acampar' : b.tall ? 'alta' : b.fixed ? 'fija' : 'rodante');
   const camps = new Set();
+  const watcher = createWatcher();
   const max = MAX_S * 60;
   while (g.alive && g.frame < max) {
     const prevS = g.s;
+    watcher.before(g);
     const ev = g.step(bot(g));
     if (g.level > 0) r.boostFrames++;
     for (const e of ev) {
@@ -65,6 +68,7 @@ function play(mode, seed, level) {
       if (e.type === 'death') {
         const b = g.boxes.find((x) => x.id === e.id);
         r.deaths = b ? kindOf(b, camps.has(b.id)) : 'fija';
+        r.inevitable = watcher.inevitable(g.frame);
       }
     }
     // «por los pelos» (mismo cálculo que main.js): una caja pasa rozando el carril de al lado
@@ -103,6 +107,9 @@ function summarize(rs) {
     mundo2_pct: Math.round(100 * rs.filter((r) => r.visWorld >= 2).length / n),
     impulso_pct: Math.round(100 * rs.reduce((a, r) => a + r.boostFrames, 0) / Math.max(1, t.reduce((a, b) => a + b, 0) * 60)),
     roces_min: r1(rs.reduce((a, r) => a + r.near, 0) / Math.max(1, t.reduce((a, b) => a + b, 0) / 60)),
+    muertes: dead.length,
+    inevitables: dead.filter((r) => r.inevitable).length,
+    inevitables_pct: dead.length ? r1(100 * dead.filter((r) => r.inevitable).length / dead.length) : null,
     muertesPorCaja_pct: Object.fromEntries(KINDS.map((k) => [k, dead.length ? Math.round(100 * killed[k] / dead.length) : 0])),
     cajasQueSalen_pct: Object.fromEntries(KINDS.map((k) => [k, Math.round(100 * spawned[k] / totSp)])),
     momentos: Object.fromEntries(SPECIAL.map((k) => {
@@ -116,6 +123,7 @@ function summarize(rs) {
 }
 
 const t0 = Date.now();
+for (const mode of MODES) verifyClone((seed) => makeGame(mode, seed));
 const out = {};
 for (const mode of MODES) {
   out[mode] = {};
@@ -124,6 +132,9 @@ for (const mode of MODES) {
     for (let i = 0; i < N[mode]; i++) rs.push(play(mode, 1000 + i, level));
     out[mode][level] = summarize(rs);
   }
+  const lv = Object.keys(LEVELS).map((l) => out[mode][l]);
+  const muertes = lv.reduce((a, m) => a + m.muertes, 0), inevitables = lv.reduce((a, m) => a + m.inevitables, 0);
+  out[mode].injustas = { muertes, inevitables, inevitables_pct: muertes ? r1(100 * inevitables / muertes) : null };
 }
 fs.mkdirSync(new URL('../.noche/', import.meta.url), { recursive: true });
 const cfg = { n: N.arcade, nc: N.classic };
@@ -144,9 +155,12 @@ for (const mode of MODES) {
   const rows = {};
   for (const level of Object.keys(LEVELS)) {
     const m = out[mode][level];
-    rows[level] = { mediana: m.mediana_s, peor10: m.peor10_s, 'choque 1º': m.primerChoque_s, mundo2: m.mundo2_pct + '%', impulso: m.impulso_pct + '%', 'roces/min': m.roces_min, 'cartón': m.cartonRoto_pct === null ? '-' : m.cartonRoto_pct + '%', misiones: m.misionesPorPartida };
+    rows[level] = { mediana: m.mediana_s, peor10: m.peor10_s, 'choque 1º': m.primerChoque_s, mundo2: m.mundo2_pct + '%', impulso: m.impulso_pct + '%', 'roces/min': m.roces_min, 'cartón': m.cartonRoto_pct === null ? '-' : m.cartonRoto_pct + '%', misiones: m.misionesPorPartida, 'inevit.': m.inevitables_pct === null ? '-' : `${m.inevitables}/${m.muertes}` };
   }
   console.table(rows);
+  const inj = out[mode].injustas;
+  console.log(`  muertes inevitables (ningún plan de giros las evita 0,5 s antes): ${inj.inevitables}/${inj.muertes} = ${inj.inevitables_pct ?? '-'} %`);
+  if (mode === 'arcade' && inj.inevitables_pct !== null && inj.inevitables_pct >= 3) { worse++; console.log(RED(`  ⚠ ${mode}: ${inj.inevitables_pct} % de muertes injustas (objetivo < 3 %)`)); }
   for (const level of Object.keys(LEVELS)) {
     const m = out[mode][level];
     const muertes = KINDS.map((k) => `${k} ${m.muertesPorCaja_pct[k]}% (salen ${m.cajasQueSalen_pct[k]}%)`).join(' · ');
