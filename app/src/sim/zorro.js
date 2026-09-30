@@ -27,6 +27,7 @@ export class Zorro extends Arcade {
     super(opts);
     this.variant = 'arcade'; this.hero = true;
     this.airT = -1; this.jumpBuf = 0; this.jumps = 0;
+    this.grazeOn = false;   // el zorro tiene sus propios roces (dan saltos, no monedas)
     this.charges = 1; this.coinAcc = 0; this.nearRun = 0; this.nearT = 0; this.coinSeen = 0;
   }
 

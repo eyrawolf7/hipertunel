@@ -417,6 +417,56 @@ await run('l', async () => {
   await page.close();
 });
 
+// m. roce: una caja que pasa por el carril de al lado da 1 moneda y una chispa en el borde (bucle real)
+for (const side of [1, -1]) await run('m', async () => {
+  const { page, errors } = await open();
+  const ready = await page.evaluate((side) => {
+    window.__hip.start('arcade', 7); window.__freeze = true;
+    const h = window.__hip, g = h.game, hw = Math.PI / 6;
+    for (let i = 0; i < 60 * 40 && g.alive && !g.boxes.some((b) => !b.wall && b.k - g.s > 8 && b.k - g.s < 30); i++) h.step(1);
+    const b = g.boxes.find((x) => !x.wall && x.k - g.s > 8 && x.k - g.s < 30);
+    if (!b) return { b: null };
+    g.invul = 30; g.v = g.vTarget = 4.76; g.theta = (b.lane + side) * hw;
+    window.__gz = []; window.__rects = []; window.__w = document.body.clientWidth;
+    const step0 = g.step.bind(g);
+    g.step = (inp) => { const c0 = g.coinsGot, ev = step0(inp); for (const e of ev) if (e.type === 'graze') window.__gz.push({ t: g.time, dc: g.coinsGot - c0, lane: e.lane }); return ev; };
+    (function f() { for (const d of document.querySelectorAll('.roce-chispa')) { const r = d.getBoundingClientRect(); window.__rects.push({ cls: d.className, l: r.left, r: r.right }); } requestAnimationFrame(f); })();
+    window.__freeze = false;
+    return { lane: b.lane, ms: +g.speedMS.toFixed(1), rows: +(b.k - g.s).toFixed(1) };
+  }, side);
+  rec('m', 'hay una caja suelta por delante y se va a su carril vecino a >60 m/s', !!ready.lane || ready.lane === 0, ready);
+  await sleep(3500);
+  const r = await page.evaluate(() => ({ gz: window.__gz, rects: window.__rects, w: window.__w, left: document.querySelectorAll('.roce-chispa').length, coins: window.__hip.game.coinsGot, grazes: window.__hip.game.grazes }));
+  rec('m', 'el roce se produce (mínimo 1 exigido) y suma su moneda', r.gz.length >= 1 && r.gz.every((x) => x.dc >= 1) && r.grazes === r.gz.length, { roces: r.gz.length, monedas: r.coins });
+  rec('m', 'sale una chispa por roce', r.rects.length > 0, { muestras: r.rects.length });
+  const w = r.w, dentro = r.rects.every((x) => (/izq/.test(x.cls) && x.r <= w * 0.1) || (/der/.test(x.cls) && x.l >= w * 0.9));
+  rec('m', 'la chispa vive en el 10 % lateral (el 20 % central queda libre)', r.rects.length > 0 && dentro, { w });
+  const lado = side === 1 ? 'izq' : 'der';
+  rec('m', `jugador ${side === 1 ? 'a la derecha' : 'a la izquierda'} de la caja: la chispa sale a la ${side === 1 ? 'izquierda' : 'derecha'}`, r.rects.length > 0 && r.rects.every((x) => x.cls.includes(lado)), { clases: [...new Set(r.rects.map((x) => x.cls))] });
+  rec('m', 'la chispa desaparece sola', r.left === 0, { quedan: r.left });
+  rec('m', 'dos roces con moneda nunca a menos de 2,5 s', r.gz.every((x, i) => i === 0 || x.t - r.gz[i - 1].t >= 2.5 - 1e-6), r.gz.map((x) => +x.t.toFixed(2)));
+  rec('m', 'sin errores', errors.length === 0, errors.slice(0, 3));
+  await page.close();
+});
+
+// m2. el Clásico no da monedas ni chispas por roce (el aviso antiguo sigue siendo solo aviso)
+await run('m', async () => {
+  const { page, errors } = await open();
+  const r = await page.evaluate(() => {
+    window.__hip.start('classic', 7); window.__freeze = true;
+    const h = window.__hip, g = h.game; g.crash = (x) => { x.hit = true; };
+    let graze = 0; const step0 = g.step.bind(g);
+    g.step = (inp) => { const ev = step0(inp); for (const e of ev) if (e.type === 'graze') graze++; return ev; };
+    window.__freeze = false;
+    return { variant: g.variant || 'classic', grazeOn: g.grazeOn ?? null, get: () => graze };
+  });
+  await sleep(6000);
+  const s = await page.evaluate(() => ({ chispas: document.querySelectorAll('.roce-chispa').length, coins: window.__hip.game.coinsGot, st: window.__hip.state }));
+  rec('m', 'Clásico: sin roce con moneda ni chispas', r.grazeOn === null && s.chispas === 0 && s.st === 'play', { ...r, ...s });
+  rec('m', 'sin errores', errors.length === 0, errors.slice(0, 3));
+  await page.close();
+});
+
 await browser.close();
 console.log(fails ? `${fails} FALLOS` : 'Todo OK');
 process.exit(fails ? 1 : 0);
