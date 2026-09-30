@@ -395,7 +395,7 @@ export function createAudio(options = {}) {
   }
 
   // segundos entre golpes del roce por superficie (a velocidad media): piedra, cristal, musgo, lava, hielo
-  const ROLL_GAP = [[0.26, 0.36], [0.2, 0.2], [0.3, 0.42], [0.4, 0.7], [0.9, 0.9]];
+  const ROLL_GAP = [[0.26, 0.36], [0.22, 0.36], [0.3, 0.42], [0.4, 0.7], [0.8, 1.0]];
 
   // ---------- efectos
   const SFX = {
@@ -555,7 +555,7 @@ export function createAudio(options = {}) {
           sweep('sine', 320 * (0.92 + 0.16 * r), 200, t, 0.06, 0.05, nodes.sfx, 0.012);
           break;
         case 3:      // lava: burbujeo grave
-          sweep('sine', 170 + 30 * r, 250 + 60 * r, t, 0.1, 0.06, nodes.sfx, 0.02);
+          sweep('sine', 200 + 30 * r, 270 + 50 * r, t, 0.1, 0.06, nodes.sfx, 0.02);
           break;
         case 4: {    // hielo: siseo tonal muy bajo que sube al derrapar (o.slip 0..1)
           const k = 1 + 2.5 * clamp(o.slip ?? 0, 0, 1);

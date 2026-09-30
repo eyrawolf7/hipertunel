@@ -39,6 +39,24 @@ console.log('La piedra es el giro del Clásico');
   ok(d < 1e-12, `theta idéntica a la del Clásico (máx diferencia ${d.toExponential(1)})`);
 }
 
+console.log('Qué superficie sale en cada tema de mundo (islas, selva, noche, templo, fuego, y otra vuelta)');
+{
+  // el tema avanza con los sucesos de mundo (como el render); se fuerza y se miran las filas nuevas
+  const want = [[], [2], [1], [], [3], [], [2]];   // tema 5 = islas otra vez, 6 = selva…
+  const themes = [0, 1, 2, 3, 4, 5, 6];
+  for (const th of themes) {
+    const g = new Arcade({ seed: 9 }), bot = createBot('bueno', 9);
+    g.themeN = th; g.invul = 1e9;
+    const got = new Set();
+    for (let f = 0; f < 60 * 120 && g.alive; f++) { g.step(bot(g)); if (g.world === 0 || g.world === 1) for (const [k, v] of g.surf) if (k > 40 && v > 0) got.add(v); }
+    const exp = want[th];
+    ok(exp.every((x) => got.has(x)) && [...got].every((x) => exp.includes(x)), `tema ${th}: ${got.size ? [...got].map((x) => SURFACES[x].name).join(', ') : 'solo piedra'} (esperado ${exp.length ? exp.map((x) => SURFACES[x].name).join(', ') : 'solo piedra'})`);
+  }
+  const g = new Arcade({ seed: 4 }), bot = createBot('experto', 4);
+  for (let f = 0; f < 60 * 400 && g.alive; f++) g.step(bot(g));
+  ok(g.themeN >= 2, `el tema avanza con los saltos de mundo (${g.themeN} en ${g.time.toFixed(0)} s, mundo de la simulación ${g.world})`);
+}
+
 console.log('Cada superficie se ve ≥ 1,5 s antes de notarse');
 {
   const seen = new Map();   // fila -> fotograma en que entró

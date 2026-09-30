@@ -206,13 +206,14 @@ int game_surface_at(const Game *g, int k) { return g->surf[k & 127]; }
 
 static void on_new_row(Game *g, int k) {
   if (g->arcade) {
-    int w = WORLD_SURF[(g->world >> 1) % 5];
+    int w = WORLD_SURF[g->themeN % 5];
     g->surf[k & 127] = (unsigned char)(w > 0 && surf_hash(k / ARC_SURF_SEG, g->world) >= ARC_SURF_STONE_PCT ? w : 0);
   }
   if (g->worldRows > 0 && --g->worldRows == 0) {
     Event *e;
     g->world = g->world + 1 < 6 ? g->world + 1 : 6;
     event(g, EV_WORLD, &e); e->world = g->world;
+    if (g->arcade && !game_inverted(g)) g->themeN++;     /* tema visual: un salto por suceso fuera del estado invertido */
   }
   /* las cajas de esta fila las pone BoxManager::update en el fotograma siguiente */
   spawn_boosts(g, k);
@@ -292,7 +293,7 @@ static void increment_wave(Game *g) {
   g->hasColl = 0;
   g->gap = 20;
   g->curves = g->wave->curves;
-  if (g->wave->world >= 0) { g->world = g->wave->world; event(g, EV_WORLD, &e); e->world = g->world; }
+  if (g->wave->world >= 0) { g->world = g->wave->world; event(g, EV_WORLD, &e); e->world = g->world; if (g->arcade && !game_inverted(g)) g->themeN++; }
   if (g->wave->fold) begin_fold(g);
   event(g, EV_WAVE, &e); e->wave = g->waveIdx;
   if (g->arcade) arcade_increment(g);

@@ -92,6 +92,10 @@ if (!process.argv.includes('--pura')) {
   ok(await page.evaluate(() => window.__hip.state) === 'paused', 'la partida está en pausa');
   const c = await count(); await wait(1200); const d = await count();
   ok(c === d, 'en pausa no hay pulsos de superficie');
+  const cl0 = await count();
+  await page.evaluate(() => { window.__hip.start('classic', 7); });
+  await wait(2500);
+  { const cl = (await count()) - cl0; ok(cl > 10, `el Clásico también vibra con las juntas de la piedra (${cl} pulsos en 2,5 s; la simulación no cambia)`); }
   ok(errors.length === 0, 'sin errores de página' + (errors.length ? ': ' + errors.join(' | ') : ''));
   await browser.close();
 }

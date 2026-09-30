@@ -356,6 +356,8 @@ let nearT = 0, pendingChime = false, padHint = false, hitstop = 0;
 let flightT = 0, wasFlight = false, trickHints = 0, wallHints = 0, toastOk = false;
 // en pleno salto entre mundos solo se ven los avisos de la pirueta (el resto espera a aterrizar)
 { const raw = ui.toast; ui.toast = (t, k, o) => { if (!toastOk && state === 'play' && game && game.flight && game.flight() && game.alive) return; raw(t, k, o); }; }
+const SURF_HINT = [null, 'Suelo de cristal: el giro es más vivo', 'Suelo de musgo: el giro va más blando', 'Suelo de basalto: el giro es más pesado', 'Hielo: el suelo resbala'];
+let surfHints = []; try { surfHints = JSON.parse(localStorage.getItem('hipertunel-pistas-suelo') || '[]'); } catch (e) {}
 try { trickHints = +(localStorage.getItem('hipertunel-pistas-pirueta') || 0); wallHints = +(localStorage.getItem('hipertunel-pistas-muro') || 0); } catch (e) {}
 
 // moneda que vuela desde donde la coges hasta el contador (por el borde, nunca por el centro)
@@ -440,6 +442,14 @@ function stepSim() {
       audio.setWorld(game.world + worldBase * 2);
       // la campanilla del mundo nuevo suena al aterrizar del salto, si lo hay
       if (!game.inverted) { if (game.gaps.some((g) => g.to + 1 > game.s)) pendingChime = true; else audio.play('world'); }
+    }
+  }
+  // suelo nuevo: aviso de una sola vez por superficie, cuando entra en la vista (se nota unos segundos después)
+  if (game.variant === 'arcade' && state === 'play' && game.alive && game.surfaceAt) {
+    const sf = game.surfaceAt(game.kLast);
+    if (sf > 0 && !surfHints.includes(sf)) {
+      surfHints.push(sf); try { localStorage.setItem('hipertunel-pistas-suelo', JSON.stringify(surfHints)); } catch (e) {}
+      ui.toast(SURF_HINT[sf], 'info');
     }
   }
   // Arcade: puntos = distancia × racha; cada 500 m sin chocar la racha sube

@@ -117,26 +117,27 @@ void main(){
   // de un carril ni con azul; los carriles con aviso no se tocan
   if (vSurf > 0.5) {
     float wk = 1.0 - clamp(wa * 2.0, 0.0, 1.0);
-    if (vSurf < 1.5) {                                   // cristal: losa pulida y clara con destellos
-      float sp = pow(vn(p * 8.0 + vec2(uTime * 0.25, 0.0)), 16.0);
-      col = mix(col, vec3(1.0) * (0.75 + 0.25 * lam), 0.4 * wk);
+    float sOff = smoothstep(0.1, 0.45, length(cross(normalize(uCam - vW), vec3(0.0, 0.0, 1.0))));   // aprox.: lejos del eje de la vista
+    if (vSurf < 1.5) {                                   // cristal: losa pulida gris-cian con destellos fuera del centro
+      float sp = pow(vn(p * 8.0 + vec2(uTime * 0.25, 0.0)), 24.0) * sOff;
+      col = mix(col, vec3(0.55, 0.78, 0.85) * (0.75 + 0.25 * lam), 0.65 * wk);
       col += vec3(1.0) * (sp * 1.1 + pow(max(dot(N, H), 0.0), 14.0) * 0.3) * wk;
-    } else if (vSurf < 2.5) {                            // musgo: húmedo, verde y más oscuro
+    } else if (vSurf < 2.5) {                            // musgo: verde oscuro húmedo con manchas
       float m = smoothstep(0.3, 0.7, vn(p * 1.3 + vCell.yx * 2.1));
-      vec3 mo = mix(uMoss, uMoss * 0.55, vn(p * 5.0)) * lam;
-      col = mix(col, mo, (0.5 + 0.35 * m) * wk);
-    } else if (vSurf < 3.5) {                            // basalto: oscuro con juntas de ascua
-      col = mix(col, vec3(0.15, 0.12, 0.12) * (0.7 + 0.5 * blockId) * lam, 0.8 * wk);
+      vec3 mo = mix(vec3(0.22, 0.42, 0.2), vec3(0.1, 0.2, 0.11), m) * (0.6 + 0.5 * lam);
+      col = mix(col, mo, 0.88 * wk);
+    } else if (vSurf < 3.5) {                            // basalto: gris casi negro con juntas de brasa
+      col = mix(col, vec3(0.22, 0.19, 0.19) * (0.7 + 0.5 * blockId) * lam * 0.6, 0.85 * wk);
       float ember = (grout + rim * 0.6) * (0.6 + 0.4 * sin(uTime * 1.5 + vCell.y * 0.7 + vCell.x));
-      col += vec3(1.0, 0.4, 0.1) * ember * 0.65 * wk;
-    } else {                                             // hielo: blanco brillante con grietas
+      col += vec3(0.45, 0.06, 0.03) * ember * 0.6 * wk;
+    } else {                                             // hielo: blanco lechoso con grietas oscuras
       float cr = 1.0 - smoothstep(0.0, 0.03 + px * 2.0, abs(vn(p * 2.5) - 0.5) * 0.6);
-      col = mix(col, vec3(0.95, 0.96, 0.96) * (0.85 + 0.2 * lam), 0.65 * wk);
-      col = mix(col, vec3(1.0), cr * 0.5 * wk);
-      col += vec3(1.0) * pow(max(dot(N, H), 0.0), 20.0) * 0.5 * wk;
+      col = mix(col, vec3(0.85, 0.91, 0.94) * (0.8 + 0.25 * lam), 0.88 * wk);
+      col *= 1.0 - 0.6 * cr * wk;
+      col += vec3(1.0) * pow(max(dot(N, H), 0.0), 20.0) * 0.4 * wk;
     }
   }
-  float fog = smoothstep(uFogNear, uFogFar, camD);
+  float fog = smoothstep(uFogNear, uFogFar, camD) * (1.0 - 0.55 * step(0.5, vSurf));
   col = mix(col, uFog, fog);
   col += uGlow * fog * (1.0 - fog) * 0.5 * smoothstep(80.0, 110.0, camD) * (1.0 - uOutside);
   col = mix(col, vec3(1.0, 0.25, 0.3), uHit * 0.35);

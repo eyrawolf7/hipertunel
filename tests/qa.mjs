@@ -847,7 +847,7 @@ if (!ONLY && !opt.built) {
 if (!ONLY && !opt.built) {
   const sf = spawnSync(process.execPath, [new URL('./superficies.mjs', import.meta.url).pathname, '--n=20'], { encoding: 'utf8', timeout: 480000 });
   const sl = sf.stdout.split('\n').filter((l) => /^  [✓✗] /.test(l));
-  rec(22, 'Superficies: agarre, adelanto y muertes (superficies.mjs)', sf.status === 0 && sl.length >= 19, { comprobaciones: sl.length, fallos: sl.filter((l) => l.includes('✗')).map((l) => l.slice(0, 200)).slice(0, 3) });
+  rec(22, 'Superficies: agarre, adelanto y muertes (superficies.mjs)', sf.status === 0 && sl.length >= 26, { comprobaciones: sl.length, fallos: sl.filter((l) => l.includes('✗')).map((l) => l.slice(0, 200)).slice(0, 3) });
   const vb = spawnSync(process.execPath, [new URL('./vibe.mjs', import.meta.url).pathname, `--url=${URL0}`], { encoding: 'utf8', timeout: 240000 });
   const vl = vb.stdout.split('\n').filter((l) => /^  [✓✗] /.test(l));
   rec(23, 'Vibración de la superficie (vibe.mjs)', vb.status === 0 && vl.length >= 30, { comprobaciones: vl.length, fallos: vl.filter((l) => l.includes('✗')).map((l) => l.slice(0, 200)).slice(0, 3) });

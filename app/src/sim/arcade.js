@@ -65,7 +65,7 @@ export class Arcade extends Game {
   constructor({ seed = 1, easyWalls = 0, forceSurface = -1 } = {}) {
     super({ mode: 'classic', seed });
     this.variant = 'arcade';
-    this.surf = new Map(); this.padT = 0; this.forceSurface = forceSurface; this.surfNow = 0;
+    this.surf = new Map(); this.themeN = 0; this.padT = 0; this.forceSurface = forceSurface; this.surfNow = 0;
     for (const w of this.waves) {
       w.a0 = w.a;
       if (w.n > 0 && w.n < 1000) w.n = Math.max(6, Math.round(w.n * COMPRESS));
@@ -84,13 +84,20 @@ export class Arcade extends Game {
   // ------------------------------------------------------------------ superficies
   onNewRow(row) {
     if (this.surf) {
-      const w = WORLD_SURF[(this.world >> 1) % 5];   // el mundo cuenta 2 por salto: el impar es el estado invertido
+      const w = WORLD_SURF[this.themeN % 5];
       const seg = Math.floor(row.k / SURF_SEG);
       const id = w > 0 && surfHash(seg, this.world) >= SURF_STONE_PCT ? w : S_STONE;
       this.surf.set(row.k, id);
       this.surf.delete(row.k - 80);
     }
     super.onNewRow(row);
+  }
+
+  // el tema visual avanza con cada suceso de mundo fuera del estado invertido (como render/index.js);
+  // `world` se queda en 6, el tema sigue (Fuego es el cuarto salto)
+  event(type, data) {
+    if (type === 'world' && this.themeN !== undefined && !this.inverted) this.themeN++;
+    super.event(type, data);
   }
 
   // superficie dibujada en la fila k (la que se ve; se nota SURF_LAG filas después)
