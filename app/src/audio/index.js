@@ -115,7 +115,10 @@ export function createAudio(options = {}) {
     n.musicGain = ctx.createGain(); n.musicGain.gain.value = state.music ? MUSIC_VOLUME : 0;
     n.musicFilter = ctx.createBiquadFilter(); n.musicFilter.type = 'lowpass';
     n.musicFilter.frequency.value = 18000; n.musicFilter.Q.value = 0.7;
-    n.musicGain.connect(n.musicFilter); n.musicFilter.connect(n.master);
+    // "ahogo" de la música al chocar con impulso (aparte del filtro de las transiciones)
+    n.muffle = ctx.createBiquadFilter(); n.muffle.type = 'lowpass';
+    n.muffle.frequency.value = 20000; n.muffle.Q.value = 0.5;
+    n.musicGain.connect(n.musicFilter); n.musicFilter.connect(n.muffle); n.muffle.connect(n.master);
     n.music = ctx.createGain(); n.music.connect(n.musicGain); // bus de instrumentos
 
     // eco (corchea con puntillo) para lead y arpegio
@@ -389,6 +392,7 @@ export function createAudio(options = {}) {
   function scheduleUntil(until) {
     if (!ctx || !nodes) return;
     while (state.nextTime < until) {
+      if (options.log) options.log.push({ what: 'step', s: state.step, t: state.nextTime });
       scheduleStep(state.step, state.nextTime);
       if (state.entrySteps < ENTRY_STEPS) state.entrySteps++;
       state.step = (state.step + 1) % 128;
@@ -436,6 +440,15 @@ export function createAudio(options = {}) {
     n.hGl2.frequency.setTargetAtTime((620 + 260 * v) * 1.5, now, 0.15);
   }
 
+  // Primer paso de la rejilla de la música (un paso = semicorchea) en o después de `t`.
+  // Los pasos ya programados están hacia atrás desde nextTime; los siguientes, hacia delante.
+  function nextGridTime(t) {
+    const sd = stepDur();
+    const k = Math.ceil((t - state.nextTime) / sd - 1e-6);
+    return state.nextTime + k * sd;
+  }
+  const musicRuns = () => state.music && !state.paused && !state.muted && state.nextTime > ctx.currentTime - 0.2;
+
   // ---------- efectos
   const SFX = {
     boost(t, o) {
@@ -443,18 +456,26 @@ export function createAudio(options = {}) {
       noiseHit(t, 0.45, 0.3, nodes.sfx, 'bandpass', 400 * up, 3500 * up, 1.2, 0.02);
       sweep('triangle', 220 * up, 880 * up, t, 0.3, 0.18, nodes.sfx, 0.01);
       const base = 72 + (L - 1) * 3;
+      // nivel 3: la última nota del remate cae en el siguiente paso de la música
+      let t0 = t + 0.12;
+      if (L === 3 && musicRuns()) t0 = nextGridTime(t0 + 3 * 0.045) - 3 * 0.045;
+      if (options.log && L === 3) options.log.push({ what: 'remate', t: t0 + 3 * 0.045 });
+      unmuffle(t);
       [0, 4, 7, 12].forEach((iv, i) => {
-        const tt = t + 0.12 + i * 0.045;
+        const tt = t0 + i * 0.045;
         note('square', mtof(base + iv), tt, 0.05, 0.06, nodes.sfx, { sus: 0.4, rel: 0.12, cutoff: 5000 });
         note('sine', mtof(base + iv + 12), tt, 0.05, 0.05, nodes.sfxDelay, { sus: 0.4, rel: 0.15 });
       });
     },
+    // solo para pruebas (con options.log): ahoga o abre la música sin sumar ningún otro sonido
+    muffle(t, o) { if (!options.log) return; if (o.open) unmuffle(t); else muffle(t, o.hold || 0.5); },
     crash(t) {
       noiseHit(t, 0.28, 0.4, nodes.sfx, 'lowpass', 3000, 300, 0.8);
       noiseHit(t, 0.12, 0.2, nodes.sfx, 'bandpass', 1400, 900, 2);
       sweep('square', 160, 55, t, 0.18, 0.12, nodes.sfx);
       sweep('sine', 110, 40, t, 0.25, 0.4, nodes.sfx);
       duck(0.6, 0.4);
+      muffle(t, 0.5);
     },
     death(t) {
       sweep('sine', 130, 28, t, 0.7, 0.7, nodes.sfx);
@@ -598,6 +619,26 @@ export function createAudio(options = {}) {
     g.cancelScheduledValues(now);
     g.setTargetAtTime(MUSIC_VOLUME * amount, now, 0.02);
     g.setTargetAtTime(MUSIC_VOLUME, now + time, 0.3);
+  }
+
+  // la música se "ahoga" (paso bajo) al chocar con impulso y se abre sola tras `hold` s
+  // o antes, con el siguiente impulso (unmuffle)
+  function muffle(t, hold) {
+    if (!state.music) return;
+    const f = nodes.muffle.frequency;
+    f.cancelScheduledValues(t);
+    f.setTargetAtTime(380, t, 0.03);
+    f.setTargetAtTime(20000, t + hold, 0.18);
+    state.muffledUntil = t + hold;
+    if (options.log) options.log.push({ what: 'muffle', t, hold });
+  }
+  function unmuffle(t) {
+    if (!(state.muffledUntil > t)) return;
+    const f = nodes.muffle.frequency;
+    f.cancelScheduledValues(t);
+    f.setTargetAtTime(20000, t, 0.06);
+    state.muffledUntil = 0;
+    if (options.log) options.log.push({ what: 'unmuffle', t });
   }
 
   function setMusicFilterForWorld() {
