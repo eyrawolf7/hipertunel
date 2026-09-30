@@ -2063,3 +2063,31 @@
 }
 .htui .scr-pause .vig-dim { --fondo-blur: .1em; }
 .htui.htui-q-baja .vig-title, .htui.htui-q-baja .scr-pause .vig-dim { --fondo-blur: 0px; }
+/* pausa y ajustes: velo oscuro cálido (marrón), sin lavar la escena con crema; da profundidad a la tarjeta */
+.htui .scr-settings .vig-menu, .htui .scr-pause .vig-dim {
+  --fondo-tinte: sepia(.45) saturate(1.4) brightness(.8) contrast(1.05);
+  background: linear-gradient(rgba(40, 25, 10, .35), rgba(40, 25, 10, .35));
+}
+/* fin: el texto de reintento sobre una píldora oscura para que se lea con cualquier fondo */
+.htui .scr-over .oc-hint {
+  width: max-content; margin-left: auto; margin-right: auto; padding: .25em .9em; border-radius: 2em;
+  background: rgba(40, 25, 10, .55);
+  text-shadow: 0 .1em 0 rgba(20, 10, 0, .9), 0 0 .5em rgba(20, 10, 0, .9);
+}
+/* portada: velo ámbar izquierdo más visible detrás del logo y los botones */
+.htui .vig-title { background: linear-gradient(90deg, rgba(255, 190, 100, .24), rgba(255, 190, 100, .08) 35%, transparent 55%); }
+/* elige modo, pausa, ajustes y fin: una sola regla de fondo (velo oscuro cálido + arenisca), sin capas claras que laven la escena */
+.htui .scr-modes .vig-menu, .htui .scr-settings .vig-menu, .htui .scr-pause .vig-dim, .htui .scr-over .vig-dim {
+  --fondo-tinte: sepia(.4) saturate(1.3) brightness(.85) contrast(1.05);
+  background:
+    linear-gradient(180deg, rgba(214, 160, 70, .2), rgba(120, 70, 20, .24)),
+    linear-gradient(rgba(40, 25, 10, .28), rgba(40, 25, 10, .28));
+}
+.htui .scr-over .oc-hint { background: rgba(30, 18, 8, .65); color: #fff3d6; }
+/* vuelta final: viñeta en vez de velo plano (centro cálido, bordes oscuros) y más saturación para que asome el color del mundo */
+.htui .scr-modes .vig-menu, .htui .scr-settings .vig-menu, .htui .scr-pause .vig-dim, .htui .scr-over .vig-dim {
+  --fondo-tinte: sepia(.3) saturate(1.5) brightness(.85) contrast(1.08);
+  background:
+    radial-gradient(ellipse at 50% 45%, rgba(255, 214, 140, .10) 0, rgba(255, 214, 140, .10) 35%, rgba(30, 18, 8, .42) 100%),
+    linear-gradient(rgba(40, 25, 10, .14), rgba(40, 25, 10, .14));
+}

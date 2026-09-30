@@ -2,9 +2,9 @@
 // una captura normal y otra con el contenido de la interfaz oculto (solo escena + velo), y mide
 // sobre esta última, sin el 30 % central: tono medio (°) y detalle (varianza del laplaciano).
 // Uso: node tests/fondo-menus.mjs [--shots=carpeta] [--base] [--url=...]
-//   --base guarda las cifras como «antes» en .noche/fondo-menus-base.json; sin él compara con ellas.
+//   --base guarda las cifras actuales en .noche/fondo-menus-base.json; la comparación usa ANTES (fijo en el código).
 import puppeteer from 'puppeteer';
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 const opt = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith('--')).map((a) => { const [k, v] = a.slice(2).split('='); return [k, v ?? '1']; }));
 const URL0 = opt.url || process.env.HIP_URL || 'http://localhost:5173/';
 const shots = opt.shots || '.noche/capturas/fondo-menus/tmp';
@@ -24,7 +24,7 @@ for (const [w, h] of VPS) {
   await sleep(800);
   for (const name of SCREENS) {
     await page.evaluate((n) => window.__hip.ui.show(n), name);
-    await sleep(900);
+    await sleep(1500); // deja acabar los fundidos de entrada (el aviso de reintento tarda 1,3 s)
     await page.screenshot({ path: `${shots}/${name}-${w}.png` });
     await page.addStyleTag({ content: '.htui .scr > *:not(.vig){visibility:hidden!important} .fps{visibility:hidden!important} .htui .scr *{animation:none!important}' });
     await sleep(200);
@@ -94,9 +94,13 @@ pb.on('pageerror', (e) => errs.push(String(e)));
 await pb.setViewport({ width: 844, height: 390, isMobile: true, hasTouch: true, isLandscape: true });
 await pb.goto(URL0 + (URL0.includes('?') ? '&' : '?') + 'q=baja', { waitUntil: 'networkidle0' });
 await pb.waitForFunction(() => window.__hip && window.__hip.ui, { timeout: 15000 });
-await pb.evaluate(() => window.__hip.ui.show('pause')); await sleep(400);
-const bajaFiltros = await pb.evaluate(() => [...document.querySelectorAll('.htui .scr.on .vig')].filter((v) => getComputedStyle(v).backdropFilter !== 'none').length);
-const bajaOk = bajaFiltros === 0 && errs.length === 0;
+let bajaFiltros = 0, bajaVistas = 0;
+for (const n of SCREENS) {
+  await pb.evaluate((s) => window.__hip.ui.show(s), n); await sleep(300);
+  const r = await pb.evaluate(() => { const v = [...document.querySelectorAll('.htui .scr.on .vig')]; return [v.length, v.filter((e) => getComputedStyle(e).backdropFilter !== 'none').length]; });
+  bajaVistas += r[0]; bajaFiltros += r[1];
+}
+const bajaOk = bajaFiltros === 0 && bajaVistas >= SCREENS.length && errs.length === 0;
 console.log(`${bajaOk ? 'PASS' : 'FAIL'} calidad baja sin filtro (${bajaFiltros}) y sin errores (${errs.length})`);
 await browser.close();
 const out ={ gold: GOLD, res, fps };
@@ -104,7 +108,9 @@ console.log(JSON.stringify(out, null, 1));
 const baseF = '.noche/fondo-menus-base.json';
 if (opt.base) { writeFileSync(baseF, JSON.stringify(out, null, 1)); console.log('base guardada'); process.exit(0); }
 let fails = 0;
-const base = existsSync(baseF) ? JSON.parse(readFileSync(baseF)) : null;
+// detalle «antes» (v0.60 sin velo), fijo en el código para que la prueba no dependa de .noche/ (ignorado por git)
+const ANTES = { title: { 844: 67.28, 1280: 39.08 }, modes: { 844: 51.85, 1280: 18.55 }, map: { 844: 44.15, 1280: 19.46 }, shop: { 844: 86.48, 1280: 3.33 }, settings: { 844: 6.17, 1280: 5.37 }, pause: { 844: 3.87, 1280: 1.9 }, over: { 844: 4.49, 1280: 2.19 } };
+const base = { res: Object.fromEntries(Object.entries(ANTES).map(([n, v]) => [n, Object.fromEntries(Object.entries(v).map(([w, lap]) => [w, { lap }]))])) };
 const dh = (a, b) => Math.min(Math.abs(a - b), 360 - Math.abs(a - b));
 for (const n of SCREENS) for (const [w] of VPS) {
   const m = res[n][w], b = base?.res[n]?.[w];

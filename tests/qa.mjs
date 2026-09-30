@@ -841,7 +841,7 @@ if (!ONLY && !opt.built) {
 if (!ONLY && !opt.built) {
   const fm = spawnSync(process.execPath, [new URL('./fondo-menus.mjs', import.meta.url).pathname, `--url=${URL0}`], { encoding: 'utf8' });
   const fl = fm.stdout.split('\n').filter((l) => /^(PASS|FAIL)/.test(l));
-  rec(21, 'Fondo de los menús cálido y desenfocado (fondo-menus.mjs)', fm.status === 0 && fl.length === 15, { pasa: fl.filter((l) => l.startsWith('PASS')).length, fallos: fl.filter((l) => l.startsWith('FAIL')).map((l) => l.slice(0, 200)).slice(0, 2) });
+  rec(21, 'Fondo de los menús cálido y desenfocado (fondo-menus.mjs)', fm.status === 0 && fl.length === 16, { pasa: fl.filter((l) => l.startsWith('PASS')).length, fallos: fl.filter((l) => l.startsWith('FAIL')).map((l) => l.slice(0, 200)).slice(0, 2) });
 }
 writeFileSync(SHOTS + 'qa-report.json', JSON.stringify(results, null, 1));
 const fails = results.filter((r) => r.pass === false);
