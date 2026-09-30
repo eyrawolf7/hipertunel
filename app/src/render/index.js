@@ -421,6 +421,7 @@ export class Renderer {
     styleUniforms.uSunDirV.value.copy(this.tunnel.uniforms.uKey.value).transformDirection(cam.matrixWorldInverse);
     const gapNear = game.gaps.some((g) => g.from - s < 34 && g.to - s > -6);
     const outside = game.fold < 29 || gapNear;
+    this.outside = outside;
     const fogFar = (outside ? 190 : 120) * (1 + 0.3 * (this.landT > 0 ? this.landT / 1.5 : 0));
     if (this.landT > 0) this.landT -= dt;
     this.tunnel.uniforms.uFogFar.value += (fogFar - this.tunnel.uniforms.uFogFar.value) * Math.min(1, dt * 2);

@@ -1,10 +1,11 @@
 // Renderiza sin conexión unos segundos de música + turbina + efectos y guarda WAV y espectrograma.
 // Uso: node tests/sonido.mjs [mundo] [nivel] [velocidad m/s] [segundos]
+// --espacio: mide la acústica dentro/fuera del tubo (cola, viento, whoomp, energía < 80 Hz).
 // ZORRO=1: secuencia del modo Zorro (tabla flotante + jump/land/whiff/smash) y pico de cada efecto por separado.
 import puppeteer from 'puppeteer';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
-const [world = 0, level = 2, speed = 80, secs = 10] = process.argv.slice(2).map(Number);
+const [world = 0, level = 2, speed = 80, secs = 10] = process.argv.slice(2).filter((x) => !x.startsWith('--')).map(Number);
 const dir = new URL('./shots/sonido/', import.meta.url).pathname; mkdirSync(dir, { recursive: true });
 const b = await puppeteer.launch({ headless: 'new' });
 const p = await b.newPage();
@@ -12,6 +13,48 @@ await p.goto((process.env.HIP_URL || 'http://localhost:5173/') + 'src/audio/demo
 if (process.env.SIN_MUSICA) await p.evaluate(() => { window.__noMusic = true; });
 const zorro = !!process.env.ZORRO;
 if (zorro) await p.evaluate(() => { window.__zorro = true; });
+if (process.argv.includes('--espacio')) {
+  // acústica: cola de reverberación dentro/fuera, viento, whoomp y energía < 80 Hz frente a un render sin espacio
+  const r = await p.evaluate(async () => {
+    const { createAudio } = await import('/src/audio/index.js');
+    const sr = 44100, secs = 3.2;
+    let sd = 7; Math.random = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };   // ruido de los efectos reproducible
+    const go = async (kind, sfx) => {
+      sd = 7;   // mismo ruido en cada render: la diferencia con «sin espacio» es solo el espacio
+      const ctx = new OfflineAudioContext(1, sr * secs, sr);
+      const a = createAudio({ context: ctx, noSpace: kind === 'none' });
+      a.unlock(); a.setMusic(false); a.setSpace(kind === 'outside');
+      if (sfx) a.play(sfx, { delay: 0.6 });
+      const d = (await ctx.startRendering()).getChannelData(0);
+      const rms = (a0, b0) => { let q = 0; for (let i = a0 * sr | 0; i < b0 * sr; i++) q += d[i] * d[i]; return Math.sqrt(q / ((b0 - a0) * sr)); };
+      const low = (f0, f1) => { let e = 0; for (let f = f0; f <= f1; f += 5) { let re = 0, im = 0; const w = 2 * Math.PI * f / sr; for (let i = 0; i < d.length; i += 2) { const h = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / d.length); re += h * d[i] * Math.cos(w * i); im += h * d[i] * Math.sin(w * i); } e += re * re + im * im; } return e / d.length; };
+      return { cola: rms(0.75, 1.15), viento: rms(2.0, 3.0), whoomp: rms(0.02, 0.12), graves: low(20, 80), pico: d.reduce((m, v) => Math.max(m, Math.abs(v)), 0) };
+    };
+    const out = {};
+    for (const k of ['none', 'inside', 'outside']) for (const s of ['crash', 'coin', null]) out[k + '/' + (s || 'silencio')] = await go(k, s);
+    return out;
+  });
+  for (const [k, v] of Object.entries(r)) console.log(k.padEnd(18), Object.entries(v).map(([a, b]) => `${a} ${b.toExponential(2)}`).join('  '));
+  const ok = (c, m) => { console.log((c ? 'OK   ' : 'FALLA'), m); if (!c) process.exitCode = 1; };
+  // la cola del efecto = RMS 0,15-0,55 s después del golpe, sin el viento que haya de fondo
+  const cola = (k, s) => Math.sqrt(Math.max(0, r[k + '/' + s].cola ** 2 - r[k + '/silencio'].cola ** 2));
+  for (const s of ['crash']) {   // 'coin' suena demasiado tiempo: su propia cola tapa la del espacio
+    const ci = cola('inside', s), co = cola('outside', s), cn = cola('none', s);
+    ok(ci > co * 1.5, `${s}: la cola dentro (${ci.toExponential(2)}) > fuera (${co.toExponential(2)})`);
+    ok(ci > cn * 1.5 + 1e-6, `${s}: dentro hay eco frente a sin espacio (${cn.toExponential(2)})`);
+    for (const k of ['inside', 'outside']) {
+      const nuevo = r[k + '/' + s].graves - r['none/' + s].graves;
+      // lo que cambia es el efecto original al pasar por el compresor con más señal encima: se admite un 6 % de su propio grave
+      ok(nuevo < Math.max(1e-5, 0.06 * r['none/' + s].graves), `${s}: ${k} añade ${nuevo.toExponential(2)} de energía < 80 Hz (el efecto solo ya tiene ${r['none/' + s].graves.toExponential(2)}; límite 6 %)`);
+    }
+  }
+  ok(r['outside/silencio'].graves < 1e-5, `viento + whoomp: energía < 80 Hz ${r['outside/silencio'].graves.toExponential(2)} < 1e-5`);
+  ok(r['outside/silencio'].viento > 0.004 && r['inside/silencio'].viento < 1e-4, `viento solo fuera (${r['outside/silencio'].viento.toExponential(2)} / ${r['inside/silencio'].viento.toExponential(2)})`);
+  ok(r['outside/silencio'].whoomp > r['inside/silencio'].whoomp * 3 && r['outside/silencio'].whoomp > 0.01, `whoomp al salir audible en 0,02-0,12 s, antes de que suba el viento (${r['outside/silencio'].whoomp.toExponential(2)})`);
+  console.log('  graves whoomp+viento fuera:', r['outside/silencio'].graves.toExponential(2), 'frente a sin espacio', r['none/silencio'].graves.toExponential(2));
+  await b.close();
+  process.exit(process.exitCode || 0);
+}
 const data = await p.evaluate(async (world, level, speed, secs) => {
   const { createAudio } = await import('/src/audio/index.js');
   const sr = 44100, ctx = new OfflineAudioContext(1, sr * secs, sr);
