@@ -1661,7 +1661,7 @@
    ===================================================================== */
 /* logo con el subtítulo incluido (1400×488) */
 .htui.has-logo .logo {
-  width: clamp(280px, min(58vw, 43vh * 2.87), 900px);
+  width: clamp(280px, min(61vw, 45vh * 2.87), 1200px);
   aspect-ratio: 1400 / 488;
   padding: 0;
   background: var(--img-logo) center / contain no-repeat;
@@ -1957,7 +1957,7 @@
 .htui.has-marco-jugar .play-frame.pf-sm > .btn { font-size: 1.3em; min-height: 2.6em; }
 .htui.has-marco-jugar .play-frame.pf-sm > .pf-gem { display: none; }
 /* portada: la píldora de Jugar llena el hueco del marco */
-.htui.has-marco-jugar .scr-title .play-frame { width: 14em; padding: 8.5% 15.5%; }
+.htui.has-marco-jugar .scr-title .play-frame { width: 14em; padding: 8.5% 15.5%; font-size: max(1em, 1.9vw); }
 .htui.has-marco-jugar .scr-title .play-frame > .btn-play { font-size: 1.45em; }
 /* tienda: filas más bajas para que quepan las tres */
 .htui.has-marco-crema .shop-cat { border-image-width: 2em; border-image-outset: .75em; padding: 1.05em .55em .35em; }
@@ -1970,7 +1970,9 @@
   .htui .card .card-name { font-size: .86em; }
 }
 /* el padding en % va contra el ancho del padre: en em para el marco de 14em (536×240) */
-.htui.has-marco-jugar .scr-title .play-frame { padding: 1.2em 2.2em; }
+.htui.has-marco-jugar .scr-title .play-frame { padding: 1.2em 2.2em; margin-top: -.1em; }
+/* el marco de Jugar crece con el ancho: la fila secundaria sube para dejar aire a «Pulsa para jugar» */
+.htui.has-marco-jugar .scr-title .title-row { margin-top: -.1em; }
 /* tienda: tres filas enteras a la vista */
 .htui .scr-shop .head { margin-bottom: .4em; }
 .htui .shop-cats { gap: 1.35em; padding-top: 1.25em; padding-bottom: .6em; }
