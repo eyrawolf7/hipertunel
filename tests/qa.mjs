@@ -843,6 +843,11 @@ if (!ONLY && !opt.built) {
   const fl = fm.stdout.split('\n').filter((l) => /^(PASS|FAIL)/.test(l));
   rec(21, 'Fondo de los menús cálido y desenfocado (fondo-menus.mjs)', fm.status === 0 && fl.length === 16, { pasa: fl.filter((l) => l.startsWith('PASS')).length, fallos: fl.filter((l) => l.startsWith('FAIL')).map((l) => l.slice(0, 200)).slice(0, 2) });
 }
+// Misiones al alcance (el novato cumple ≥ 1,5 por partida y ninguna es imposible en su modo): tests/misiones.mjs
+if (!ONLY && !opt.built) {
+  const mi = spawnSync(process.execPath, [new URL('./misiones.mjs', import.meta.url).pathname, '20', 'novato'], { encoding: 'utf8' });
+  rec(24, 'Misiones al alcance (misiones.mjs)', mi.status === 0, mi.stdout.split('\n').filter((l) => /misiones cumplidas|FALLA|IMPOSIBLE/.test(l)).slice(0, 3));
+}
 writeFileSync(SHOTS + 'qa-report.json', JSON.stringify(results, null, 1));
 const fails = results.filter((r) => r.pass === false);
 console.log(`\n${results.filter((r) => r.pass === true).length} PASS · ${fails.length} FAIL`);

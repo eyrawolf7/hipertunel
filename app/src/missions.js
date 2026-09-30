@@ -5,25 +5,34 @@
 
 const KEY = 'hipertunel-misiones';
 
-// kind: 'run' = en una sola partida; 'total' = sumando partidas. v = valores por dificultad.
+// kind: 'run' = en una sola partida; 'total' = sumando partidas. v = valores por dificultad; el
+// primero es el de la introducción (rango 1, sin azar: al alcance de quien acaba de empezar).
+// arcade: solo existe en Arcade y Zorro (muro de cartón y piruetas del salto entre mundos).
+// hard: no sale en el rango 1 (hace falta ya algo de dominio).
+// no: modos donde no existe (Supervivencia no tiene placas, plegados ni choques con impulso).
+const ARCADE_MODES = ['arcade', 'zorro'];
+const SURV = ['survival'];
 const TEMPLATES = [
-  { id: 'dist', kind: 'run', stat: 'dist', v: [800, 1500, 2500, 4000, 6000, 9000], text: (n) => `Recorre ${fmt(n)} m en una partida` },
-  { id: 'clean', kind: 'run', stat: 'cleanBest', v: [500, 900, 1500, 2500, 4000], text: (n) => `Recorre ${fmt(n)} m sin chocar` },
-  { id: 'coinsRun', kind: 'run', stat: 'coins', v: [8, 15, 25, 40, 60], text: (n) => `Coge ${n} monedas en una partida` },
-  { id: 'coinsTot', kind: 'total', stat: 'coins', v: [40, 100, 200, 400], text: (n) => `Coge ${n} monedas en total` },
-  { id: 'near', kind: 'run', stat: 'near', v: [2, 4, 7, 10, 15], text: (n) => `Pasa rozando ${n} cajas en una partida` },
-  { id: 'pads', kind: 'run', stat: 'pads', v: [4, 8, 12, 18, 25], text: (n) => `Pisa ${n} placas de impulso en una partida` },
-  { id: 'max', kind: 'run', stat: 'maxSpeed', v: [1, 2, 3, 5], text: (n) => n === 1 ? 'Llega a velocidad máxima' : `Llega ${n} veces a velocidad máxima en una partida` },
-  { id: 'world', kind: 'run', stat: 'world', v: [2, 3, 4, 5, 6], text: (n) => `Llega al mundo ${n}` },
-  { id: 'folds', kind: 'run', stat: 'folds', v: [1, 2, 4, 6], text: (n) => n === 1 ? 'Sal por fuera del túnel' : `Sal por fuera del túnel ${n} veces en una partida` },
-  { id: 'saves', kind: 'run', stat: 'saves', v: [1, 2, 3, 5], text: (n) => n === 1 ? 'Choca con impulso y sigue vivo' : `Sobrevive a ${n} choques en una partida` },
+  { id: 'dist', kind: 'run', stat: 'dist', v: [500, 800, 1500, 2500, 4000, 6000, 9000], text: (n) => `Recorre ${fmt(n)} m en una partida` },
+  { id: 'clean', kind: 'run', stat: 'cleanBest', v: [300, 500, 900, 1500, 2500, 4000], text: (n) => `Recorre ${fmt(n)} m sin chocar` },
+  { id: 'coinsRun', kind: 'run', stat: 'coins', v: [5, 8, 15, 25, 40, 60], text: (n) => `Coge ${n} monedas en una partida` },
+  { id: 'coinsTot', kind: 'total', stat: 'coins', v: [25, 40, 100, 200, 400], text: (n) => `Coge ${n} monedas en total` },
+  { id: 'near', kind: 'run', stat: 'near', v: [1, 2, 4, 7, 10, 15], text: (n) => n === 1 ? 'Pasa rozando una caja' : `Pasa rozando ${n} cajas en una partida` },
+  { id: 'pads', kind: 'run', no: SURV, stat: 'pads', v: [2, 4, 8, 12, 18, 25], text: (n) => `Pisa ${n} placas de impulso en una partida` },
+  { id: 'max', kind: 'run', hard: true, no: SURV, stat: 'maxSpeed', v: [1, 1, 2, 3, 5], text: (n) => n === 1 ? 'Llega a velocidad máxima' : `Llega ${n} veces a velocidad máxima en una partida` },
+  { id: 'world', kind: 'run', hard: true, stat: 'world', v: [2, 2, 3, 4, 5, 6], text: (n) => `Llega al mundo ${n}` },
+  { id: 'folds', kind: 'run', no: SURV, stat: 'folds', v: [1, 1, 2, 4, 6], text: (n) => n === 1 ? 'Sal por fuera del túnel' : `Sal por fuera del túnel ${n} veces en una partida` },
+  { id: 'saves', kind: 'run', no: SURV, stat: 'saves', v: [1, 1, 2, 3, 5], text: (n) => n === 1 ? 'Choca con impulso y sigue vivo' : `Sobrevive a ${n} choques en una partida` },
   // Arcade: muro de cartón y piruetas del salto entre mundos
-  { id: 'smash', kind: 'run', stat: 'smashes', v: [1, 2, 3, 5], text: (n) => n === 1 ? 'Rompe un bloque de cartón' : `Rompe ${n} bloques de cartón en una partida` },
-  { id: 'tricks', kind: 'total', stat: 'tricks', v: [3, 8, 15, 25], text: (n) => `Haz ${n} piruetas en total` },
-  { id: 'perfect', kind: 'run', stat: 'perfect', v: [1, 2, 3], text: (n) => n === 1 ? 'Haz una pirueta perfecta' : `Haz ${n} piruetas perfectas en una partida` },
-  { id: 'combo', kind: 'run', stat: 'combo', v: [2, 3], text: (n) => `Encadena ${n} piruetas en un mismo salto` },
-  { id: 'runs', kind: 'total', stat: 'runs', v: [3, 5, 8], text: (n) => `Juega ${n} partidas` },
+  { id: 'smash', kind: 'run', arcade: true, hard: true, stat: 'smashes', v: [1, 1, 2, 3, 5], text: (n) => n === 1 ? 'Rompe un bloque de cartón' : `Rompe ${n} bloques de cartón en una partida` },
+  { id: 'tricks', kind: 'total', arcade: true, hard: true, stat: 'tricks', v: [2, 3, 8, 15, 25], text: (n) => `Haz ${n} piruetas en total` },
+  { id: 'perfect', kind: 'run', arcade: true, hard: true, stat: 'perfect', v: [1, 1, 2, 3], text: (n) => n === 1 ? 'Haz una pirueta perfecta' : `Haz ${n} piruetas perfectas en una partida` },
+  { id: 'combo', kind: 'run', arcade: true, hard: true, stat: 'combo', v: [2, 2, 3], text: (n) => `Encadena ${n} piruetas en un mismo salto` },
+  { id: 'runs', kind: 'total', stat: 'runs', v: [2, 3, 5, 8], text: (n) => `Juega ${n} partidas` },
 ];
+
+// ids de las misiones que pueden salir (y cumplirse) en un modo
+export const missionsFor = (mode) => TEMPLATES.filter((t) => (!t.arcade || ARCADE_MODES.includes(mode)) && !(t.no && t.no.includes(mode))).map((t) => t.id);
 
 const RANKS = ['Novato', 'Aprendiz', 'Piloto', 'Piloto veterano', 'As del túnel', 'Maestro', 'Leyenda', 'Leyenda de oro'];
 
@@ -36,16 +45,19 @@ function load() {
 
 export function createMissions() {
   let data = load();
-  let run = null;
+  let run = null, mode = 'arcade';
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (e) {} };
 
   // elige una misión nueva que no esté ya activa, con dificultad según el rango
+  // Rango 1: tramo de introducción; rango 2: el siguiente, sin azar; ambos sin las difíciles. Solo
+  // salen las que existen en el último modo jugado (Arcade al principio).
   function roll() {
     const used = new Set(data.active.map((m) => m.id));
-    const pool = TEMPLATES.filter((t) => !used.has(t.id));
+    const ok = new Set(missionsFor(mode));
+    const pool = TEMPLATES.filter((t) => !used.has(t.id) && ok.has(t.id) && !(data.rank < 2 && t.hard));
     const t = pool[(Math.random() * pool.length) | 0];
-    const base = Math.floor(data.rank / 2);
-    const tier = Math.max(0, Math.min(t.v.length - 1, base + (Math.random() < 0.35 ? 1 : 0) - (Math.random() < 0.2 ? 1 : 0)));
+    let tier = Math.min(t.v.length - 1, data.rank);   // rango 1: introducción; rango 2: escalón intermedio
+    if (data.rank > 1) tier = Math.max(1, Math.min(t.v.length - 1, 1 + Math.floor(data.rank / 2) + (Math.random() < 0.35 ? 1 : 0) - (Math.random() < 0.2 ? 1 : 0)));
     return { id: t.id, n: t.v[tier], got: 0, done: false, key: ++data.seq };
   }
   function fill() { while (data.active.length < 3) data.active.push(roll()); }
@@ -73,7 +85,15 @@ export function createMissions() {
 
   return {
     // al empezar una partida
-    start() { run = { dist: 0, clean: 0, cleanBest: 0, coins: 0, near: 0, pads: 0, maxSpeed: 0, world: 1, folds: 0, saves: 0, runs: 0, smashes: 0, tricks: 0, perfect: 0, combo: 0 }; },
+    // (las sin empezar que no existen en este modo se cambian por otras que sí)
+    start(m = 'arcade') {
+      mode = m;
+      const ok = new Set(missionsFor(m));
+      const gone = data.active.filter((x) => !x.done && x.got === 0 && !ok.has(x.id));
+      if (gone.length) { data.active = data.active.filter((x) => !gone.includes(x)); fill(); save(); }
+      run = { dist: 0, clean: 0, cleanBest: 0, coins: 0, near: 0, pads: 0, maxSpeed: 0, world: 1, folds: 0, saves: 0, runs: 0, smashes: 0, tricks: 0, perfect: 0, combo: 0 };
+    },
+    activeIds() { return data.active.filter((m) => !m.done).map((m) => m.id); },
     // sucesos de la simulación y de main.js; devuelve las misiones recién cumplidas
     event(e, game) {
       if (!run) return [];
