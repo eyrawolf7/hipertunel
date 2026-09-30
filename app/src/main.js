@@ -193,7 +193,7 @@ function startGame(m, quick = false, fromCp = false) {
   if (m === 'adventure') { renderer.track.sync(game); prev = { s: game.s, theta: game.theta }; const st = STAGES[advStage]; ui.intro?.({ n: advStage + 1, name: st.name, boss: !!st.boss, tip: fromCp ? 'Sigues desde el punto de control' : st.tip || (st.boss ? 'Jefe: a mitad del tramo hay un punto de control' : ''), goals: ['Supéralo', 'Sin chocar ni caer', 'Coge monedas: ' + Math.round(0.35 * 100) + ' % del tramo'] }); }
   coins = 0;
   bestAtStart[m] = bestOf(m);
-  missions.start(); missDist = 0; mult = 1; multDist = 0; points = 0; maxMult = 1; bestScoreAtStart = bestScore(m); lostAt = -1; killBox = null; recAnnounced = false; visWorld = 1;
+  missions.start(m); pushMissions(); missDist = 0; mult = 1; multDist = 0; points = 0; maxMult = 1; bestScoreAtStart = bestScore(m); lostAt = -1; killBox = null; recAnnounced = false; visWorld = 1;
   renderer.setRecordRow?.(bestAtStart[m] > 0 ? Math.round(bestAtStart[m] / 4) : -1);
   // reintento rápido: sin 3-2-1, solo un instante antes del ¡YA!
   state = 'countdown'; countdown = quick ? 0.6 : 3; pendingChime = false; nearT = 0; toastQ.length = 0; input.syncJump();
