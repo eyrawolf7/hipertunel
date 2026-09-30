@@ -16,14 +16,15 @@ const ICONS = {
   magnet: () => icon((g) => { disc(g, '#ff4d5e'); g.strokeStyle = '#fff'; g.lineWidth = 16; g.lineCap = 'butt'; g.beginPath(); g.arc(64, 58, 24, Math.PI, 0, true); g.stroke(); g.fillStyle = '#fff'; g.fillRect(32, 58, 16, 22); g.fillRect(80, 58, 16, 22); g.fillStyle = '#2b2257'; g.fillRect(32, 74, 16, 8); g.fillRect(80, 74, 16, 8); }),
   x2: () => icon((g) => { disc(g, '#ffd23f'); g.fillStyle = '#2b2257'; g.font = 'bold 58px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('×2', 64, 68); }),
   shield: () => icon((g) => { disc(g, '#b58cff'); g.fillStyle = '#fff'; g.beginPath(); g.moveTo(64, 30); g.lineTo(92, 42); g.quadraticCurveTo(90, 82, 64, 98); g.quadraticCurveTo(38, 82, 36, 42); g.closePath(); g.fill(); }),
-  // marca del fantasma del Arcade: anillo crema con contorno violeta oscuro y centro suave (se lee sobre túneles claros y oscuros)
+  // marca del fantasma del Arcade (se lee sobre túneles claros y oscuros; sin dorado, que es de las monedas, ni azul)
   ghostArc: () => icon((g) => {
-    g.lineCap = 'round';
-    g.strokeStyle = 'rgba(43,34,87,0.75)'; g.lineWidth = 17; g.beginPath(); g.arc(64, 64, 42, 0, 7); g.stroke();
-    g.strokeStyle = 'rgba(255,246,224,1)'; g.lineWidth = 9; g.beginPath(); g.arc(64, 64, 42, 0, 7); g.stroke();
-    const r = g.createRadialGradient(64, 64, 2, 64, 64, 34);
-    r.addColorStop(0, 'rgba(255,246,224,0.55)'); r.addColorStop(1, 'rgba(255,246,224,0)');
-    g.fillStyle = r; g.beginPath(); g.arc(64, 64, 34, 0, 7); g.fill();
+    // silueta de fantasma: cuerpo crema translúcido, contorno violeta oscuro grueso con halo crema y dos ojos
+    g.lineJoin = 'round';
+    const body = () => { g.beginPath(); g.moveTo(26, 104); g.lineTo(26, 62); g.arc(64, 62, 38, Math.PI, 0); g.lineTo(102, 104); g.lineTo(88, 94); g.lineTo(76, 106); g.lineTo(64, 94); g.lineTo(52, 106); g.lineTo(40, 94); g.closePath(); };
+    body(); g.strokeStyle = 'rgba(255,243,214,0.7)'; g.lineWidth = 16; g.stroke();
+    body(); g.strokeStyle = '#2a1247'; g.lineWidth = 9; g.stroke();
+    body(); g.fillStyle = 'rgba(255,246,224,0.92)'; g.fill();
+    g.fillStyle = '#2a1247'; for (const x of [50, 78]) { g.beginPath(); g.ellipse(x, 62, 6, 9, 0, 0, 7); g.fill(); }
   }),
   ghost: () => icon((g) => {
     const r = g.createRadialGradient(64, 64, 4, 64, 64, 62);
@@ -62,7 +63,7 @@ export class AdvView {
   pinGhost(camera, gap) {
     const p = this.ghost.position, v = this._ndc.copy(p).project(camera);
     if (v.z < -1 || v.z > 1) return false;
-    const r = 0.05 + 0.04 * (1 - Math.min(1, gap / 30));                      // radio: fracción de la mitad del alto
+    const r = 0.075 + 0.04 * (1 - Math.min(1, gap / 30));                      // radio: fracción de la mitad del alto
     const nx = CENTER + 1.7 * r / camera.aspect + 0.03, ny = CENTER + 1.7 * r + 0.03;
     let x = v.x, y = v.y;
     if (Math.abs(x) < 1e-4 && Math.abs(y) < 1e-4) y = -1e-3;                    // justo delante: hacia el suelo

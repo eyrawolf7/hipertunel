@@ -127,7 +127,7 @@ if (doWeb) {
   await page.evaluate(() => {
     const h = window.__hip; h.start('arcade', 777);
     const inp = h.input; window.__toasts = [];
-    const raw = h.ui.toast; h.ui.toast = (t, k, o) => { window.__toasts.push({ t, rows: h.game.rowsPassed, frame: h.game.frame }); return raw(t, k, o); };
+    const raw = h.ui.toast; h.ui.toast = (t, k, o) => { window.__toasts.push({ t, rows: h.game.rowsPassed, frame: h.game.frame, prev: window.__prevScore, score: h.arcScore() }); return raw(t, k, o); };
     window.__pol = 'bot';
     inp.steer = () => {   // alterna: seguir el carril del fantasma (para taparte el centro) y jugar con el bot
       const g = h.game, gg = h.renderer.ghostGame;
@@ -141,11 +141,11 @@ if (doWeb) {
   rec(setup.ghost && setup.rec === saved.rows, 'la partida siguiente carga el fantasma y la marca dorada en la fila del récord', { ...setup, esperado: saved.rows });
 
   const medir = (chunk) => page.evaluate((n) => new Promise((res) => {
-    const h = window.__hip; h.sim(n);
+    const h = window.__hip; for (let i = 0; i < n; i++) { window.__prevScore = h.arcScore(); h.sim(1); }
     requestAnimationFrame(() => requestAnimationFrame(() => {
       const r = h.renderer, g = h.game, gg = r.ghostGame, gs = r.adv.ghost, cam = r.camera, cv = r.renderer.domElement;
       const out = { frame: g.frame, ghostFrame: gg ? gg.frame : -1, ghostAlive: gg ? gg.alive : null, ghostRows: gg ? gg.rowsPassed : -1, state: h.state, vis: gs.visible, op: gs.material.opacity };
-      const info = r.adv.ghostInfo;
+      const info = r.adv.ghostInfo; const chipEl = document.querySelector('.hud-ghost'); out.chip = chipEl && chipEl.classList.contains('on') ? chipEl.textContent : null; out.gapM = gg ? Math.round((gg.s - g.s) * 4) : null;
       if (gg && gg.alive && info) {
         // dónde queda la marca en pantalla (sin margen de brillo): ¿toca el 20 % central (±0,2 en pantalla normalizada)?
         const v = gs.position.clone().project(cam), depth = -gs.position.clone().applyMatrix4(cam.matrixWorldInverse).z;
@@ -177,7 +177,8 @@ if (doWeb) {
   for (let i = 0; i < Math.ceil(saved.n / 10) + 300; i++) {
     await page.evaluate((i) => { window.__pol = i >= 150 ? 'bot' : Math.floor(i / 12) % 2 ? 'chase' : 'flank'; }, i);
     const m = await medir(10);
-    S.n++; if (opt.debug && m.dbg && i % 3 === 0) console.log(i, JSON.stringify(m.dbg), m.vis, m.op.toFixed(2));
+    S.n++; if (m.ghostAlive) { S.chipN = (S.chipN || 0) + 1; const mm = m.chip && /(▲|▼) ([\d.,]+) m/.exec(m.chip); const val = mm ? (mm[1] === "▲" ? 1 : -1) * +mm[2].replace(/\./g, "") : null; if (val !== null && Math.abs(val - m.gapM) <= 8) S.chipOk = (S.chipOk || 0) + 1; }
+    if (opt.debug && m.dbg && i % 3 === 0) console.log(i, JSON.stringify(m.dbg), m.vis, m.op.toFixed(2));
     if (m.ghostAlive) { S.lock++; if (m.ghostFrame !== m.frame) S.lockBad++; }
     if (m.ahead && m.vis && m.op > 0.05) { S.vis++; if (m.touches) S.visTouch++; }
     if (m.ahead && m.pinned) S.hiddenNear++;
@@ -194,8 +195,9 @@ if (doWeb) {
   rec(S.hiddenNear >= 5, 'cuando el fantasma cae en el centro la marca se empuja fuera de él (la regla se ejerce)', { empujadas: S.hiddenNear });
   rec(S.pixN >= 10 && S.pixOut > 0, 'con el fantasma hay píxeles distintos fuera del centro (se dibuja de verdad)', { muestras: S.pixN, fueraDelCentro: S.pixOut });
   rec(S.pixBase === 0 && S.pixCtr === 0, 'ni un píxel del 20 % central cambia con el fantasma (más de 12/765 de diferencia; el resplandor tenue del bloom se cuenta aparte)', { muestras: S.pixN, ruidoBase: S.pixBase, centro: S.pixCtr, resplandorTenue: S.faint, maxDif: S.mx });
-  const t = await page.evaluate(() => window.__toasts.filter((x) => /récord/i.test(x.t)));
-  rec(t.length === 1 && t[0].rows === saved.rows + 1, 'el aviso de récord salta una sola vez, en la fila exacta', { avisos: t, filaRecord: saved.rows });
+  const t = await page.evaluate(() => window.__toasts.filter((x) => /nuevo récord/i.test(x.t)));
+  rec(t.length === 1 && t[0].prev <= saved.score && t[0].score > saved.score, "el aviso de récord salta una sola vez, en el paso exacto en que los puntos superan el récord (el del Arcade es por puntos)", { avisos: t, récord: saved.score });
+  rec(S.chipN > 100 && S.chipOk >= S.chipN * 0.95, 'el chip «Fantasma ▲/▼ X m» del HUD sigue la diferencia real de metros', { muestras: S.chipN, coinciden: S.chipOk });
   rec(errors.length === 0, 'sin errores de página', errors.slice(0, 3));
   await browser.close();
 }
