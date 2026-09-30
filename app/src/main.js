@@ -19,7 +19,7 @@ import { Zorro } from './sim/zorro.js';
 import { GHOST_KEY, GhostRecorder, quantGhost, unpackRun, newGhostGame, stepGhost, ghostMatches } from './ghost.js';
 import { Fase, FASES, FASE_COIN_STAR, Recording, replay, packRec, unpackRec } from './sim/fases.js';
 
-const VERSION = '0.71';
+const VERSION = '0.72';
 const STEP = 1 / 60;
 const $ = (id) => document.getElementById(id);
 const QS = new URLSearchParams(location.search);
