@@ -7,6 +7,7 @@
 // Deja un resumen en tests/shots/qa-report.json y capturas en tests/shots/qa-long/.
 import puppeteer from 'puppeteer';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 const args = process.argv.slice(2);
 const opt = Object.fromEntries(args.filter((a) => a.startsWith('--')).map((a) => { const [k, v] = a.slice(2).split('='); return [k, v ?? '1']; }));
@@ -809,6 +810,12 @@ await run(17, async () => {
 
 if (reloads.length) note(0, 'recargas inesperadas de la página (HMR de Vite): pruebas afectadas pueden fallar', reloads.length);
 await browser.close();
+// Mando simulado (pausa, cuenta atrás, fin de partida): lo lleva tests/qa-mando.mjs, aparte
+if (!ONLY && !opt.built) {
+  const m = spawnSync(process.execPath, [new URL('./qa-mando.mjs', import.meta.url).pathname, `--url=${URL0}`], { encoding: 'utf8' });
+  const bad = m.stdout.split('\n').filter((l) => l.startsWith('FALLA'));
+  rec(18, 'mando simulado (qa-mando.mjs)', m.status === 0 && bad.length === 0, { pasa: (m.stdout.match(/^PASA/gm) || []).length, fallos: bad.slice(0, 3) });
+}
 writeFileSync(SHOTS + 'qa-report.json', JSON.stringify(results, null, 1));
 const fails = results.filter((r) => r.pass === false);
 console.log(`\n${results.filter((r) => r.pass === true).length} PASS · ${fails.length} FAIL`);

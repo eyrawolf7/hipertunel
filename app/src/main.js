@@ -119,6 +119,7 @@ input.onButton = (b) => {
   if (state === 'play' && (b === 'pause' || b === 'back')) { pause(); return; }
   if (state === 'paused' && b === 'pause') { resume(); return; }
   if (state === 'countdown' && renderer.introOn && (b === 'ok' || b === 'back')) { skipIntro(); return; }
+  if (state === 'countdown' && (b === 'pause' || b === 'back')) { pause(); return; }
   if (state !== 'play' && state !== 'countdown') {
     if (b === 'up' || b === 'left' || b === 'down' || b === 'right') ui.navigate?.(b);
     else if (b === 'ok') ui.confirm?.();
@@ -195,7 +196,7 @@ function startGame(m, quick = false, fromCp = false) {
   missions.start(); missDist = 0; mult = 1; multDist = 0; points = 0; maxMult = 1; bestScoreAtStart = bestScore(m); lostAt = -1; killBox = null; recAnnounced = false; visWorld = 1;
   renderer.setRecordRow?.(bestAtStart[m] > 0 ? Math.round(bestAtStart[m] / 4) : -1);
   // reintento rápido: sin 3-2-1, solo un instante antes del ¡YA!
-  state = 'countdown'; countdown = quick ? 0.6 : 3; pendingChime = false; nearT = 0;
+  state = 'countdown'; countdown = quick ? 0.6 : 3; pendingChime = false; nearT = 0; input.syncJump();
   // desde el menú (no en el reintento rápido): se ve al zorro y la cámara entra en su cabeza
   if (!quick && m !== 'zorro' && !settings.reduceFx) renderer.startIntro();
   ui.show('hud');
@@ -209,7 +210,7 @@ function startGame(m, quick = false, fromCp = false) {
   if (seen >= 3 && !input.hasTilt && settings.tilt && COARSE) setTimeout(() => { if (!input.hasTilt) ui.toast('Sin giroscopio: toca a izquierda o derecha', 'info'); }, 1500);
 }
 
-function pause() { if (state !== 'play') return; pausedFrom = state; state = 'paused'; pushMissions(); ui.show('pause'); audio.pause(true); }
+function pause() { if (state !== 'play' && state !== 'countdown') return; pausedFrom = state; state = 'paused'; pushMissions(); ui.show('pause'); audio.pause(true); }
 function resume() {
   // el mismo toque que ha pausado no debe pulsar también "Continuar", que sale debajo del dedo
   if (state !== 'paused' || performance.now() - pausedAt < 450) return;
@@ -471,6 +472,7 @@ function frame(now) {
 
   if (state === 'countdown') {
     const before = Math.ceil(countdown);
+    input.syncJump();   // lo pulsado durante la cuenta atrás (o el toque de «Continuar») no salta al arrancar
     countdown -= dt;
     if (Math.ceil(countdown) !== before && countdown > 0) audio.play('countdown');
     if (!$('rotate').hidden) countdown = Math.max(countdown, 0.5);   // en vertical no arranca
