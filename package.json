@@ -22,6 +22,7 @@
   "dependencies": {
     "@capacitor/android": "^7.6.9",
     "@capacitor/core": "^7.6.9",
+    "@capacitor/haptics": "^7.0.5",
     "three": "^0.186.1"
   },
   "type": "module"
