@@ -71,12 +71,35 @@ if (wearK > 0.0) {
   float crack = 1.0 - smoothstep(0.0, 0.015 + 0.05 * wearK, min(c1, c2));
   diffuseColor.rgb *= (1.0 - 0.8 * crack * wearK) * (1.0 - 0.25 * wearK);
 }
-float seamM = (1.0 - smoothstep(0.1, 0.15, dot(texture2D(map, vMapUv).rgb, vec3(0.2126, 0.7152, 0.0722)))) * step(0.13, vMapUv.y);   // solo la cara (las jambas de los arcos usan la franja de arriba del atlas, v < 0,13)`)
+float seamM = (1.0 - smoothstep(0.1, 0.15, dot(texture2D(map, vMapUv).rgb, vec3(0.2126, 0.7152, 0.0722)))) * step(0.13, vMapUv.y);   // solo la cara (las jambas de los arcos usan la franja de arriba del atlas, v < 0,13)
+// superficie (vWarn.z: 0 piedra, 1 cristal, 2 musgo, 3 lava, 4 hielo): se lee de lejos por el tono de
+// toda la losa, nunca con el color de un carril ni con azul
+float sCr = step(0.5, vWarn.z) * step(vWarn.z, 1.5), sMo = step(1.5, vWarn.z) * step(vWarn.z, 2.5), sLa = step(2.5, vWarn.z) * step(vWarn.z, 3.5), sIc = step(3.5, vWarn.z);
+float sLum = dot(diffuseColor.rgb, vec3(0.3333));
+vec3 sTint = diffuse / max(max(diffuse.r, max(diffuse.g, diffuse.b)), 0.001);   // tinte cálido del mundo: se compensa en cristal y hielo
+float sMm = 0.5 + 0.5 * sin(vMapUv.x * 23.0 + vTile * 40.0) * sin(vMapUv.y * 17.0 + vTile * 11.0);
+float sOff = smoothstep(0.1, 0.45, length(vViewPosition.xy) / max(abs(vViewPosition.z), 0.001));   // 0 en el centro de la vista
+// cristal: losa pulida gris-cian clara; musgo: verde oscuro húmedo con manchas; basalto: gris casi negro; hielo: blanco lechoso
+diffuseColor.rgb = mix(diffuseColor.rgb, min(vec3(0.55, 0.78, 0.85) / sTint, vec3(1.3)) * (0.75 + 0.3 * sLum), 0.65 * sCr);
+diffuseColor.rgb = mix(diffuseColor.rgb, mix(vec3(0.22, 0.42, 0.2), vec3(0.1, 0.2, 0.11), sMm) * (0.55 + 0.5 * sLum), 0.88 * sMo);
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(sLum) * vec3(0.22, 0.19, 0.19), 0.85 * sLa);
+diffuseColor.rgb = mix(diffuseColor.rgb, min(vec3(0.85, 0.91, 0.94) / sTint, vec3(1.3)) * (0.8 + 0.25 * sLum), 0.88 * sIc);
+float sSpark = pow(fract(sin(dot(floor(vMapUv * vec2(90.0, 16.0)), vec2(12.9898, 78.233))) * 43758.5453), 48.0) * sOff;`)
+      .replace('#include <roughnessmap_fragment>', crystal ? '#include <roughnessmap_fragment>' : `#include <roughnessmap_fragment>
+roughnessFactor *= 1.0 - 0.65 * sCr - 0.8 * sIc;`)
+      .replace('#include <fog_fragment>', crystal ? '#include <fog_fragment>' : `#ifdef USE_FOG
+// las losas con superficie se velan menos con la niebla: el cambio se ve con tiempo
+float fogFactor = smoothstep(fogNear, fogFar, vFogDepth) * (1.0 - 0.55 * step(0.5, vWarn.z));
+gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, fogFactor);
+#endif`)
       .replace('#include <emissivemap_fragment>', crystal ? `#include <emissivemap_fragment>
 float fresC = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 3.0);
 vec3 glowC = mix(vWarn.rgb, vec3(1.0), 0.35);
 totalEmissiveRadiance += (vWarn.rgb * (0.06 + 0.3 * on) + glowC * vRimC * (0.1 + 0.3 * on) + glowC * fresC * (0.08 + 0.15 * on)) * uGlowK;` : `#include <emissivemap_fragment>
-totalEmissiveRadiance += uInlay * ribInlay * 1.4 + uSeamGlow * seamM + vec3(1.0, 0.75, 0.2) * recBand * 1.1;`);
+totalEmissiveRadiance += uInlay * ribInlay * 1.4 + uSeamGlow * seamM * (1.0 - step(0.5, vWarn.z)) + vec3(1.0, 0.75, 0.2) * recBand * 1.1;
+totalEmissiveRadiance += vec3(1.0) * sSpark * 0.6 * sCr + vec3(0.45, 0.06, 0.03) * (seamM * 0.6 + 0.02) * sLa + vec3(0.6, 0.1, 0.04) * pow(fract(sin(dot(floor(vMapUv * 28.0), vec2(39.3468, 11.135))) * 43758.5453), 30.0) * 0.9 * sLa;
+diffuseColor.rgb *= 1.0 - 0.6 * seamM * sIc;
+totalEmissiveRadiance += vec3(0.1, 0.14, 0.17) * sIc + vec3(0.03, 0.08, 0.09) * sCr;   // la luz cálida del mundo no los vuelve crema`);
     sh.uniforms.uGlowK = mat.userData.uGlowK; sh.uniforms.uInlay = kitU.uInlay; sh.uniforms.uSeamGlow = kitU.uSeamGlow;
   };
   mat.userData.uGlowK = { value: 1 };
@@ -150,6 +173,7 @@ export class TunnelKit {
       // un arco cada 4 filas: cada 2 formaban en el punto de fuga una doble fila de teclas de
       // piano blancas que tapaba el centro de la vista
       const archRow = (k & 3) === 0;
+      const sf = game.surfaceAt ? game.surfaceAt(k) : 0;      // superficie del Arcade (0 = piedra)
       for (let c = 0; c < LANES; c++) {
         // Aventura: carril hundido (no hay losa: se ve el vacío)
         if (game.isHole && game.isHole(k, c)) continue;
@@ -175,7 +199,7 @@ export class TunnelKit {
         const nx = -d[c * 2 + 1], ny = d[c * 2];
         n.copy(ra.X).multiplyScalar(nx).addScaledVector(ra.U, ny); g.aN0.setXYZ(i, n.x, n.y, n.z);
         n.copy(rb.X).multiplyScalar(nx).addScaledVector(rb.U, ny); g.aN1.setXYZ(i, n.x, n.y, n.z);
-        if (wa > 0) g.aWarn.setXYZW(i, wr, wg, wb, wa); else g.aWarn.setXYZW(i, k === this.recordRow ? 2 : (k & 7) === 0 ? 1 : 0, game.wearAt ? game.wearAt(k, c) : 0, 0, 0);
+        if (wa > 0) g.aWarn.setXYZW(i, wr, wg, wb, wa); else g.aWarn.setXYZW(i, k === this.recordRow ? 2 : (k & 7) === 0 ? 1 : 0, game.wearAt ? game.wearAt(k, c) : 0, sf, 0);
       }
       // lámina abierta: un faldón de sillería cuelga de cada borde, así la pista tiene grosor de
       // obra (como el anillo del concepto C·3) y no es una cinta de papel. Usa la losa lisa del

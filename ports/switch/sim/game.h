@@ -129,7 +129,12 @@ typedef struct {
   double campRows; int campLane, camps;
   double trickT; int tricks, tricksTotal, trickCoins, easyWalls;
   int wallWorld, wallLead, wallAfter, walls, smashes, seenWorld; double worldT;
+  /* superficies (arcade.js): una por fila en un anillo de 128 (0 piedra, 1 cristal, 2 musgo, 3 lava, 4 hielo) */
+  unsigned char surf[128]; double padT; int surfNow; int themeN;
 } Game;
+
+/* superficie pintada en la fila k (se nota ARC_SURF_LAG filas después) */
+int    game_surface_at(const Game *g, int k);
 
 void   game_init(Game *g, GameMode mode, uint32_t seed);
 void   game_reset(Game *g);

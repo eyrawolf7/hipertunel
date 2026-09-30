@@ -103,7 +103,10 @@ const maxPorSegundo = (ps) => { let m = 0; for (let i = 0; i < ps.length; i++) {
   const st = await page.evaluate(() => ({ s: window.__hip.state, lvl: window.__hip.game.level }));
   rec(st.lvl >= 1 && boosts.length >= 1, 'impulso: patrón seco (28 ms)', { boosts: boosts.length, st });
   // antes del primer impulso la partida va por dentro del tubo: tics al cruzar anillos, ni demasiado juntos ni muy espaciados
-  const tics = l.filter((c) => typeof c.p === 'number' && c.p >= 8 && c.p <= 12 && (!boosts[0] || c.t < boosts[0].t));
+  // los pulsos del suelo (input/vibe.js, juntas de la piedra…) no son tics del motor: se apartan por su registro
+  const suelo = await page.evaluate(() => (window.__vibe ? window.__vibe.log.filter((x) => x.kind === 'suelo').map((x) => x.t) : []));
+  const esSuelo = (c) => suelo.some((t) => Math.abs(t - c.t) < 1);
+  const tics = l.filter((c) => typeof c.p === 'number' && c.p >= 8 && c.p <= 12 && !esSuelo(c) && (!boosts[0] || c.t < boosts[0].t));
   const sep = tics.slice(1).map((c, i) => c.t - tics[i].t).sort((a, b) => a - b);
   rec(tics.length >= 8 && sep[0] >= 195 && sep[Math.floor(sep.length / 2)] <= 400, 'tics del motor por dentro: ≥ 0,2 s entre ellos y ritmo de 2,5-5 por segundo', { tics: tics.length, minMs: Math.round(sep[0]), medianaMs: Math.round(sep[Math.floor(sep.length / 2)]) });
   await page.close();

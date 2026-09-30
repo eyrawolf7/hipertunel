@@ -19,7 +19,13 @@
 //   atraviesas y los pierdes; sin impulso, fin). Si tu carril más cercano es el del cartón, la piedra
 //   de los lados no te toca. 5 filas vacías antes y 0,5 s después para leerlo. Los primeros muros
 //   (opts.easyWalls, los de las primeras partidas) ponen el cartón a 2 carriles o menos.
-import { Game, R_UNITS, LANES, SHORT_H, FOLD_IN, FOLD_OUT } from './game.js';
+// - Superficies (agarre): el giro pasa a ω += k·(a·0,2·g − ω). Piedra k=1 g=1 es exactamente el giro
+//   del Clásico. Cada segmento de 56 filas tiene su superficie según el mundo (musgo en la selva,
+//   cristal de noche, lava en el fuego; el hielo solo existe en fases y en las pruebas). Sale de un
+//   hash de (segmento, mundo), sin gastar rng. Se ve al menos 1,5 s antes de notarse (SURF_LAG) y
+//   vuelve a piedra en plegados, saltos entre mundos, muros y 2 s tras una placa.
+import { Game, R_UNITS, LANES, SHORT_H, FOLD_IN, FOLD_OUT, STEER_GAIN, STEER_DEAD } from './game.js';
+const wrapAngle = (a) => { a %= Math.PI * 2; return a < 0 ? a + Math.PI * 2 : a; };
 
 export const TRICK_T = 0.4;      // s que dura una pirueta
 const PERFECT_T = 0.3;          // s antes de aterrizar en los que acabarla es perfecta
@@ -34,10 +40,34 @@ const EARLY_T = 25;             // s de arranque amable: sin cajas altas y con f
 const EARLY_SKIP = 2;           // en ese arranque, una fila de cada 2 no sale caja nueva
 export const CAMP_ROWS = 22;   // filas en un carril antes de que te echen una caja encima
 
+// Superficies: agarre k (0..1, 1 = sin retraso) y ganancia g del giro
+export const SURFACES = [
+  { name: 'piedra', k: 1, g: 1 },
+  { name: 'cristal', k: 1, g: 1.15 },
+  { name: 'musgo', k: 0.45, g: 1 },
+  { name: 'lava', k: 1, g: 0.85 },
+  { name: 'hielo', k: 0.22, g: 1 },
+];
+export const S_STONE = 0, S_CRYSTAL = 1, S_MOSS = 2, S_LAVA = 3, S_ICE = 4;
+export const SURF_SEG = 56;      // filas por segmento de superficie
+export const SURF_LAG = 10;      // filas entre que se ve una superficie y se nota (≥ 1,5 s a velocidad máxima)
+const SURF_STONE_PCT = 45;       // % de segmentos que siguen siendo piedra en un mundo con otra superficie
+const WORLD_SURF = [-1, S_MOSS, S_CRYSTAL, -1, S_LAVA];   // por tema de mundo (islas, selva, noche, templo, fuego): la propia, o -1 = solo piedra
+const PAD_COOL = 2;              // s de piedra tras una placa
+
+// hash entero determinista (sin rng): la superficie de un segmento no altera el guion de oleadas
+function surfHash(seg, world) {
+  let h = Math.imul(seg + 1, 0x9E3779B1) ^ Math.imul(world + 7, 0x85EBCA6B);
+  h ^= h >>> 15; h = Math.imul(h, 0x2C1B3C6D); h ^= h >>> 12;
+  return (h >>> 0) % 100;
+}
+
 export class Arcade extends Game {
-  constructor({ seed = 1, easyWalls = 0 } = {}) {
+  // forceSurface: solo para pruebas, todo el camino con esa superficie (con las mismas excepciones)
+  constructor({ seed = 1, easyWalls = 0, forceSurface = -1 } = {}) {
     super({ mode: 'classic', seed });
     this.variant = 'arcade';
+    this.surf = new Map(); this.themeN = 0; this.padT = 0; this.forceSurface = forceSurface; this.surfNow = 0;
     for (const w of this.waves) {
       w.a0 = w.a;
       if (w.n > 0 && w.n < 1000) w.n = Math.max(6, Math.round(w.n * COMPRESS));
@@ -52,6 +82,49 @@ export class Arcade extends Game {
   }
 
   laneOf() { return this.lane; }   // mismo cálculo que el carril del jugador (paridad con C)
+
+  // ------------------------------------------------------------------ superficies
+  onNewRow(row) {
+    if (this.surf) {
+      const w = WORLD_SURF[this.themeN % 5];
+      const seg = Math.floor(row.k / SURF_SEG);
+      const id = w > 0 && surfHash(seg, this.world) >= SURF_STONE_PCT ? w : S_STONE;
+      this.surf.set(row.k, id);
+      this.surf.delete(row.k - 80);
+    }
+    super.onNewRow(row);
+  }
+
+  // el tema visual avanza con cada suceso de mundo fuera del estado invertido (como render/index.js);
+  // `world` se queda en 6, el tema sigue (Fuego es el cuarto salto)
+  event(type, data) {
+    if (type === 'world' && this.themeN !== undefined && !this.inverted) this.themeN++;
+    super.event(type, data);
+  }
+
+  // superficie dibujada en la fila k (la que se ve; se nota SURF_LAG filas después)
+  surfaceAt(k) { return this.forceSurface >= 0 ? this.forceSurface : (this.surf.get(k) ?? S_STONE); }
+
+  // agarre que siente el jugador en la posición s (filas). Vuelve a piedra donde el guion pide
+  // precisión: plegados, salto entre mundos, muros y los 2 s tras una placa
+  gripAt(s = this.s) {
+    const id = this.forceSurface >= 0 ? this.forceSurface : this.surf.get(Math.floor(s) - SURF_LAG) ?? S_STONE;
+    if (id === S_STONE) return SURFACES[S_STONE];
+    if ((this.fold !== FOLD_IN && this.fold !== FOLD_OUT) || this.folding || this.inverted || this.flight(s) || this.padT > 0) return SURFACES[S_STONE];
+    const cur = Math.floor(s);
+    if (this.wallLead > 0 || this.boxes.some((b) => b.wall && !b.hit && b.k >= cur - 2 && b.k <= cur + 14)) return SURFACES[S_STONE];
+    return SURFACES[id];
+  }
+
+  steer(a) {
+    const sf = this.gripAt();
+    this.surfNow = SURFACES.indexOf(sf);
+    if (sf.k === 1 && sf.g === 1) return super.steer(a);   // piedra: el giro de Boost 2, tal cual
+    this.omega += sf.k * ((Math.abs(a) < STEER_DEAD ? 0 : a * STEER_GAIN * sf.g) - this.omega);
+    this.theta += this.omega;
+    if (this.fold === FOLD_IN || this.fold === FOLD_OUT) this.theta = wrapAngle(this.theta);
+    else this.theta = Math.max(-0.1, Math.min(5.9, this.theta));
+  }
 
   incrementWave() {
     super.incrementWave();
@@ -159,8 +232,10 @@ export class Arcade extends Game {
   step(input = {}) {
     const before = this.s;
     const startTrick = !!input.trick && this.alive && this.trickT < 0 && !!this.flight();
+    if (this.padT > 0) this.padT -= 1 / 60;
     const ev = super.step(input);
     if (!this.alive) return ev;
+    if (ev.some((e) => e.type === 'boost')) this.padT = PAD_COOL;
     if (this.world !== this.seenWorld) { this.seenWorld = this.world; this.worldT = this.time; }
     if (startTrick) { this.trickT = 0; this.event('trick', { n: this.tricks + 1 }); }
     else if (this.trickT >= 0) {

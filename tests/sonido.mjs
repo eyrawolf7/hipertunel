@@ -7,12 +7,14 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 // --musica: la música reacciona (remate del nivel 3 sobre la rejilla, ahogo al chocar, se abre con el impulso)
 const musica = process.argv.includes('--musica');
-const [world = 0, level = 2, speed = 80, secs = 10] = process.argv.slice(2).filter((x) => !x.startsWith('--')).map(Number);
+const flags = process.argv.slice(2).filter((a) => a.startsWith('--'));   // --superficies, --sin-musica
+const [world = 0, level = 2, speed = 80, secs = 10] = process.argv.slice(2).filter((a) => !a.startsWith('--')).map(Number);
 const dir = new URL('./shots/sonido/', import.meta.url).pathname; mkdirSync(dir, { recursive: true });
 const b = await puppeteer.launch({ headless: 'new' });
 const p = await b.newPage();
 await p.goto((process.env.HIP_URL || 'http://localhost:5173/') + 'src/audio/demo.html', { waitUntil: 'networkidle0' });
-if (process.env.SIN_MUSICA) await p.evaluate(() => { window.__noMusic = true; });
+if (process.env.SIN_MUSICA || flags.includes('--sin-musica')) await p.evaluate(() => { window.__noMusic = true; });
+if (process.env.SUPERFICIES || flags.includes('--superficies')) await p.evaluate(() => { window.__superficies = true; });
 if (process.argv.includes('--capas')) {
   // tras el salto entre mundos: compás en silencio y la música crece por escalones (un compás por capa)
   const r = await p.evaluate(async () => {
@@ -218,6 +220,40 @@ const data = await p.evaluate(async (world, level, speed, secs) => {
       for (let i = sr; i < d4.length; i++) q += d4[i] * d4[i];
       solo['turbina ' + speed] = `rms ${Math.sqrt(q / sr).toFixed(4)}`;
     }
+  } else if (window.__superficies) {
+    // roce de cada superficie aislado (sin música ni turbina) y luego sobre la turbina
+    solo = {};
+    const names = ['piedra', 'cristal', 'musgo', 'lava', 'hielo'];
+    const lp80 = (x) => { // paso bajo de 2.º orden a 80 Hz (Butterworth) para medir la energía por debajo
+      const w = Math.tan(Math.PI * 80 / sr), k = Math.SQRT2, n = 1 / (1 + k * w + w * w);
+      const b0 = w * w * n, b1 = 2 * b0, a1 = 2 * (w * w - 1) * n, a2 = (1 - k * w + w * w) * n;
+      const y = new Float32Array(x.length); let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+      for (let i = 0; i < x.length; i++) { const v = b0 * x[i] + b1 * x1 + b0 * x2 - a1 * y1 - a2 * y2; y[i] = v; x2 = x1; x1 = x[i]; y2 = y1; y1 = v; }
+      return y;
+    };
+    for (let s = 0; s < 5; s++) {
+      const c2 = new OfflineAudioContext(1, sr * 1.5, sr), a2 = createAudio({ context: c2 });
+      a2.unlock(); a2.setMusic(false);
+      for (let i = 0; i < 4; i++) a2.play('roll', { surface: s, v: 0.6, slip: 1, delay: 0.1 + i * 0.3 });
+      const d2 = (await c2.startRendering()).getChannelData(0); let pk = 0, e = 0;
+      for (let i = 0; i < d2.length; i++) { const v = Math.abs(d2[i]); if (v > pk) pk = v; e += v * v; }
+      const low = lp80(d2); let el = 0; for (let i = 0; i < low.length; i++) el += low[i] * low[i];
+      solo[names[s]] = `pico ${pk.toFixed(3)} energía ${e.toFixed(2)} por debajo de 80 Hz ${(100 * el / Math.max(e, 1e-12)).toFixed(2)} %`;
+    }
+    { // turbina sola y turbina con el roce de cada superficie (rms)
+      const rms = async (s) => {
+        const c3 = new OfflineAudioContext(1, sr * 3, sr), a3 = createAudio({ context: c3 });
+        a3.unlock(); a3.setMusic(false); a3.setSpeed(speed, level);
+        if (s >= 0) for (let i = 0; i < 8; i++) a3.play('roll', { surface: s, v: 0.6, slip: 1, delay: 0.3 + i * 0.3 });
+        const d3 = (await c3.startRendering()).getChannelData(0); let q = 0, pk = 0;
+        for (let i = sr; i < d3.length; i++) { q += d3[i] * d3[i]; pk = Math.max(pk, Math.abs(d3[i])); }
+        return { rms: Math.sqrt(q / (2 * sr)), pk };
+      };
+      const base = await rms(-1);
+      solo['turbina ' + speed] = `rms ${base.rms.toFixed(4)} pico ${base.pk.toFixed(3)}`;
+      for (let s = 0; s < 5; s++) { const r = await rms(s); solo['con ' + names[s]] = `rms ${r.rms.toFixed(4)} (${(20 * Math.log10(r.rms / base.rms)).toFixed(2)} dB) pico ${r.pk.toFixed(3)}`; }
+    }
+    a.play('boost', { level: 1, delay: 2 });
   } else {
     a.play('boost', { level: 1, delay: 2 }); a.play('coin', { combo: 2, delay: 4 }); a.play('crash', { delay: 6 });
   }
