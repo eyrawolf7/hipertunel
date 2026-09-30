@@ -37,7 +37,7 @@ function play(mode, seed, level) {
   Math.random = mulberry(seed * 31 + 7);          // misiones deterministas
   const missions = createMissions();
   missions.reset();
-  missions.start();
+  missions.start(mode);
   let visWorld = 1, nearT = 0, campNext = false;
   const r = { seed, firstCrash: null, boostFrames: 0, near: 0, spawned: Object.fromEntries(KINDS.map((k) => [k, 0])), deaths: null, first: {}, last: { t: 0, kind: null } };
   // las placas salen todo el rato: no cuentan para «el momento especial más lejano»
