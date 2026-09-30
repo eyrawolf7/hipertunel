@@ -4,12 +4,93 @@
 import puppeteer from 'puppeteer';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
-const [world = 0, level = 2, speed = 80, secs = 10] = process.argv.slice(2).map(Number);
+// --musica: la música reacciona (remate del nivel 3 sobre la rejilla, ahogo al chocar, se abre con el impulso)
+const musica = process.argv.includes('--musica');
+const [world = 0, level = 2, speed = 80, secs = 10] = process.argv.slice(2).filter((x) => !x.startsWith('--')).map(Number);
 const dir = new URL('./shots/sonido/', import.meta.url).pathname; mkdirSync(dir, { recursive: true });
 const b = await puppeteer.launch({ headless: 'new' });
 const p = await b.newPage();
 await p.goto((process.env.HIP_URL || 'http://localhost:5173/') + 'src/audio/demo.html', { waitUntil: 'networkidle0' });
 if (process.env.SIN_MUSICA) await p.evaluate(() => { window.__noMusic = true; });
+if (musica) {
+  const r = await p.evaluate(async () => {
+    const { createAudio } = await import('/src/audio/index.js');
+    const sr = 44100, secs = 7, out = { grid: [], duck: {} };
+    // 1) el remate del nivel 3 cae a < 10 ms de un paso de la rejilla (varios desfases, varios mundos)
+    for (const w of [0, 2, 4]) for (let k = 0; k < 8; k++) {
+      const log = [], ctx = new OfflineAudioContext(1, sr * secs, sr), a = createAudio({ context: ctx, log });
+      a.unlock(); a.setMusic(true); a.setWorld(w); a.setSpeed(80, 3);
+      a.play('boost', { level: 3, delay: 1 + k * 0.0173 + w * 0.031 });
+      a._scheduleUntil(secs);
+      const steps = log.filter((e) => e.what === 'step').map((e) => e.t), rem = log.find((e) => e.what === 'remate');
+      const err = Math.min(...steps.map((s) => Math.abs(s - rem.t)));
+      const wait = rem.t - (1 + k * 0.0173 + w * 0.031 + 0.005 + 0.12 + 3 * 0.045);
+      out.grid.push({ w, k, errMs: err * 1000, waitMs: wait * 1000 });
+    }
+    // 1b) escenarios que mueven state.nextTime (el error 0,000 de arriba es casi tautológico: rem y pasos salen de la
+    // misma nextTime). La referencia es una segunda pasada IDÉNTICA SIN impulso: sus pasos no dependen de nextGridTime.
+    // No se puede medir el remate en el audio renderizado: el compresor maestro y la música (5-8 veces más fuerte
+    // en 2960 Hz que el remate) tapan la resta A-B; haría falta un gancho _muteMusicBus() en el audio.
+    out.esc = [];
+    const escenarios = {
+      'nextTime por delante': (a, boost) => { a._scheduleUntil(1.5); boost(1.0); },
+      'tras pausa/reanudar': (a, boost) => { a.pause(true); a.pause(false); a._scheduleUntil(0.6); boost(1.0); },
+      'cambio de bpm (mundo 0 a 2)': (a, boost) => { a._scheduleUntil(0.9); a.setWorld(2); boost(1.0); },
+      'cambio de bpm (mundo 2 a 4)': (a, boost) => { a.setWorld(2); a._scheduleUntil(0.9); a.setWorld(4); boost(1.0); },
+      'musica apagada': (a, boost) => { a.setMusic(false); boost(1.0); },
+      'silenciado': (a, boost) => { a.setMuted(true); boost(1.0); },
+    };
+    for (const [nombre, fn] of Object.entries(escenarios)) for (const dl of [0, 0.037, 0.071]) {
+      const run = (con) => {
+        const log = [], ctx = new OfflineAudioContext(1, sr * secs, sr), a = createAudio({ context: ctx, log });
+        a.unlock(); a.setMusic(true); a.setWorld(0); a.setSpeed(80, 3);
+        fn(a, (t) => { if (con) a.play('boost', { level: 3, delay: t + dl }); });
+        a._scheduleUntil(secs);
+        return log;
+      };
+      const A = run(true), B = run(false);
+      const sA = A.filter((e) => e.what === 'step').map((e) => e.t), sB = B.filter((e) => e.what === 'step').map((e) => e.t);
+      const rem = A.find((e) => e.what === 'remate');
+      const musicaOn = !/apagada|silenciado/.test(nombre);
+      const err = rem && sB.length ? Math.min(...sB.map((s) => Math.abs(s - rem.t))) * 1000 : NaN;
+      out.esc.push({ nombre, dl, remate: !!rem, errMs: err, musicaOn, igual: sA.length === sB.length && sA.every((t, i) => Math.abs(t - sB[i]) < 1e-9) });
+    }
+    // 2) el ahogo: energía de agudos (diferencia de primer orden) frente a la misma música sin choque
+    const render = async (fn) => {
+      const ctx = new OfflineAudioContext(1, sr * secs, sr), a = createAudio({ context: ctx, log: [] });
+      a.unlock(); a.setMusic(true); a.setWorld(0); a.setSpeed(80, 3);
+      fn(a); a._scheduleUntil(secs);
+      return (await ctx.startRendering()).getChannelData(0);
+    };
+    const hf = (d, t0, t1) => { let e = 0, n = 0; for (let i = Math.floor(t0 * sr) + 1; i < Math.floor(t1 * sr); i++) { const x = d[i] - d[i - 1]; e += x * x; n++; } return e / n; };
+    const ref = await render(() => {});
+    const mu = await render((a) => a.play('muffle', { delay: 3 }));
+    const mb = await render((a) => { a.play('muffle', { delay: 3 }); a.play('muffle', { open: true, delay: 3.15 }); });
+    out.duck = {
+      ahogado: hf(mu, 3.05, 3.45) / hf(ref, 3.05, 3.45),
+      abierto: hf(mu, 4.6, 5.6) / hf(ref, 4.6, 5.6),
+      conImpulso: hf(mb, 3.4, 3.7) / hf(ref, 3.4, 3.7),
+      sinImpulso: hf(mu, 3.4, 3.7) / hf(ref, 3.4, 3.7),
+    };
+    return out;
+  });
+  await b.close();
+  let bad = 0;
+  for (const g of r.grid) if (g.errMs >= 10) { bad++; console.log('FALLA rejilla', JSON.stringify(g)); }
+  const maxErr = Math.max(...r.grid.map((g) => g.errMs)), maxWait = Math.max(...r.grid.map((g) => g.waitMs));
+  console.log(`remate: ${r.grid.length} casos, error máx ${maxErr.toFixed(3)} ms a la rejilla, espera añadida máx ${maxWait.toFixed(0)} ms`);
+  for (const nombre of [...new Set(r.esc.map((e) => e.nombre))]) {
+    const xs = r.esc.filter((e) => e.nombre === nombre), musicaOn = xs[0].musicaOn;
+    const ok = musicaOn ? xs.every((e) => e.remate && e.errMs < 10 && e.igual) : xs.every((e) => (nombre === 'silenciado' ? !e.remate : e.remate) && e.igual);
+    if (!ok) bad++;
+    console.log(ok ? 'PASA ' : 'FALLA', 'remate,', nombre + ':', musicaOn ? `error máx ${Math.max(...xs.map((e) => e.errMs)).toFixed(3)} ms` : (nombre === 'silenciado' ? 'sin remate' : 'sin cuantizar'), '· rejilla intacta', xs.every((e) => e.igual));
+  }
+  const d = r.duck; console.log('agudos (frente a sin choque): ahogado', d.ahogado.toFixed(3), '· abierto', d.abierto.toFixed(3), '· a 0,4 s sin impulso', d.sinImpulso.toFixed(3), '· a 0,25 s con impulso', d.conImpulso.toFixed(3));
+  const okDuck = d.ahogado < 0.5 && d.abierto > 0.9 && d.abierto < 1.1 && d.conImpulso > d.sinImpulso;
+  if (!okDuck) console.log('FALLA ahogo');
+  console.log(bad || !okDuck ? 'MÚSICA: FALLA' : 'MÚSICA: OK');
+  process.exit(bad || !okDuck ? 1 : 0);
+}
 const zorro = !!process.env.ZORRO;
 if (zorro) await p.evaluate(() => { window.__zorro = true; });
 const data = await p.evaluate(async (world, level, speed, secs) => {
