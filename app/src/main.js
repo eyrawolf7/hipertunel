@@ -12,6 +12,7 @@ import { createShop, SHOP } from './shop.js';
 import { Adventure, STAGES, packGhost, unpackGhost, quantSteer } from './sim/adventure.js';
 import { Arcade } from './sim/arcade.js';
 import { Zorro } from './sim/zorro.js';
+import { GHOST_KEY, GhostRecorder, quantGhost, unpackRun, newGhostGame, stepGhost, ghostMatches } from './ghost.js';
 
 const VERSION = '0.61';
 const STEP = 1 / 60;
@@ -63,6 +64,11 @@ let coins = 0;
 let worldBase = 0;
 // Aventura: tramo elegido, progreso guardado (estrellas, mejor avance y fantasma) y la partida del fantasma
 let advStage = 0, advRec = [], ghostSteers = null, ghostGame = null, cpFrame = -1, cpPrefix = null;
+// Arcade: fantasma de la mejor partida (semilla + giros y piruetas de cada paso) y grabación de la actual
+let arcGhost = null, arcRec = null;
+const loadArcGhost = () => {
+  try { const best = bestScore('arcade'); const r = unpackRun(JSON.parse(localStorage.getItem(GHOST_KEY))); return r && best > 0 && r.score === best ? r : null; } catch (e) { return null; }
+};
 const loadAdv = () => { try { return JSON.parse(localStorage.getItem('hipertunel-aventura') || '{}'); } catch (e) { return {}; } };
 const saveAdv = (d) => { try { localStorage.setItem('hipertunel-aventura', JSON.stringify(d)); } catch (e) {} };
 const bitsOf = (e) => (e ? (e.bits ?? (e.stars >= 3 ? 7 : e.stars === 2 ? 3 : e.stars ? 1 : 0)) : 0);
@@ -146,6 +152,7 @@ function goLandscape() {
 // ---------------------------------------------------------------- estados
 function newGame(m, seed, fromCp = false) {
   if (m === 'daily' && seed === undefined) seed = daySeed(dayKey());
+  arcRec = null; arcGhost = null;
   if (m === 'adventure') {
     game = new Adventure({ stage: advStage });
     const saved = loadAdv()[advStage];
@@ -159,7 +166,12 @@ function newGame(m, seed, fromCp = false) {
       advRec = Array.from(cpPrefix); game.fromCheckpoint = true; game.events = [];
     } else { cpFrame = -1; cpPrefix = null; }
   } else if (m === 'zorro') { game = new Zorro({ seed: seed ?? ((Math.random() * 1e9) | 0) }); ghostGame = null; ghostSteers = null; }
-  else if (m === 'arcade') { game = new Arcade({ seed: seed ?? ((Math.random() * 1e9) | 0), easyWalls: Math.max(0, 3 - wallHints) }); ghostGame = null; ghostSteers = null; }
+  else if (m === 'arcade') {
+    const sd = seed ?? ((Math.random() * 1e9) | 0), easy = Math.max(0, 3 - wallHints);
+    game = new Arcade({ seed: sd, easyWalls: easy });
+    arcRec = new GhostRecorder({ seed: sd, easy });
+    arcGhost = loadArcGhost(); ghostGame = arcGhost ? newGhostGame(arcGhost) : null; ghostSteers = null;
+  }
   else { game = new Game({ mode: simMode(m), seed: seed ?? ((Math.random() * 1e9) | 0) }); ghostGame = null; ghostSteers = null; }
   renderer.ghostGame = ghostGame;
   renderer.third = m === 'zorro';
@@ -229,6 +241,8 @@ function finish() {
   if (isArcade(mode)) list.sort((a, b) => b.score - a.score); else list.sort((a, b) => (b.distM ?? b.score) - (a.distM ?? a.score));
   const top = list.slice(0, 5); saveTop(mode, top);
   const isRecord = top[0] === me && list.length > 1;
+  // la mejor partida del Arcade se guarda entera para que sea tu fantasma (semilla + entradas)
+  if (mode === 'arcade' && arcRec && top[0] === me) { try { localStorage.setItem(GHOST_KEY, JSON.stringify(arcRec.pack({ rows: game.rowsPassed, score, distM }))); } catch (e) {} }
   if (isRecord) renderer.heroMood = 'record';
   try { const w = worldBase + visWorld - 1; if (w > maxWorld()) localStorage.setItem('hipertunel-mundo-max', String(Math.min(w, 4))); } catch (e) {}
   shop.add(game.coinsGot);
@@ -384,7 +398,18 @@ function stepSim() {
   }
   else input.steer(STEP, game.theta, false);
   const arc = state === 'play' && game.variant === 'arcade';
-  const ev = game.step({ steer, jump: state === 'play' && game.hero ? input.consumeJump() : false, trick: arc ? input.consumeTrick() : false });
+  // Arcade: el giro se juega en milésimas, tal cual se graba, y el fantasma repite los mismos pasos
+  const rec = arc && arcRec && game.alive;
+  if (rec) steer = quantGhost(steer);
+  const trick = arc ? input.consumeTrick() : false;
+  if (rec) {
+    arcRec.push(steer, trick);
+    if (ghostGame && ghostGame.alive) {
+      stepGhost(ghostGame, arcGhost);
+      if (!ghostGame.alive && !ghostMatches(ghostGame, arcGhost)) { ghostGame = null; renderer.ghostGame = null; try { localStorage.removeItem(GHOST_KEY); } catch (e) {} }   // otra versión de las reglas: no sirve
+    }
+  }
+  const ev = game.step({ steer, jump: state === 'play' && game.hero ? input.consumeJump() : false, trick });
   // pirueta: mientras vuelas (y 0,5 s después de caer) tocar la pantalla no pausa
   if (arc) {
     const fl = !!game.flight();
@@ -461,7 +486,7 @@ function stepSim() {
     }
   }
   // pasar tu récord se celebra en el momento (la marca dorada del túnel está en esa fila)
-  if (state === 'play' && !recAnnounced && bestAtStart[mode] > 0 && game.distanceM > bestAtStart[mode]) { recAnnounced = true; ui.toast('¡Récord superado!', 'mission', DEFER); audio.play('record'); buzz([20, 30, 20, 30, 40]); }
+  if (state === 'play' && !recAnnounced && bestAtStart[mode] > 0 && game.distanceM > bestAtStart[mode]) { recAnnounced = true; ui.toast('¡Nuevo récord!', 'mission', DEFER); audio.play('record'); buzz([20, 30, 20, 30, 40]); }
   if (padHint && state === 'play' && game.pads.some((p) => !p.taken && (p.k - game.s) / Math.max(1e-3, game.v / 13.176 * 60) < 1.6 && p.k > game.s)) { padHint = false; ui.toast('Pisa las flechas azules para acelerar', 'boost'); }
   if (toastQ.length) {
     if (state === 'play' && game.alive && !(game.flight && game.flight())) for (const a of toastQ.splice(0)) ui.toast(...a);
@@ -528,5 +553,7 @@ window.__hip = {
   start: (m = 'classic', seed) => { startGame(m); if (seed !== undefined) newGame(m, seed); state = 'play'; },
   skipTo(rows) { while (game.s < rows && game.alive) { game.step({ steer: botSteer(game) }); renderer.track.sync(game); } prev = { s: game.s, theta: game.theta }; },
   step(n = 1, steer = null) { for (let i = 0; i < n; i++) { prev.s = game.s; prev.theta = game.theta; const ev = game.step({ steer: steer ?? botSteer(game) }); renderer.onEvents(ev, game); renderer.track.sync(game); } },
+  // n pasos por el bucle real (stepSim, con entrada, grabación, avisos y fantasma), sin esperar a los fotogramas
+  sim(n = 1) { for (let i = 0; i < n && state === 'play'; i++) { stepSim(); if (!game.alive) { state = 'dying'; overT = 0; } } },
   bot: botSteer, padDirection: () => padDirection(),
 };
