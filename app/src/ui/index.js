@@ -135,6 +135,8 @@ function modesHTML() {
 <section class="scr scr-menu scr-modes" data-screen="modes">
   <div class="vig vig-menu"></div>
   ${headerHTML('Elige modo', 'elige-modo')}
+  <button class="car-arrow car-prev" data-car="-1" tabindex="-1" aria-label="Modos anteriores">${ICON.back}</button>
+  <button class="car-arrow car-next" data-car="1" tabindex="-1" aria-label="Más modos">${ICON.back}</button>
   <div class="cards">
     ${MODE_KEYS.map((k, i) => `
     <button class="card card-${k}" data-nav data-mode="${k}" style="--i:${i}" ${i === 0 ? 'data-default' : ''}>
@@ -377,6 +379,7 @@ export function createUI(root, handlers = {}) {
     if (name === 'hud' && prev !== 'pause' && prev !== 'settings') hudReset();
     if (name === 'over') overShownAt = performance.now();
     if (name === 'title' || name === 'modes') paintRecords();
+    if (name === 'modes') requestAnimationFrame(carUpdate);
     focused = null;
     for (const el of $$('.is-focus')) el.classList.remove('is-focus');
     if (MENU_SCREENS.has(name)) {
@@ -397,7 +400,16 @@ export function createUI(root, handlers = {}) {
     focused = el;
     el.classList.add('is-focus');
     try { el.focus({ preventScroll: true }); } catch (e) { el.focus(); }
+    if (el.closest('.cards')) el.scrollIntoView({ inline: 'center', block: 'nearest', behavior: sound ? 'smooth' : 'auto' });
     if (sound) snd('menuMove');
+  }
+  // flechas del carrusel de Modos: solo se ven si hay más tarjetas fuera de la vista en ese lado
+  function carUpdate() {
+    const cards = $('.scr-modes .cards');
+    if (!cards) return;
+    const max = cards.scrollWidth - cards.clientWidth;
+    $('.car-prev').classList.toggle('on', max > 2 && cards.scrollLeft > 2);
+    $('.car-next').classList.toggle('on', max > 2 && cards.scrollLeft < max - 2);
   }
   function navigate(dir) {
     if (!MENU_SCREENS.has(current)) return;
@@ -487,6 +499,8 @@ export function createUI(root, handlers = {}) {
   root.addEventListener('click', (e) => {
     const el = e.target.closest('[data-nav], [data-act]');
     const segBtn = e.target.closest('.seg button');
+    const car = e.target.closest('[data-car]');
+    if (car) { const c = $('.scr-modes .cards'); snd('menuMove'); c.scrollBy({ left: +car.dataset.car * c.clientWidth * 0.75, behavior: 'smooth' }); return; }
     if (segBtn) { setVal('quality', segBtn.dataset.q); snd('menuOk'); setFocus(segBtn.parentElement, false); return; }
     if (el && root.contains(el) && !el.closest('.slider')) { press(el); return; }
     if (!el && current === 'title' && e.target.closest('.scr-title')) { snd('menuOk'); call('onPlay', lastMode); return; }
@@ -828,6 +842,8 @@ export function createUI(root, handlers = {}) {
 
   paintSettings();
   paintRecords();
+  $('.scr-modes .cards').addEventListener('scroll', carUpdate, { passive: true });
+  window.addEventListener('resize', carUpdate);
   show('none');
 
   return {

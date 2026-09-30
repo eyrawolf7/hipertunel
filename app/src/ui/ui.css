@@ -2093,3 +2093,28 @@
     radial-gradient(ellipse at 50% 45%, rgba(255, 214, 140, .10) 0, rgba(255, 214, 140, .10) 35%, rgba(30, 18, 8, .42) 100%),
     linear-gradient(rgba(40, 25, 10, .14), rgba(40, 25, 10, .14));
 }
+
+/* ---------- Modos: flechas del carrusel (solo si hay tarjetas fuera de la vista) ---------- */
+.htui .scr-modes .car-arrow {
+  position: absolute; top: 50%; z-index: 6; width: 2.3em; height: 3.2em; margin-top: -.4em; padding: 0;
+  display: none; align-items: center; justify-content: center; font: inherit; font-size: 1.05em; color: var(--ink);
+  background: linear-gradient(180deg, #fffaf0, #f0e2c2); border: .16em solid var(--s-ink, var(--ink)); border-radius: .9em;
+  box-shadow: 0 .18em 0 var(--s-ink, var(--ink)), 0 .5em 1em rgba(10, 6, 40, .4); cursor: pointer;
+  -webkit-tap-highlight-color: transparent; animation: car-nudge 1.4s ease-in-out infinite;
+}
+.htui .scr-modes .car-arrow.on { display: flex; }
+.htui .scr-modes .car-arrow svg { width: 1.5em; height: 1.5em; }
+.htui .scr-modes .car-prev { left: calc(var(--sl, 0px) + .2em); }
+.htui .scr-modes .car-next { right: calc(var(--sr, 0px) + .2em); }
+.htui .scr-modes .car-next svg { transform: scaleX(-1); }
+.htui .scr-modes .car-arrow:active { transform: translateY(.1em); box-shadow: 0 .06em 0 var(--s-ink, var(--ink)); animation: none; }
+@keyframes car-nudge { 50% { translate: var(--nudge, .2em) 0; } }
+.htui .scr-modes .car-prev { --nudge: -.2em; }
+@media (prefers-reduced-motion: reduce) { .htui .scr-modes .car-arrow { animation: none; } }
+/* pantallas anchas (8 tarjetas de ~130 px): la etiqueta y el nombre caben enteros, sin «…» */
+@media (min-width: 1000px) and (min-height: 600px) {
+  .htui .scr-modes .card .card-tag { font-size: .5em; letter-spacing: 0; padding-left: .15em; padding-right: .15em; }
+  .htui .scr-modes .card .card-name { font-size: .8em; letter-spacing: -.02em; }
+  .htui .scr-modes .card .card-rec { font-size: .6em; }
+}
+.htui .scr-modes .card .card-desc { text-wrap: balance; }
