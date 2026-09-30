@@ -22,7 +22,7 @@ const ICONS = {
     g.lineJoin = 'round';
     const body = () => { g.beginPath(); g.moveTo(26, 104); g.lineTo(26, 62); g.arc(64, 62, 38, Math.PI, 0); g.lineTo(102, 104); g.lineTo(88, 94); g.lineTo(76, 106); g.lineTo(64, 94); g.lineTo(52, 106); g.lineTo(40, 94); g.closePath(); };
     body(); g.strokeStyle = 'rgba(255,243,214,0.75)'; g.lineWidth = 22; g.stroke();
-    body(); g.strokeStyle = '#2a1247'; g.lineWidth = 14; g.stroke();
+    body(); g.strokeStyle = '#2a1247'; g.lineWidth = 18; g.stroke();
     body(); g.fillStyle = 'rgba(255,246,224,0.92)'; g.fill();
     g.fillStyle = '#2a1247'; for (const x of [50, 78]) { g.beginPath(); g.ellipse(x, 62, 6, 9, 0, 0, 7); g.fill(); }
   }),
@@ -117,10 +117,10 @@ export class AdvView {
           if (!this.place(track, game, b.k + 0.5, b.lane, this._bp, 0.5)) continue;
           const q = this._ndc.copy(this._bp).project(camera);
           if (q.z > 1 || q.z < -1) continue;
-          if (Math.hypot((q.x - px) * asp, q.y - py) < r * 1.7 + 0.03) { over = true; break; }
+          if (Math.hypot((q.x - px) * asp, q.y - py) < r * 2.2 + 0.03) { over = true; break; }
         }
         this._crowd += ((over ? 1 : 0) - this._crowd) * Math.min(1, dt * 8);
-        this.ghost.visible = true; this.ghost.material.opacity = (0.85 + 0.1 * Math.sin(this.t * 6)) * (1 - 0.6 * this._crowd) * Math.max(0, fade);
+        this.ghost.visible = true; this.ghost.material.opacity = (0.85 + 0.1 * Math.sin(this.t * 6)) * (1 - 0.7 * this._crowd) * Math.max(0, fade);
       }
     }
     const m = this.ghost.material, look = arc && this.ghost.visible;
