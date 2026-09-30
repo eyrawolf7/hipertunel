@@ -528,6 +528,7 @@ export function createUI(root, handlers = {}) {
     seg.style.setProperty('--q', qi);
     $$('button', seg).forEach((b, i) => b.classList.toggle('sel', i === qi));
     root.classList.toggle('htui-reduce', !!vals.reduceFx);
+    root.classList.toggle('htui-q-baja', vals.quality === 'baja'); // sin desenfoque de fondo (lo caro va tras la calidad)
   }
   function setVal(key, value, silent = false) {
     if (vals[key] === value) return;
