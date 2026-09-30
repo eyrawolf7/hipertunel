@@ -1018,7 +1018,7 @@
 }
 
 /* ---------- fin de partida: marco de piedra lila ---------- */
-.htui .scr-over { padding-left: calc(var(--sl) + max(1.4em, 17vw)); }
+.htui .scr-over { padding-left: calc(var(--sl) + max(1.4em, 28vw)); }
 .htui .scr-over .vig-dim {
   background:
     radial-gradient(circle at 58% 50%, rgba(46, 30, 72, .3), rgba(22, 14, 36, .72));
@@ -2088,6 +2088,16 @@
     linear-gradient(rgba(40, 25, 10, .28), rgba(40, 25, 10, .28));
 }
 .htui .scr-over .oc-hint { background: rgba(30, 18, 8, .65); color: #fff3d6; }
+/* fin: el zorro (franja izquierda, algo por debajo del centro) queda nítido, sin desenfoque ni velo;
+   y la tarjeta deja sitio a los cristales de su esquina derecha */
+.htui .scr-over .vig-dim {
+  -webkit-mask-image: radial-gradient(ellipse 15% 29% at 16% 67%, rgba(0, 0, 0, .3) 35%, #000 120%);
+  mask-image: radial-gradient(ellipse 15% 29% at 16% 67%, rgba(0, 0, 0, .3) 35%, #000 120%);
+}
+.htui .scr-over { padding-right: calc(var(--sr) + 2.4em); }
+/* la hoja del medio-izquierda del marco se mete en la caja del zorro; y en pantallas bajas la pista de reintento pegada a los botones para no salirse */
+.htui .scr-over .od-lf-ml { display: none; }
+@media (max-height: 400px) { .htui .scr-over .oc-hint { top: calc(100% + 1.15em); } }
 /* vuelta final: viñeta en vez de velo plano (centro cálido, bordes oscuros) y más saturación para que asome el color del mundo */
 .htui .scr-modes .vig-menu, .htui .scr-settings .vig-menu, .htui .scr-pause .vig-dim, .htui .scr-over .vig-dim {
   --fondo-tinte: sepia(.3) saturate(1.5) brightness(.85) contrast(1.08);
