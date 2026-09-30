@@ -371,6 +371,7 @@ export function createUI(root, handlers = {}) {
     if (name === 'pause' || (name === 'settings' && settingsFrom === 'pause')) screens.hud.classList.add('on', 'under');
     else screens.hud.classList.remove('under');
     current = name;
+    if (name === 'pause' || name === 'over') toasts.replaceChildren();
     root.dataset.screen = name;
     root.classList.toggle('htui-menu', MENU_SCREENS.has(name));
     if (name === 'hud' && prev !== 'pause' && prev !== 'settings') hudReset();
@@ -693,11 +694,18 @@ export function createUI(root, handlers = {}) {
   }
 
   // ----- avisos -----
-  function toast(text, kind = 'info') {
+  const toastSeen = new Map();
+  function toast(text, kind = 'info', opts = {}) {
+    // ni sobre la pausa ni sobre el fin de partida; el mismo texto no se repite en 1,5 s
+    if ((current === 'pause' || current === 'over') && !opts.force) return;
+    const now = performance.now();
+    if (now - (toastSeen.get(text) ?? -1e9) < 1500) return;
+    toastSeen.set(text, now);
+    if (toastSeen.size > 24) toastSeen.delete(toastSeen.keys().next().value);
     const ico = kind === 'boost' ? ICON.boost : /^¡Impulsos perdidos|^Racha perdida|^¡Al vacío|^¡Tropiezo/.test(text) ? '<i class="t-alert" aria-hidden="true"></i>' : '';
     const t = h(`<div class="toast toast-${esc(kind)}">${kind === 'boost' ? hudLeaves : ''}${ico}<span>${esc(text)}</span></div>`);
     toasts.appendChild(t);
-    while (toasts.children.length > 3) toasts.firstElementChild.remove();
+    while (toasts.children.length > 2) toasts.firstElementChild.remove();
     const life = kind === 'info' ? 2800 : 1600;
     setTimeout(() => t.classList.add('out'), life);
     setTimeout(() => t.remove(), life + 400);
