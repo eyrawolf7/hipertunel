@@ -224,6 +224,24 @@
    "rama": null,
    "commit": null,
    "nota": ""
+  },
+  {
+   "id": "multijugador-web",
+   "prioridad": 50,
+   "tipo": "propuesta",
+   "titulo": "Multijugador local «Gran Premio del Túnel» (primera versión web, 2 jugadores)",
+   "descripcion": "Validado por Víctor para DESPUÉS de cerrar los carriles de sonido, visual y mecánicas (se monta encima de la versión con las ramas elegidas). Diseño del crítico jugador y del director de arte: ?mp=2; dos simulaciones con la misma semilla (cada Game es Boost 2 exacto; la reaparición es una capa de modo); rondas de 60-90 s, GP de 3-5 rondas, puntos 10/7/5/3; al chocar sin impulso la vista se congela desaturada 2 s y reapareces en la misma fila con la pista despejada 1,5 s; ayuda opcional por jugador para niños (guía al carril libre y aviso antes); pantalla dividida en VERTICAL (dos vistas lado a lado; 3-4 jugadores: cuadrícula 2×2 y con 3 el hueco es un mapa de carrera en DOM); separadores crema de 8 px pintados después del bloom; identidad por forma+número+color fuera de la paleta de carriles y del azul (J1 círculo #FFD23F, J2 triángulo #F5EFE2, J3 cuadrado #2B2433, J4 estrella #C98A4B); rivales como contorno translúcido (≤ 0,35, sin bloom, nunca en el círculo central del 18 %), los de detrás con un chevrón abajo; HUD por vista escalado (impulsos, distancia pequeña y posición); una sola pausa; todas las vistas en el mismo destino HDR con un solo bloom y gradación; entrada separada por jugador (A/D frente a flechas y Gamepad API). Luego: podio con los zorros 3D y port a Switch con 4 Joy-Con.",
+   "criterio_hecho": "1.000 rondas de bots mezclados: nadie > 20 % de la ronda congelado, el novato con ayuda gana ≥ 15 % y el bueno < 60 %, ≥ 2 cambios de líder por ronda; capturas 1280×720 y 844×390 en mundos 0, 2 y 4 con el techo visible en las dos vistas y HUD ≤ 12 % de cada vista; fantasma: < 2 % de píxeles cambiados en el círculo central; ≥ 58 fps con ?q=media y llamadas de dibujo ≤ 2,1× las de un jugador; paridad y dorado OK; director de arte y crítico jugador ≥ 8/10.",
+   "verificacion": [
+    "sh noche/puerta.sh"
+   ],
+   "critico": "critico-jugador",
+   "depende": [],
+   "estado": "espera",
+   "intentos": 0,
+   "rama": null,
+   "commit": null,
+   "nota": ""
   }
  ]
 }
