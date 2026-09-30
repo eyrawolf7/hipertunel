@@ -237,7 +237,7 @@ function finish() {
   if (isArcade(mode)) facts.lines.unshift(`Racha máxima ×${maxMult} · ${fmtN(Math.round(distM))} m`); facts.lines = facts.lines.slice(0, 2);
   pushMissions();
   ui.over({ mode, distM, coins, score, best: isArcade(mode) ? top[0].score : (top[0].distM ?? top[0].score), isRecord, time: game.time, maxBoostTime: mode === 'classic' ? game.boostTotal : game.maxBoostTime, top: top.map((e) => ({ ...e, me: e === me })), missionsDone: mr.completed, facts, headline: facts.headline, rankUp: mr.rankUp, rank: missions.rank() });
-  if (mr.rankUp) setTimeout(() => { audio.play('record'); ui.toast(`¡Rango ${missions.rank().level}: ${missions.rank().name}!`, 'mission'); }, 700);
+  if (mr.rankUp) setTimeout(() => { if (state !== 'over') return; audio.play('record'); ui.toast(`¡Rango ${missions.rank().level}: ${missions.rank().name}!`, 'mission', { force: true }); }, 700);
   ui.show('over');
   if (isRecord) audio.play('record');
   pushRecords();
@@ -340,7 +340,7 @@ function finishAdventure() {
   }
   ui.over({ mode: 'adventure', distM: game.distanceM, coins: game.coinsGot, score: Math.round(game.distanceM + game.coinsGot * 10), best: 0, isRecord: false, time: game.time, top: [], missionsDone: mr.completed, facts: { lines: lines.slice(0, 2) }, headline: game.cleared ? (stars === 3 ? '¡Perfecto!' : '¡Tramo superado!') : '¡Casi lo tienes!', adv: { name: st.name, n: advStage + 1, stars, bits, merged, cleared: game.cleared, hasNext: game.cleared && advStage + 1 < STAGES.length, prog, time: game.time, coins: game.coinsGot, goal: game.coinGoal, cp: !game.cleared && cpPrefix && game.frame > cpFrame } });
   ui.show('over');
-  if (mr.rankUp) setTimeout(() => { audio.play('record'); ui.toast(`¡Rango ${missions.rank().level}: ${missions.rank().name}!`, 'mission'); }, 700);
+  if (mr.rankUp) setTimeout(() => { if (state !== 'over') return; audio.play('record'); ui.toast(`¡Rango ${missions.rank().level}: ${missions.rank().name}!`, 'mission', { force: true }); }, 700);
 }
 
 // vibración (móvil): se apaga con "Reducir efectos"
@@ -348,7 +348,7 @@ const buzz = (p) => { if (settings.reduceFx || settings.vibe === false || state 
 let nearT = 0, pendingChime = false, padHint = false, hitstop = 0;
 let flightT = 0, wasFlight = false, trickHints = 0, wallHints = 0, toastOk = false;
 // en pleno salto entre mundos solo se ven los avisos de la pirueta (el resto espera a aterrizar)
-{ const raw = ui.toast; ui.toast = (t, k) => { if (!toastOk && state === 'play' && game && game.flight && game.flight() && game.alive) return; raw(t, k); }; }
+{ const raw = ui.toast; ui.toast = (t, k, o) => { if (!toastOk && state === 'play' && game && game.flight && game.flight() && game.alive) return; raw(t, k, o); }; }
 try { trickHints = +(localStorage.getItem('hipertunel-pistas-pirueta') || 0); wallHints = +(localStorage.getItem('hipertunel-pistas-muro') || 0); } catch (e) {}
 
 // moneda que vuela desde donde la coges hasta el contador (por el borde, nunca por el centro)

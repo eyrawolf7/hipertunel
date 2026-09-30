@@ -350,6 +350,46 @@ await run('j', async () => {
   await page.close();
 });
 
+// k. avisos: sin repeticiones, ≤ 2 a la vez, ninguno sobre la pausa ni el fin de partida
+await run('k', async () => {
+  const { page, errors } = await open();
+  const count = () => page.evaluate(() => document.querySelectorAll('.toast').length);
+  await page.evaluate(() => { window.__hip.ui.show('hud'); });
+  await sleep(100);
+  await page.evaluate(() => { const u = window.__hip.ui; u.toast('Aviso repetido', 'info'); u.toast('Aviso repetido', 'info'); u.toast('Aviso repetido', 'info'); });
+  rec('k', 'el mismo texto seguido sale una sola vez', await count() === 1, await count());
+  await page.evaluate(() => { const u = window.__hip.ui; for (let i = 1; i <= 5; i++) u.toast('Aviso ' + i, 'mission'); });
+  const seq = await count();
+  const txt = await page.evaluate(() => [...document.querySelectorAll('.toast')].map((t) => t.textContent));
+  rec('k', '5 avisos seguidos dejan ≤ 2 en el DOM (los más recientes)', seq >= 1 && seq <= 2 && txt.includes('Aviso 5'), txt);
+  await sleep(1600);
+  await page.evaluate(() => { window.__hip.ui.show('pause'); });
+  rec('k', 'al abrir la pausa se limpian los avisos', await count() === 0, await count());
+  await page.evaluate(() => { const u = window.__hip.ui; u.toast('Sobre la pausa A', 'info'); u.toast('Sobre la pausa B', 'boost'); });
+  rec('k', 'con la pausa abierta no entra ningún aviso', await count() === 0, await count());
+  await page.evaluate(() => { window.__hip.ui.show('over'); window.__hip.ui.toast('Sobre el fin', 'mission'); });
+  rec('k', 'en el fin de partida tampoco', await count() === 0, await count());
+  await page.evaluate(() => window.__hip.ui.toast('¡Rango 2: Piloto!', 'mission', { force: true }));
+  rec('k', 'el aviso de rango (force) sí sale en el fin de partida', await count() === 1, await count());
+  await page.evaluate(() => { window.__hip.ui.show('hud'); window.__hip.ui.toast('Otra vez en juego', 'info'); });
+  rec('k', 'al volver al HUD los avisos vuelven', await count() >= 1, await count());
+  await sleep(3300);
+  const nT = (x) => page.evaluate((x) => [...document.querySelectorAll('.toast')].filter((t) => t.textContent === x).length, x);
+  const t0 = await nT('Vuelve a salir');
+  await page.evaluate(() => { const u = window.__hip.ui; u.toast('Vuelve a salir', 'mission'); u.toast('Vuelve a salir', 'mission'); });
+  const t1 = await nT('Vuelve a salir');
+  await sleep(1700);
+  await page.evaluate(() => window.__hip.ui.toast('Vuelve a salir', 'mission'));
+  const t2 = await nT('Vuelve a salir');
+  rec('k', 'el mismo texto se bloquea de inmediato y vuelve a entrar pasado 1,5 s', t0 === 0 && t1 === 1 && t2 >= 1 && t2 !== t1 - 1, { t0, t1, t2 });
+  const cnt = await page.evaluate(() => { const before = document.querySelectorAll('.toast').length; return before; });
+  await sleep(500);
+  await page.evaluate(() => { const u = window.__hip.ui; u.toast('Distinto uno', 'mission'); u.toast('Distinto dos', 'mission'); });
+  rec('k', 'dos textos distintos seguidos entran los dos', await nT('Distinto uno') + await nT('Distinto dos') === 2, cnt);
+  rec('k', 'sin errores', errors.length === 0, errors.slice(0, 3));
+  await page.close();
+});
+
 await browser.close();
 console.log(fails ? `${fails} FALLOS` : 'Todo OK');
 process.exit(fails ? 1 : 0);
